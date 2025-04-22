@@ -3,8 +3,11 @@ import io
 import sys
 import logging
 from contextvars import ContextVar
-from typing import Any, Callable, List, Optional, Dict, Tuple
-from datetime import datetime, UTC
+from typing import Any, Callable, Optional
+from datetime import datetime, timezone
+
+UTC = timezone.utc
+
 
 # --- Context Variables ---
 # These variables hold state specific to the current execution context (e.g., a single agent run within a workflow).

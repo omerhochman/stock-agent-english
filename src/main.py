@@ -33,6 +33,21 @@ from src.utils.llm_interaction_logger import (
 )
 from src.utils.api_utils import app as fastapi_app
 
+# --- Import Summary Report Generator ---
+try:
+    from src.utils.summary_report import print_summary_report
+    from src.utils.agent_collector import store_final_state, get_enhanced_final_state
+    HAS_SUMMARY_REPORT = True
+except ImportError:
+    HAS_SUMMARY_REPORT = False
+
+# --- Import Structured Terminal Output ---
+try:
+    from src.utils.structured_terminal import print_structured_output
+    HAS_STRUCTURED_OUTPUT = True
+except ImportError:
+    HAS_STRUCTURED_OUTPUT = False
+
 # Initialize standard output logging
 # This will create a timestamped log file in the logs directory
 sys.stdout = OutputLogger()
@@ -41,11 +56,12 @@ sys.stdout = OutputLogger()
 log_storage = get_log_storage()
 set_global_log_storage(log_storage)
 
+
 # --- Run the Hedge Fund Workflow ---
-def run_hedge_fund(run_id: str, ticker: str, start_date: str, end_date: str, portfolio: dict, show_reasoning: bool = False, num_of_news: int = 5):
+def run_hedge_fund(run_id: str, ticker: str, start_date: str, end_date: str, portfolio: dict, show_reasoning: bool = False, num_of_news: int = 5, show_summary: bool = False):
     print(f"--- Starting Workflow Run ID: {run_id} ---")
 
-    # 设置api_state的run_id
+    # 设置API状态
     try:
         from src.utils.api_utils import api_state
         api_state.current_run_id = run_id
@@ -69,6 +85,7 @@ def run_hedge_fund(run_id: str, ticker: str, start_date: str, end_date: str, por
         "metadata": {
             "show_reasoning": show_reasoning,
             "run_id": run_id,  # Pass run_id in metadata
+            "show_summary": show_summary,  # 是否显示汇总报告
         }
     }
 
@@ -76,10 +93,22 @@ def run_hedge_fund(run_id: str, ticker: str, start_date: str, end_date: str, por
     final_state = app.invoke(initial_state)
     print(f"--- Finished Workflow Run ID: {run_id} ---")
 
-    # 尝试更新API状态（如果可用）
+    # 在工作流结束后保存最终状态并生成汇总报告（如果启用）
+    if HAS_SUMMARY_REPORT and show_summary:
+        # 保存最终状态到收集器
+        store_final_state(final_state)
+        # 获取增强的最终状态（包含所有收集到的数据）
+        enhanced_state = get_enhanced_final_state()
+        # 打印汇总报告
+        print_summary_report(enhanced_state)
+
+    # 如果启用了显示推理，显示结构化输出
+    if HAS_STRUCTURED_OUTPUT and show_reasoning:
+        print_structured_output(final_state)
+
+    # 尝试更新API状态
     try:
         from src.utils.api_utils import api_state
-        # 更新运行状态为完成
         api_state.update_agent_data(run_id, "status", "completed")
     except Exception:
         pass
@@ -147,6 +176,10 @@ def run_fastapi():
 
 # --- Main Execution Block ---
 if __name__ == "__main__":
+    # Start FastAPI server in a background thread
+    fastapi_thread = threading.Thread(target=run_fastapi, daemon=True)
+    fastapi_thread.start()
+
     # --- Argument Parsing ---
     parser = argparse.ArgumentParser(
         description='Run the hedge fund trading system')
@@ -164,6 +197,8 @@ if __name__ == "__main__":
                         help='Initial cash amount (default: 100,000)')
     parser.add_argument('--initial-position', type=int, default=0,
                         help='Initial stock position (default: 0)')
+    parser.add_argument('--summary', action='store_true',
+                        help='Show beautiful summary report at the end')
 
     args = parser.parse_args()
 
@@ -195,13 +230,14 @@ if __name__ == "__main__":
     # Generate run_id here when running directly
     main_run_id = str(uuid.uuid4())
     result = run_hedge_fund(
-        run_id=main_run_id,  # Pass the generated run_id
+        run_id=main_run_id,
         ticker=args.ticker,
         start_date=start_date.strftime('%Y-%m-%d'),
         end_date=end_date.strftime('%Y-%m-%d'),
         portfolio=portfolio,
         show_reasoning=args.show_reasoning,
-        num_of_news=args.num_of_news
+        num_of_news=args.num_of_news,
+        show_summary=args.summary
     )
     print("\nFinal Result:")
     print(result)

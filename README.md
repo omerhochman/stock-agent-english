@@ -1,186 +1,91 @@
-## 系统架构
+Forked From：https://github.com/24mlight/A_Share_investment_Agent.git
 
-![System Architecture V2](src/data/img/structure_v2.png)
+# A 股投资 Agent 系统
 
-新版本的架构做出了以下改进：
+![System Architecture V2](assets/img/structure_v2.png)
 
-1. 引入了多头研究员(Researcher Bull)和空头研究员(Researcher Bear)，让系统能够从不同角度分析市场
-2. 增加了辩论室(Debate Room)环节，通过多空双方的辩论来达成更全面的决策
-3. 优化了数据流向，使决策过程更加系统化和完整
-
-另外，优化了终端输出，减少了不必要的详细数据显示，使输出更加清晰易读
-
-## 最新功能：辩论室智能增强
-
-我们最新升级了辩论室(Debate Room)模块的决策机制：
-
-1. **LLM 第三方分析**：引入大型语言模型作为独立的第三方分析师，对多空观点进行客观评估
-2. **混合置信度计算**：将传统的多空置信度差异与 LLM 评分进行加权融合，形成更全面的决策依据
-3. **增强的辩论机制**：系统现在能够自动汇总所有研究员的观点，生成结构化分析，并整合进最终决策
-
-这一改进使决策过程更加平衡客观，特别适合在市场信息复杂、多方观点存在分歧的情况下提供更可靠的投资建议。未来我们将持续优化这一机制，进一步提升决策质量。
-
-⚠️ **注意**: 目前回测系统还在测试中，建议使用以下命令来使用系统：
-
-```bash
-# 简单模式 - 只显示关键决策信息
-poetry run python src/main.py --ticker 000000 #修改成你想要测试的股票代码
-
-# 显示详细推理过程 - 查看每个智能体的分析过程
-poetry run python src/main.py --ticker 000000 --show-reasoning #修改成你想要测试的股票代码
-
-# 启动后端API服务（适用于想要开发前端的用户）
-poetry run python run_with_backend.py
-```
-
-最后一种方式会启动一个 API 服务，可以通过浏览器访问 http://localhost:8000/docs 来使用交互式 API 文档，测试各接口功能。
+## 系统组成
 
 系统由以下几个协同工作的 agent 组成：
 
-1. Market Data Analyst - 负责收集和预处理市场数据
-2. Valuation Agent - 计算股票内在价值并生成交易信号
-3. Sentiment Agent - 分析市场情绪并生成交易信号
-4. Fundamentals Agent - 分析基本面数据并生成交易信号
-5. Technical Analyst - 分析技术指标并生成交易信号
-6. Risk Manager - 计算风险指标并设置仓位限制
-7. Portfolio Manager - 制定最终交易决策并生成订单
+1. **Market Data Analyst** - 负责收集和预处理市场数据
+2. **Valuation Agent** - 计算股票内在价值并生成交易信号
+3. **Sentiment Agent** - 分析市场情绪并生成交易信号
+4. **Fundamentals Agent** - 分析基本面数据并生成交易信号
+5. **Technical Analyst** - 分析技术指标并生成交易信号
+6. **Researcher Bull** - 从多头角度分析综合研究结果
+7. **Researcher Bear** - 从空头角度分析综合研究结果
+8. **Debate Room** - 综合多空观点并形成平衡分析
+9. **Risk Manager** - 计算风险指标并设置仓位限制
+10. **Portfolio Manager** - 制定最终交易决策并生成订单
 
-## Setup
+## 环境配置
 
-Clone the repository:
+### 克隆仓库
 
 ```bash
 git clone https://github.com/24mlight/A_Share_investment_Agent.git
 cd A_Share_investment_Agent
 ```
 
-1. Install Poetry:
+### 使用 Conda 配置环境
 
-# Windows (PowerShell)
-
-```powershell
-(Invoke-WebRequest -Uri https://install.python-poetry.org -UseBasicParsing).Content | py -
-```
-
-# Unix/macOS
+1. 创建并激活 Conda 环境:
 
 ```bash
-curl -sSL https://install.python-poetry.org | python3 -
+conda create -n a_share_agent python=3.10
+conda activate a_share_agent
 ```
 
-2. Install dependencies:
+2. 安装依赖:
 
 ```bash
-poetry lock --no-update
+pip install -r requirements.txt
 ```
 
-```bash
-poetry install
-```
-
-3. Set up your environment variables:
+3. 设置环境变量:
 
 ```bash
-# Create .env file for your API keys
+# 创建 .env 文件存放API密钥
 cp .env.example .env
-
-# Get your Gemini API key from https://aistudio.google.com/
 ```
 
-你可以通过以下两种方式设置环境变量:
+**直接修改 .env 文件**
 
-1. **直接修改 .env 文件**
-   打开 .env 文件,填入你的 API key:
+打开 .env 文件,填入你的 API key:
 
 ```
-# Gemini API 配置
-GEMINI_API_KEY=your-gemini-api-key
-GEMINI_MODEL=gemini-1.5-flash
-
 # OpenAI Compatible API 配置（可选）
 OPENAI_COMPATIBLE_API_KEY=your-openai-compatible-api-key
 OPENAI_COMPATIBLE_BASE_URL=https://your-api-endpoint.com/v1
 OPENAI_COMPATIBLE_MODEL=your-model-name
 ```
 
-2. **通过命令行设置**
-
-Unix/macOS:
-
-```bash
-# Gemini API 配置
-export GEMINI_API_KEY='your-gemini-api-key'
-export GEMINI_MODEL='gemini-1.5-flash'
-
-# OpenAI Compatible API 配置（可选）
-export OPENAI_COMPATIBLE_API_KEY='your-openai-compatible-api-key'
-export OPENAI_COMPATIBLE_BASE_URL='https://your-api-endpoint.com/v1'
-export OPENAI_COMPATIBLE_MODEL='your-model-name'
-```
-
-Windows PowerShell:
-
-```powershell
-# Gemini API 配置
-$env:GEMINI_API_KEY='your-gemini-api-key'
-$env:GEMINI_MODEL='gemini-1.5-flash'
-
-# OpenAI Compatible API 配置（可选）
-$env:OPENAI_COMPATIBLE_API_KEY='your-openai-compatible-api-key'
-$env:OPENAI_COMPATIBLE_BASE_URL='https://your-api-endpoint.com/v1'
-$env:OPENAI_COMPATIBLE_MODEL='your-model-name'
-```
-
-注意: 推荐使用第一种方式(修改 .env 文件)。系统会优先使用 OpenAI Compatible API（如果配置了），否则会使用 Gemini API。
-
-## Usage
+## 使用方法
 
 ### 运行方式
 
-系统支持多种运行方式：
-
-1. **命令行分析模式**
-
 ```bash
 # 基本运行
-poetry run python src/main.py --ticker 301155
+python src/main.py --ticker 301155
 
 # 显示分析推理过程
-poetry run python src/main.py --ticker 301155 --show-reasoning
+python src/main.py --ticker 301155 --show-reasoning
+
+# 显示汇总报告
+python src/main.py --ticker 301155 --summary
 ```
-
-2. **后端 API 服务**
-
-```bash
-# 启动API服务
-poetry run python run_with_backend.py
-```
-
-启动后，可以通过浏览器访问 http://localhost:8000/docs 使用交互式 API 界面。
-常用 API 端点包括：
-
-- **开始新的分析**：使用 `POST /analysis/start` 接口，在请求体中提供股票代码、初始资金等信息。
-- **查看当前工作流状态**：使用 `GET /api/workflow/status` 接口，获取当前运行 ID 和活跃 Agent 状态 (基于内存 `api_state`)。
-- **列出历史运行**：使用 `GET /runs/` 接口，获取基于 `BaseLogStorage` (当前为内存) 记录的已完成运行列表。
-- **查看特定运行的流程图**：使用 `GET /runs/{run_id}/flow` 接口，获取指定运行的完整 Agent 执行流程图。
-- **查看特定 Agent 的详细执行日志**：使用 `GET /runs/{run_id}/agents/{agent_name}` 接口，获取该 Agent 的输入/输出状态、执行时间等详细信息。
-- **查看 LLM 交互日志**：使用 `GET /logs/` 接口 (可能需要根据具体实现调整或确认)，查询特定 Agent 和运行的 LLM 调用记录。
-
-API 服务模式的优势：
-
-- 分析任务在后台异步执行，不会阻塞主界面
-- 所有结果都可以通过 API 查询
-- 无需为每次分析重启程序
-- 可以直接根据该后端编写自己的前端界面
-
-有关后端 API 的详细结构、端点说明和数据示例，请参阅：[查看详细的后端 API 文档](./backend/README.md)
 
 ### 参数说明
 
-- `--ticker`: 股票代码（必需，仅命令行模式）
+- `--ticker`: 股票代码（必需）
 - `--show-reasoning`: 显示分析推理过程（可选，默认为 false）
+- `--summary`: 显示汇总报告（可选，默认为 false）
 - `--initial-capital`: 初始现金金额（可选，默认为 100,000）
+- `--initial-position`: 初始持仓数量（可选，默认为 0）
 - `--num-of-news`: 情绪分析使用的新闻数量（可选，默认为 5）
+- `--start-date`: 分析开始日期（可选，格式为 YYYY-MM-DD，默认为结束日期前一年）
+- `--end-date`: 分析结束日期（可选，格式为 YYYY-MM-DD，默认为昨天）
 
 ### 命令行模式输出说明
 
@@ -194,8 +99,9 @@ API 服务模式的优势：
 6. 最终交易决策
 
 如果使用了`--show-reasoning`参数，还会显示每个智能体的详细分析过程。
+如果使用了`--summary`参数，会在分析结束后显示一个格式化的汇总报告。
 
-**Example Output:**
+**示例输出:**
 
 ```
 正在获取 301157 的历史行情数据...
@@ -276,29 +182,10 @@ Final Result:
 
 所有日期格式均为 YYYY-MM-DD。如果使用了 `--show-reasoning` 参数，详细的分析过程也会记录在日志文件中。
 
-## Project Structure
+## 项目结构
 
 ```
 A_Share_investment_Agent/
-├── backend/                     # 后端 API 和服务
-│   ├── dependencies.py          # 依赖注入 (如 LogStorage)
-│   ├── main.py                  # FastAPI 应用实例
-│   ├── models/                  # API 请求/响应模型 (Pydantic)
-│   │   ├── analysis.py          # /analysis/ 相关路由
-│   │   ├── api_runs.py          # /api/runs/ 相关路由 (基于 api_state)
-│   │   ├── logs.py              # /logs/ 相关路由
-│   │   ├── runs.py              # /runs/ 相关路由 (基于 BaseLogStorage)
-│   │   └── workflow.py          # /api/workflow/ 相关路由
-│   ├── schemas.py               # 内部数据结构/日志模型 (Pydantic)
-│   ├── services/                # 业务逻辑服务
-│   │   └── analysis.py          # 股票分析服务
-│   ├── state.py                 # 内存状态管理 (api_state)
-│   ├── storage/                 # 日志存储实现
-│   │   ├── base.py              # BaseLogStorage 接口定义
-│   │   └── memory.py            # InMemoryLogStorage 实现
-│   └── utils/                   # 后端工具函数
-│       ├── api_utils.py         # API 相关工具
-│       └── context_managers.py  # 上下文管理器 (如 workflow_run)
 ├── src/                         # Agent 核心逻辑和工具
 │   ├── agents/                  # Agent 定义和工作流
 │   │   ├── __init__.py
@@ -325,20 +212,17 @@ A_Share_investment_Agent/
 │   │   └── openrouter_config.py
 │   ├── utils/                  # 通用工具函数 (日志, LLM客户端, 序列化)
 │   │   ├── __init__.py
-│   │   ├── api_utils.py        # Agent 共享的API工具 (逐步迁移至 backend)
+│   │   ├── api_utils.py        # Agent 共享的API工具
 │   │   ├── llm_clients.py
 │   │   ├── llm_interaction_logger.py
 │   │   ├── logging_config.py
 │   │   ├── output_logger.py
 │   │   └── serialization.py
-│   ├── backtester.py          # 回测系统 (可能需要检查状态)
+│   ├── backtester.py          # 回测系统
 │   └── main.py                # Agent 工作流定义和命令行入口
 ├── logs/                      # 日志文件目录 (主要由 OutputLogger 生成)
 ├── .env                       # 环境变量配置
 ├── .env.example              # 环境变量示例
-├── poetry.lock               # Poetry依赖锁定文件
-├── pyproject.toml            # Poetry项目配置
-├── run_with_backend.py       # 启动后端并可选执行分析的脚本
 └── README.md                 # 项目文档
 ```
 
@@ -349,7 +233,7 @@ A_Share_investment_Agent/
 本项目是一个基于多个 agent 的 AI 投资系统，采用模块化设计，每个 agent 都有其专门的职责。系统的架构如下：
 
 ```
-Market Data Analyst → [Technical/Fundamentals/Sentiment/Valuation Analyst] → Risk Manager → Portfolio Manager → Trading Decision
+Market Data Analyst → [Technical/Fundamentals/Sentiment/Valuation Analyst] → [Bull/Bear Researchers] → Debate Room → Risk Manager → Portfolio Manager → Trading Decision
 ```
 
 #### Agent 角色和职责
@@ -385,18 +269,36 @@ Market Data Analyst → [Technical/Fundamentals/Sentiment/Valuation Analyst] →
    - 评估股票的内在价值
    - 生成基于估值的交易信号
 
-6. **Risk Manager**
+6. **Researcher Bull**
+
+   - 从多头角度综合分析各类数据
+   - 提出支持买入的论点和证据
+   - 生成多头投资策略建议
+
+7. **Researcher Bear**
+
+   - 从空头角度综合分析各类数据
+   - 提出支持卖出的论点和证据
+   - 生成空头投资策略建议
+
+8. **Debate Room**
+
+   - 组织多头和空头研究员的辩论
+   - 评估双方论点的强度和可信度
+   - 生成平衡的综合分析结论
+
+9. **Risk Manager**
 
    - 整合所有 agent 的交易信号
    - 评估潜在风险
    - 设定交易限制和风险控制参数
    - 生成风险管理信号
 
-7. **Portfolio Manager**
-   - 作为最终决策者
-   - 综合考虑所有信号和风险因素
-   - 做出最终的交易决策（买入/卖出/持有）
-   - 确保决策符合风险管理要求
+10. **Portfolio Manager**
+    - 作为最终决策者
+    - 综合考虑所有信号和风险因素
+    - 做出最终的交易决策（买入/卖出/持有）
+    - 确保决策符合风险管理要求
 
 ### 数据流和处理
 
@@ -516,7 +418,26 @@ Market Data Analyst → [Technical/Fundamentals/Sentiment/Valuation Analyst] →
      - 进行 DCF 估值分析
      - 评估股票的内在价值
 
-3. **风险评估阶段**
+3. **研究员综合阶段**
+
+   - Bull Researcher：
+
+     - 强调积极因素和增长潜力
+     - 找出支持价格上涨的理由
+     - 生成多头论点
+
+   - Bear Researcher：
+
+     - 强调风险因素和估值问题
+     - 找出可能导致价格下跌的风险
+     - 生成空头论点
+
+   - Debate Room：
+     - 组织多空头研究员的辩论
+     - 对比评估双方论点
+     - 形成平衡的综合结论
+
+4. **风险评估阶段**
 
    Risk Manager 综合考虑多个维度：
 
@@ -525,7 +446,7 @@ Market Data Analyst → [Technical/Fundamentals/Sentiment/Valuation Analyst] →
    - 止损止盈水平设定
    - 投资组合风险控制
 
-4. **决策阶段**
+5. **决策阶段**
 
    Portfolio Manager 基于以下因素做出决策：
 
@@ -534,19 +455,12 @@ Market Data Analyst → [Technical/Fundamentals/Sentiment/Valuation Analyst] →
    - 投资组合状态和现金水平
    - 交易成本和流动性考虑
 
-5. **数据存储和缓存**
+6. **数据存储和缓存**
 
    - 情绪分析结果缓存在 `data/sentiment_cache.json`
    - 新闻数据保存在 `data/stock_news/` 目录
    - 日志文件按类型存储在 `logs/` 目录
    - API 调用记录实时写入日志
-
-6. **监控和反馈**
-
-   - 所有 API 调用都有详细的日志记录
-   - 每个 Agent 的分析过程可追踪
-   - 系统决策过程透明可查
-   - 回测结果提供性能评估
 
 ### 代理协作机制
 
@@ -574,7 +488,7 @@ Market Data Analyst → [Technical/Fundamentals/Sentiment/Valuation Analyst] →
 
 1. **多 LLM 支持**
 
-   - 支持 Google Gemini API
+   - 支持 OpenAI API
    - 支持任何兼容 OpenAI API 格式的 LLM 服务（如华为云方舟、OpenRouter 等）
    - 智能切换功能：自动选择可用的 LLM 服务
 
@@ -600,26 +514,6 @@ Market Data Analyst → [Technical/Fundamentals/Sentiment/Valuation Analyst] →
    - 基于多维度分析
    - 考虑多个市场因素
    - 动态调整策略
-
-### 未来展望
-
-1. **数据源扩展**
-
-   - 添加更多 A 股数据源
-   - 接入更多财经数据平台
-   - 增加社交媒体情绪数据
-   - 扩展到港股、美股市场
-
-2. **功能增强**
-
-   - 添加更多技术指标
-   - 实现自动化回测
-   - 支持多股票组合管理
-
-3. **性能优化**
-   - 提高数据处理效率
-   - 优化决策算法
-   - 增加并行处理能力
 
 ### 情感分析功能
 
@@ -655,6 +549,6 @@ Market Data Analyst → [Technical/Fundamentals/Sentiment/Valuation Analyst] →
 - **-0.5 到 -0.9**: 消极（业绩下滑、重要客户流失、行业政策收紧）
 - **-1.0**: 极其消极（重大违规、核心业务严重亏损、被监管处罚）
 
-# 结果展示
+## 结果展示
 
-![image](src/data/img/image.png)
+![image](assets/img/image.png)

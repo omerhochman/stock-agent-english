@@ -9,6 +9,7 @@ from src.main import run_hedge_fund
 import sys
 import matplotlib
 import os
+import uuid  # 添加uuid模块用于生成run_id
 
 # 根据操作系统配置中文字体
 if sys.platform.startswith('win'):
@@ -106,8 +107,12 @@ class Backtester:
                 self._last_api_call = time.time()
                 self._api_call_count += 1
 
-                # 调用智能体并解析结果
+                # 生成run_id (添加这行)
+                run_id = str(uuid.uuid4())
+
+                # 调用智能体并解析结果 (添加run_id参数)
                 result = self.agent(
+                    run_id=run_id,  # 添加run_id参数
                     ticker=self.ticker,
                     start_date=lookback_start,
                     end_date=current_date,
@@ -133,7 +138,7 @@ class Backtester:
                         # 处理智能体信号
                         if "agent_signals" in parsed_result:
                             formatted_result["analyst_signals"] = {
-                                signal["agent"]: {
+                                signal.get("agent_name", signal.get("agent", "unknown")): {
                                     "signal": signal.get("signal", "unknown"),
                                     "confidence": signal.get("confidence", 0)
                                 }
@@ -141,9 +146,9 @@ class Backtester:
                             }
 
                         self.logger.info(
-                            f"解析后的决策: {formatted_result['decision']}")  # 添加日志
+                            f"解析后的决策: {parsed_result}")  # 添加日志
                         return formatted_result
-                    return result
+                    return {"decision": {"action": "hold", "quantity": 0}, "analyst_signals": {}}
                 except json.JSONDecodeError as e:
                     # 如果无法解析为 JSON，记录错误并返回默认决策
                     self.logger.warning(f"JSON解析错误: {str(e)}")
@@ -249,7 +254,10 @@ class Backtester:
 
     def run_backtest(self):
         """运行回测"""
+        # 回测精度：每天
         dates = pd.date_range(self.start_date, self.end_date, freq="B")
+        # 回测精度：每周取一天
+        # dates = pd.date_range(self.start_date, self.end_date, freq="W-MON")
 
         self.logger.info("\n开始回测...")
         print(f"{'日期':<12} {'代码':<6} {'操作':<6} {'数量':>8} {'价格':>8} {'现金':>12} {'持仓':>8} {'总值':>12} {'看多':>8} {'看空':>8} {'中性':>8}")
@@ -357,6 +365,10 @@ class Backtester:
         # 将金额转换为千元
         performance_df["Portfolio Value (K)"] = performance_df["Portfolio Value"] / 1000
 
+        # 创建图像保存目录
+        img_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'assets', 'img')
+        os.makedirs(img_dir, exist_ok=True)
+
         # 创建两个子图
         fig, (ax1, ax2) = plt.subplots(
             2, 1, figsize=(12, 10), height_ratios=[1, 1])
@@ -400,8 +412,17 @@ class Backtester:
         # 自动调整布局以防止标签重叠
         plt.tight_layout()
 
-        # 显示图表
-        plt.show()
+        # 生成图片文件名
+        current_date = datetime.now().strftime('%Y%m%d')
+        backtest_period = f"{self.start_date.replace('-', '')}_{self.end_date.replace('-', '')}"
+        img_filename = os.path.join(
+            img_dir, f"backtest_{self.ticker}_{current_date}_{backtest_period}.png")
+        
+        # 保存图表到文件
+        plt.savefig(img_filename, dpi=300, bbox_inches='tight')
+        plt.close(fig)  # 关闭图表，释放内存
+        
+        self.logger.info(f"回测图表已保存至: {img_filename}")
 
         # 计算和打印性能指标
         total_return = (
@@ -416,6 +437,7 @@ class Backtester:
         self.backtest_logger.info(
             f"最终总值: {self.portfolio['portfolio_value']:,.2f}")
         self.backtest_logger.info(f"总收益率: {total_return * 100:.2f}%")
+        self.backtest_logger.info(f"图表保存路径: {img_filename}")
 
         # 计算夏普比率
         daily_returns = performance_df["Daily Return"] / 100  # 转换为小数

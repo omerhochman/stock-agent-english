@@ -13,7 +13,9 @@ import inspect
 import sys
 import io
 from typing import Dict, List, Any, Optional, Callable, TypeVar
-from datetime import datetime, UTC
+from datetime import datetime, timezone
+
+UTC = timezone.utc
 
 import uvicorn
 from fastapi import FastAPI, APIRouter
