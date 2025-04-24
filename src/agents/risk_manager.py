@@ -1,5 +1,7 @@
 import math
-
+import numpy as np
+import pandas as pd
+from scipy import stats
 from langchain_core.messages import HumanMessage
 
 from src.agents.state import AgentState, show_agent_reasoning, show_workflow_status
@@ -11,7 +13,6 @@ import ast
 
 ##### Risk Management Agent #####
 
-
 @agent_endpoint("risk_management", "风险管理专家，评估投资风险并给出风险调整后的交易建议")
 def risk_management_agent(state: AgentState):
     """Responsible for risk management"""
@@ -22,7 +23,7 @@ def risk_management_agent(state: AgentState):
 
     prices_df = prices_to_df(data["prices"])
 
-    # Fetch debate room message instead of individual analyst messages
+    # 获取辩论室评估
     debate_message = next(
         msg for msg in state["messages"] if msg.name == "debate_room_agent")
 
@@ -31,11 +32,12 @@ def risk_management_agent(state: AgentState):
     except Exception as e:
         debate_results = ast.literal_eval(debate_message.content)
 
-    # 1. Calculate Risk Metrics
+    # 1. 计算基础风险指标
     returns = prices_df['close'].pct_change().dropna()
-    daily_vol = returns.std()
-    # Annualized volatility approximation
-    volatility = daily_vol * (252 ** 0.5)
+    
+    # 计算波动率（使用指数加权移动平均改进）
+    daily_vol = returns.ewm(span=20).std().iloc[-1]  # 改用EWMA波动率
+    volatility = daily_vol * (252 ** 0.5)  # 年化
 
     # 计算波动率的历史分布
     rolling_std = returns.rolling(window=120).std() * (252 ** 0.5)
@@ -43,57 +45,96 @@ def risk_management_agent(state: AgentState):
     volatility_std = rolling_std.std()
     volatility_percentile = (volatility - volatility_mean) / volatility_std
 
-    # Simple historical VaR at 95% confidence
+    # 2. 高级风险指标计算
+    # 2.1 历史VaR (95%置信度)
     var_95 = returns.quantile(0.05)
-    # 使用60天窗口计算最大回撤
-    max_drawdown = (
-        prices_df['close'] / prices_df['close'].rolling(window=60).max() - 1).min()
+    
+    # 2.2 条件VaR/Expected Shortfall (更好的尾部风险度量)
+    cvar_95 = returns[returns <= var_95].mean()
+    
+    # 2.3 最大回撤计算 (改进算法更高效)
+    cum_returns = (1 + returns).cumprod()
+    running_max = cum_returns.cummax()
+    drawdown = (cum_returns / running_max - 1)
+    max_drawdown = drawdown.min()
+    
+    # 2.4 偏度和峰度 (检测非正态分布)
+    skewness = returns.skew()
+    kurtosis = returns.kurt()
+    
+    # 2.5 Sortino比率 (仅考虑下行风险)
+    downside_returns = returns[returns < 0]
+    downside_deviation = downside_returns.std() * np.sqrt(252)
+    mean_return = returns.mean() * 252
+    sortino_ratio = mean_return / downside_deviation if downside_deviation != 0 else 0
 
-    # 2. Market Risk Assessment
+    # 3. 市场风险评估 (增强评分系统)
     market_risk_score = 0
 
-    # Volatility scoring based on percentile
+    # 波动率评分 (基于百分位)
     if volatility_percentile > 1.5:     # 高于1.5个标准差
         market_risk_score += 2
     elif volatility_percentile > 1.0:   # 高于1个标准差
         market_risk_score += 1
 
-    # VaR scoring
-    # Note: var_95 is typically negative. The more negative, the worse.
+    # VaR评分 (基于历史分布)
+    # 注意：var_95通常为负数，越负风险越高
     if var_95 < -0.03:
         market_risk_score += 2
     elif var_95 < -0.02:
         market_risk_score += 1
 
-    # Max Drawdown scoring
-    if max_drawdown < -0.20:  # Severe drawdown
+    # 最大回撤评分
+    if max_drawdown < -0.20:  # 严重回撤
         market_risk_score += 2
     elif max_drawdown < -0.10:
         market_risk_score += 1
+        
+    # 分布异常性评分 (显著非正态)
+    if abs(skewness) > 1.0 or kurtosis > 5.0:
+        market_risk_score += 1
 
-    # 3. Position Size Limits
-    # Consider total portfolio value, not just cash
+    # 4. 头寸规模计算 (更先进的方法)
+    # 考虑总组合价值而非仅现金
     current_stock_value = portfolio['stock'] * prices_df['close'].iloc[-1]
     total_portfolio_value = portfolio['cash'] + current_stock_value
 
-    # Start with 25% max position of total portfolio
-    base_position_size = total_portfolio_value * 0.25
-
-    if market_risk_score >= 4:
-        # Reduce position for high risk
-        max_position_size = base_position_size * 0.5
-    elif market_risk_score >= 2:
-        # Slightly reduce for moderate risk
-        max_position_size = base_position_size * 0.75
+    # 基于Kelly准则的头寸规模
+    # 计算胜率和赔率
+    win_rate = 0.5  # 默认假设
+    
+    # 从辩论结果调整胜率
+    bull_confidence = debate_results.get("bull_confidence", 0.5)
+    bear_confidence = debate_results.get("bear_confidence", 0.5)
+    if bull_confidence > bear_confidence:
+        win_rate = bull_confidence
     else:
-        # Keep base size for low risk
-        max_position_size = base_position_size
+        win_rate = 1 - bear_confidence
+        
+    # 计算平均胜利收益和亏损比率
+    win_loss_ratio = 1.5  # 默认假设
+    
+    # 应用分数Kelly公式 (更保守)
+    kelly_fraction = win_rate - ((1 - win_rate) / win_loss_ratio)
+    
+    # 保守系数和风险调整
+    conservative_factor = 0.5  # 只用一半Kelly建议
+    risk_adjustment = max(0, 1 - (market_risk_score / 10))
+    
+    # 最终头寸大小
+    max_position_size = total_portfolio_value * kelly_fraction * conservative_factor * risk_adjustment
+    
+    # 安全检查 - 头寸不能太高
+    max_position_size = min(max_position_size, total_portfolio_value * 0.25)
 
-    # 4. Stress Testing
+    # 5. 压力测试 (更全面的情景)
     stress_test_scenarios = {
-        "market_crash": -0.20,
-        "moderate_decline": -0.10,
-        "slight_decline": -0.05
+        "market_crash": -0.20,            # 市场崩溃
+        "moderate_decline": -0.10,        # 中度下跌
+        "slight_decline": -0.05,          # 轻微下跌
+        "volatility_spike": -0.15,        # 波动率飙升
+        "liquidity_crisis": -0.25,        # 流动性危机
+        "sector_rotation": -0.12,         # 行业轮换
     }
 
     stress_test_results = {}
@@ -101,45 +142,48 @@ def risk_management_agent(state: AgentState):
 
     for scenario, decline in stress_test_scenarios.items():
         potential_loss = current_position_value * decline
-        portfolio_impact = potential_loss / (portfolio['cash'] + current_position_value) if (
-            portfolio['cash'] + current_position_value) != 0 else math.nan
+        portfolio_impact = potential_loss / total_portfolio_value if total_portfolio_value != 0 else math.nan
         stress_test_results[scenario] = {
             "potential_loss": potential_loss,
             "portfolio_impact": portfolio_impact
         }
 
-    # 5. Risk-Adjusted Signal Analysis
-    # Consider debate room confidence levels
-    bull_confidence = debate_results["bull_confidence"]
-    bear_confidence = debate_results["bear_confidence"]
-    debate_confidence = debate_results["confidence"]
+    # 6. 风险调整信号分析
+    # 考虑辩论室置信度
+    bull_confidence = debate_results.get("bull_confidence", 0)
+    bear_confidence = debate_results.get("bear_confidence", 0)
+    debate_confidence = debate_results.get("confidence", 0)
 
-    # Add to risk score if confidence is low or debate was close
+    # 评估辩论结果的确定性
     confidence_diff = abs(bull_confidence - bear_confidence)
-    if confidence_diff < 0.1:  # Close debate
+    if confidence_diff < 0.1:  # 辩论接近
         market_risk_score += 1
-    if debate_confidence < 0.3:  # Low overall confidence
+    if debate_confidence < 0.3:  # 总体低置信度
         market_risk_score += 1
 
-    # Cap risk score at 10
+    # 上限风险分数为10
     risk_score = min(round(market_risk_score), 10)
 
-    # 6. Generate Trading Action
-    # Consider debate room signal along with risk assessment
-    debate_signal = debate_results["signal"]
+    # 7. 生成交易行动
+    debate_signal = debate_results.get("signal", "neutral")
 
+    # 基于风险分数和辩论信号的决策规则
     if risk_score >= 9:
-        trading_action = "hold"
+        trading_action = "hold"  # 非常高风险，持有观望
     elif risk_score >= 7:
-        trading_action = "reduce"
+        if debate_signal == "bearish":
+            trading_action = "sell"  # 高风险 + 看空 = 卖出
+        else:
+            trading_action = "reduce"  # 高风险但非看空 = 减仓
     else:
         if debate_signal == "bullish" and debate_confidence > 0.5:
-            trading_action = "buy"
+            trading_action = "buy"  # 低风险 + 强看多 = 买入
         elif debate_signal == "bearish" and debate_confidence > 0.5:
-            trading_action = "sell"
+            trading_action = "sell"  # 低风险 + 强看空 = 卖出
         else:
-            trading_action = "hold"
+            trading_action = "hold"  # 其他情况 = 持有
 
+    # 8. 构建输出消息
     message_content = {
         "max_position_size": float(max_position_size),
         "risk_score": risk_score,
@@ -147,9 +191,19 @@ def risk_management_agent(state: AgentState):
         "risk_metrics": {
             "volatility": float(volatility),
             "value_at_risk_95": float(var_95),
+            "conditional_var_95": float(cvar_95),  # 新增条件VaR
             "max_drawdown": float(max_drawdown),
+            "skewness": float(skewness),           # 新增偏度
+            "kurtosis": float(kurtosis),           # 新增峰度
+            "sortino_ratio": float(sortino_ratio), # 新增Sortino比率
             "market_risk_score": market_risk_score,
             "stress_test_results": stress_test_results
+        },
+        "position_sizing": {
+            "kelly_fraction": float(kelly_fraction),
+            "win_rate": float(win_rate),
+            "risk_adjustment": float(risk_adjustment),
+            "total_portfolio_value": float(total_portfolio_value)
         },
         "debate_analysis": {
             "bull_confidence": bull_confidence,
@@ -157,12 +211,13 @@ def risk_management_agent(state: AgentState):
             "debate_confidence": debate_confidence,
             "debate_signal": debate_signal
         },
-        "reasoning": f"Risk Score {risk_score}/10: Market Risk={market_risk_score}, "
-                     f"Volatility={volatility:.2%}, VaR={var_95:.2%}, "
-                     f"Max Drawdown={max_drawdown:.2%}, Debate Signal={debate_signal}"
+        "reasoning": f"风险评分 {risk_score}/10: 市场风险={market_risk_score}, "
+                     f"波动率={volatility:.2%}, VaR={var_95:.2%}, CVaR={cvar_95:.2%}, "
+                     f"最大回撤={max_drawdown:.2%}, 偏度={skewness:.2f}, "
+                     f"辩论信号={debate_signal}, Kelly建议占比={kelly_fraction:.2f}"
     }
 
-    # Create the risk management message
+    # 创建风险管理消息
     message = HumanMessage(
         content=json.dumps(message_content),
         name="risk_management_agent",

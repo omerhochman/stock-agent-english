@@ -3,7 +3,9 @@ import json
 import time
 import logging
 import matplotlib.pyplot as plt
+import seaborn as sns
 import pandas as pd
+import numpy as np
 from src.tools.api import get_price_data
 from src.main import run_hedge_fund
 import sys
@@ -44,6 +46,19 @@ class Backtester:
         self._api_call_count = 0
         self._api_window_start = time.time()
         self._last_api_call = 0
+
+        # 回测配置参数
+        self.trading_cost = 0.001  # 0.1%交易成本
+        self.slippage = 0.001  # 0.1%滑点成本
+        self.benchmark_ticker = "000300"  # 沪深300指数作为基准
+        self.rebalance_frequency = "day"  # 日频回测
+        
+        # 性能跟踪字段
+        self.trade_history = []
+        self.daily_returns = []
+        self.benchmark_returns = []
+        self.drawdowns = []
+
 
         # 验证输入参数
         self.validate_inputs()
@@ -355,7 +370,7 @@ class Backtester:
             })
 
     def analyze_performance(self):
-        """分析回测性能"""
+        """性能分析函数"""
         performance_df = pd.DataFrame(self.portfolio_values).set_index("Date")
 
         # 计算累计收益率
@@ -364,98 +379,278 @@ class Backtester:
 
         # 将金额转换为千元
         performance_df["Portfolio Value (K)"] = performance_df["Portfolio Value"] / 1000
-
-        # 创建图像保存目录
-        img_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'assets', 'img')
-        os.makedirs(img_dir, exist_ok=True)
-
-        # 创建两个子图
-        fig, (ax1, ax2) = plt.subplots(
-            2, 1, figsize=(12, 10), height_ratios=[1, 1])
-        fig.suptitle("回测结果分析", fontsize=12)
-
-        # 绘制资金变化图
-        line1 = ax1.plot(performance_df.index,
-                         performance_df["Portfolio Value (K)"], label="组合价值", marker='o')
-        ax1.set_ylabel("组合价值 (千元)")
-        ax1.set_title("组合价值变化")
-        ax1.grid(True)
-
-        # 在数据点上添加标签
-        for x, y in zip(performance_df.index, performance_df["Portfolio Value (K)"]):
-            ax1.annotate(f'{y:.1f}K',
-                         (x, y),
-                         textcoords="offset points",
-                         xytext=(0, 10),
-                         ha='center',
-                         fontsize=8)
-
-        # 绘制收益率变化图
-        line2 = ax2.plot(performance_df.index,
-                         performance_df["Cumulative Return"], label="累计收益率", color='green', marker='o')
-        ax2.set_ylabel("累计收益率 (%)")
-        ax2.set_title("累计收益率变化")
-        ax2.grid(True)
-
-        # 在数据点上添加标签
-        for x, y in zip(performance_df.index, performance_df["Cumulative Return"]):
-            ax2.annotate(f'{y:.2f}%',
-                         (x, y),
-                         textcoords="offset points",
-                         xytext=(0, 10),
-                         ha='center',
-                         fontsize=8)
-
-        # 设置x轴标签
-        plt.xlabel("日期")
-
-        # 自动调整布局以防止标签重叠
-        plt.tight_layout()
-
-        # 生成图片文件名
-        current_date = datetime.now().strftime('%Y%m%d')
-        backtest_period = f"{self.start_date.replace('-', '')}_{self.end_date.replace('-', '')}"
-        img_filename = os.path.join(
-            img_dir, f"backtest_{self.ticker}_{current_date}_{backtest_period}.png")
         
-        # 保存图表到文件
-        plt.savefig(img_filename, dpi=300, bbox_inches='tight')
-        plt.close(fig)  # 关闭图表，释放内存
+        # 计算高级性能指标
+        self._calculate_advanced_metrics(performance_df)
         
-        self.logger.info(f"回测图表已保存至: {img_filename}")
-
-        # 计算和打印性能指标
-        total_return = (
-            self.portfolio["portfolio_value"] - self.initial_capital) / self.initial_capital
-        print(f"\n总收益率: {total_return * 100:.2f}%")
-
-        # 记录最终回测结果
-        self.backtest_logger.info("\n" + "=" * 50)
-        self.backtest_logger.info("回测结果汇总")
-        self.backtest_logger.info("=" * 50)
-        self.backtest_logger.info(f"初始资金: {self.initial_capital:,.2f}")
-        self.backtest_logger.info(
-            f"最终总值: {self.portfolio['portfolio_value']:,.2f}")
-        self.backtest_logger.info(f"总收益率: {total_return * 100:.2f}%")
-        self.backtest_logger.info(f"图表保存路径: {img_filename}")
-
-        # 计算夏普比率
+        # 创建增强图表
+        self._create_enhanced_charts(performance_df)
+        
+        # 返回性能数据
+        return performance_df
+    
+    def _calculate_advanced_metrics(self, performance_df):
+        """计算高级性能指标"""
+        # 从每日收益计算
         daily_returns = performance_df["Daily Return"] / 100  # 转换为小数
+        
+        # 基础风险指标
         mean_daily_return = daily_returns.mean()
         std_daily_return = daily_returns.std()
-        sharpe_ratio = (mean_daily_return / std_daily_return) * \
-            (252 ** 0.5) if std_daily_return != 0 else 0
-        # print(f"夏普比率: {sharpe_ratio:.2f}")
-        self.backtest_logger.info(f"夏普比率: {sharpe_ratio:.2f}")
-
-        # 计算最大回撤
+        
+        # 年化收益和风险
+        annual_return = mean_daily_return * 252
+        annual_volatility = std_daily_return * np.sqrt(252)
+        
+        # 夏普比率
+        risk_free_rate = 0.03 / 252  # 假设年化3%无风险利率
+        sharpe_ratio = (mean_daily_return - risk_free_rate) / std_daily_return * np.sqrt(252) if std_daily_return != 0 else 0
+        
+        # 索提诺比率 (只考虑下行风险)
+        downside_returns = daily_returns[daily_returns < 0]
+        downside_deviation = downside_returns.std() * np.sqrt(252) if not downside_returns.empty else 0
+        sortino_ratio = (mean_daily_return - risk_free_rate) / downside_deviation * np.sqrt(252) if downside_deviation != 0 else 0
+        
+        # 最大回撤
         rolling_max = performance_df["Portfolio Value"].cummax()
         drawdown = (performance_df["Portfolio Value"] / rolling_max - 1) * 100
         max_drawdown = drawdown.min()
-        # print(f"最大回撤: {max_drawdown:.2f}%")
-        self.backtest_logger.info(f"最大回撤: {max_drawdown:.2f}%")
-
-        return performance_df
+        
+        # 卡玛比率 (考虑回撤风险的收益率指标)
+        calmar_ratio = annual_return / (abs(max_drawdown) / 100) if max_drawdown != 0 else 0
+        
+        # 胜率统计
+        winning_days = (daily_returns > 0).sum()
+        losing_days = (daily_returns < 0).sum()
+        win_rate = winning_days / (winning_days + losing_days) if (winning_days + losing_days) > 0 else 0
+        
+        # 平均盈亏比
+        avg_gain = daily_returns[daily_returns > 0].mean() if not daily_returns[daily_returns > 0].empty else 0
+        avg_loss = daily_returns[daily_returns < 0].mean() if not daily_returns[daily_returns < 0].empty else 0
+        profit_loss_ratio = abs(avg_gain / avg_loss) if avg_loss != 0 else 0
+        
+        # 最大连续盈利和亏损天数
+        profit_streaks = []
+        loss_streaks = []
+        current_streak = 0
+        for ret in daily_returns:
+            if ret > 0:
+                if current_streak > 0:
+                    current_streak += 1
+                else:
+                    if current_streak < 0:
+                        loss_streaks.append(abs(current_streak))
+                    current_streak = 1
+            elif ret < 0:
+                if current_streak < 0:
+                    current_streak -= 1
+                else:
+                    if current_streak > 0:
+                        profit_streaks.append(current_streak)
+                    current_streak = -1
+            else:  # ret == 0
+                if current_streak > 0:
+                    profit_streaks.append(current_streak)
+                elif current_streak < 0:
+                    loss_streaks.append(abs(current_streak))
+                current_streak = 0
+                
+        if current_streak > 0:
+            profit_streaks.append(current_streak)
+        elif current_streak < 0:
+            loss_streaks.append(abs(current_streak))
+            
+        max_profit_streak = max(profit_streaks) if profit_streaks else 0
+        max_loss_streak = max(loss_streaks) if loss_streaks else 0
+        
+        # 记录和打印性能指标
+        self.metrics = {
+            "总收益率": f"{(performance_df['Portfolio Value'].iloc[-1] / self.initial_capital - 1) * 100:.2f}%",
+            "年化收益率": f"{annual_return * 100:.2f}%",
+            "年化波动率": f"{annual_volatility * 100:.2f}%",
+            "夏普比率": f"{sharpe_ratio:.2f}",
+            "索提诺比率": f"{sortino_ratio:.2f}",
+            "最大回撤": f"{max_drawdown:.2f}%",
+            "卡玛比率": f"{calmar_ratio:.2f}",
+            "胜率": f"{win_rate * 100:.2f}%",
+            "盈亏比": f"{profit_loss_ratio:.2f}",
+            "最大连续盈利天数": max_profit_streak,
+            "最大连续亏损天数": max_loss_streak
+        }
+        
+        # 打印性能指标
+        print("\n=== 回测性能指标 ===")
+        for name, value in self.metrics.items():
+            print(f"{name}: {value}")
+    
+    def _create_enhanced_charts(self, performance_df):
+        """创建增强的分析图表"""
+        # 图表目录
+        img_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'assets', 'img')
+        os.makedirs(img_dir, exist_ok=True)
+        
+        # 生成基础文件名
+        current_date = datetime.now().strftime('%Y%m%d')
+        backtest_period = f"{self.start_date.replace('-', '')}_{self.end_date.replace('-', '')}"
+        img_base = os.path.join(img_dir, f"backtest_{self.ticker}_{current_date}_{backtest_period}")
+        
+        # 创建多个图表
+        
+        # 1. 收益与回撤图
+        self._create_returns_drawdown_chart(performance_df, f"{img_base}_returns_drawdown.png")
+        
+        # 2. 交易分析图
+        self._create_trade_analysis_chart(performance_df, f"{img_base}_trades.png")
+        
+        # 3. 月度收益热图
+        self._create_monthly_returns_heatmap(performance_df, f"{img_base}_monthly.png")
+        
+        # 4. 风险收益散点图 (如果有基准数据)
+        if hasattr(self, 'benchmark_returns') and len(self.benchmark_returns) > 0:
+            self._create_risk_return_chart(performance_df, f"{img_base}_risk_return.png")
+    
+    def _create_returns_drawdown_chart(self, performance_df, filename):
+        """创建收益与回撤组合图表"""
+        fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(12, 10), gridspec_kw={'height_ratios': [2, 1]})
+        
+        # 绘制累计收益曲线
+        ax1.plot(performance_df.index, performance_df["Cumulative Return"], 
+                label="投资组合", color='#4CAF50', linewidth=2)
+        
+        # 如果有基准数据，添加基准曲线
+        if hasattr(self, 'benchmark_returns') and len(self.benchmark_returns) > 0:
+            benchmark_df = pd.DataFrame(self.benchmark_returns)
+            ax1.plot(benchmark_df.index, benchmark_df["Cumulative Return"], 
+                    label="基准", color='#2196F3', linewidth=1.5, linestyle='--')
+        
+        # 添加交易标记
+        buy_dates = [trade['date'] for trade in self.trade_history if trade['action'] == 'buy']
+        sell_dates = [trade['date'] for trade in self.trade_history if trade['action'] == 'sell']
+        
+        for date in buy_dates:
+            if date in performance_df.index:
+                value = performance_df.loc[date, "Cumulative Return"]
+                ax1.scatter(date, value, color='green', marker='^', s=100)
+                
+        for date in sell_dates:
+            if date in performance_df.index:
+                value = performance_df.loc[date, "Cumulative Return"]
+                ax1.scatter(date, value, color='red', marker='v', s=100)
+        
+        # 美化收益图
+        ax1.set_title("累计收益 & 交易", fontsize=14, fontweight='bold')
+        ax1.set_ylabel("累计收益率 (%)", fontsize=12)
+        ax1.grid(True, alpha=0.3)
+        ax1.legend(loc='upper left')
+        
+        # 计算回撤并绘制
+        rolling_max = performance_df["Portfolio Value"].cummax()
+        drawdown = (performance_df["Portfolio Value"] / rolling_max - 1) * 100
+        
+        ax2.fill_between(performance_df.index, 0, drawdown, color='#FFA726', alpha=0.3)
+        ax2.plot(performance_df.index, drawdown, color='#E65100', linewidth=1)
+        
+        # 美化回撤图
+        ax2.set_title("回撤", fontsize=14, fontweight='bold')
+        ax2.set_ylabel("回撤 (%)", fontsize=12)
+        ax2.set_xlabel("日期", fontsize=12)
+        ax2.grid(True, alpha=0.3)
+        
+        # 保存图表
+        plt.tight_layout()
+        plt.savefig(filename, dpi=300, bbox_inches='tight')
+        plt.close(fig)
+        
+        print(f"收益与回撤图表已保存至: {filename}")
+    
+    def _create_trade_analysis_chart(self, performance_df, filename):
+        """创建交易分析图表"""
+        if not self.trade_history:
+            return
+            
+        # 准备交易数据
+        trades_df = pd.DataFrame(self.trade_history)
+        
+        fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(12, 10))
+        
+        # 绘制每笔交易盈亏
+        if 'profit_loss' in trades_df.columns:
+            colors = ['green' if pl >= 0 else 'red' for pl in trades_df['profit_loss']]
+            ax1.bar(range(len(trades_df)), trades_df['profit_loss'], color=colors)
+            ax1.set_title("每笔交易盈亏", fontsize=14, fontweight='bold')
+            ax1.set_ylabel("盈亏金额", fontsize=12)
+            ax1.set_xticks(range(len(trades_df)))
+            ax1.set_xticklabels(trades_df.index, rotation=45)
+            ax1.grid(True, alpha=0.3)
+            
+            # 添加累计盈亏线
+            cumulative_pl = trades_df['profit_loss'].cumsum()
+            ax_twin = ax1.twinx()
+            ax_twin.plot(range(len(trades_df)), cumulative_pl, color='blue', linewidth=2)
+            ax_twin.set_ylabel("累计盈亏", fontsize=12, color='blue')
+        
+        # 绘制持仓时间分布直方图
+        if 'holding_days' in trades_df.columns:
+            ax2.hist(trades_df['holding_days'], bins=20, color='#2196F3', alpha=0.7)
+            ax2.set_title("持仓时间分布", fontsize=14, fontweight='bold')
+            ax2.set_xlabel("持仓天数", fontsize=12)
+            ax2.set_ylabel("交易次数", fontsize=12)
+            ax2.grid(True, alpha=0.3)
+        
+        # 保存图表
+        plt.tight_layout()
+        plt.savefig(filename, dpi=300, bbox_inches='tight')
+        plt.close(fig)
+        
+        print(f"交易分析图表已保存至: {filename}")
+    
+    def _create_monthly_returns_heatmap(self, performance_df, filename):
+        """创建月度收益热图"""
+        # 确保有日期索引
+        if not isinstance(performance_df.index, pd.DatetimeIndex):
+            performance_df.index = pd.to_datetime(performance_df.index)
+            
+        # 计算月度收益
+        monthly_returns = performance_df['Daily Return'].resample('M').apply(
+            lambda x: ((1 + x/100).prod() - 1) * 100
+        )
+        
+        # 创建年/月交叉表
+        returns_table = pd.DataFrame(monthly_returns)
+        returns_table['Year'] = returns_table.index.year
+        returns_table['Month'] = returns_table.index.month
+        returns_pivot = returns_table.pivot_table(
+            values='Daily Return', index='Year', columns='Month'
+        )
+        
+        # 添加年度合计
+        returns_pivot['Annual'] = returns_pivot.apply(
+            lambda x: ((1 + x/100).prod() - 1) * 100, axis=1
+        )
+        
+        # 绘制热图
+        fig, ax = plt.subplots(figsize=(12, 8))
+        
+        # 调整颜色映射，使用发散型颜色映射
+        cmap = plt.cm.RdYlGn  # Red-Yellow-Green
+        norm = plt.Normalize(vmin=-10, vmax=10)  # 假设最大值为±10%
+        
+        # 绘制热图
+        sns.heatmap(returns_pivot, cmap=cmap, norm=norm, annot=True, 
+                   fmt=".2f", cbar_kws={'label': '月收益率 (%)'}, ax=ax)
+        
+        # 美化图表
+        month_names = ['', '1月', '2月', '3月', '4月', '5月', '6月', 
+                      '7月', '8月', '9月', '10月', '11月', '12月', '全年']
+        ax.set_xticklabels(month_names[:len(returns_pivot.columns)+1])
+        ax.set_title("月度收益热图", fontsize=14, fontweight='bold')
+        
+        # 保存图表
+        plt.tight_layout()
+        plt.savefig(filename, dpi=300, bbox_inches='tight')
+        plt.close(fig)
+        
+        print(f"月度收益热图已保存至: {filename}")
 
 
 if __name__ == "__main__":

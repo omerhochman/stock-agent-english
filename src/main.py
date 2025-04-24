@@ -32,6 +32,10 @@ from src.utils.llm_interaction_logger import (
     get_log_storage
 )
 from src.utils.api_utils import app as fastapi_app
+from src.utils.json_unicode_handler import monkey_patch_all_agents, patch_json_dumps
+
+patch_json_dumps()  # 修改默认json.dumps行为
+monkey_patch_all_agents()  # 修补所有代理类
 
 # --- Import Summary Report Generator ---
 try:

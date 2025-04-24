@@ -24,8 +24,8 @@ Forked From：https://github.com/24mlight/A_Share_investment_Agent.git
 ### 克隆仓库
 
 ```bash
-git clone https://github.com/24mlight/A_Share_investment_Agent.git
-cd A_Share_investment_Agent
+git clone https://github.com/1517005260/stock-agent.git
+cd stock-agent
 ```
 
 ### 使用 Conda 配置环境
@@ -33,14 +33,16 @@ cd A_Share_investment_Agent
 1. 创建并激活 Conda 环境:
 
 ```bash
-conda create -n a_share_agent python=3.10
-conda activate a_share_agent
+conda create -n stock python=3.10
+conda activate stock
 ```
 
 2. 安装依赖:
 
 ```bash
+cd stock-agent/
 pip install -r requirements.txt
+pip install -e .
 ```
 
 3. 设置环境变量:
@@ -55,25 +57,54 @@ cp .env.example .env
 打开 .env 文件,填入你的 API key:
 
 ```
-# OpenAI Compatible API 配置（可选）
-OPENAI_COMPATIBLE_API_KEY=your-openai-compatible-api-key
-OPENAI_COMPATIBLE_BASE_URL=https://your-api-endpoint.com/v1
-OPENAI_COMPATIBLE_MODEL=your-model-name
+OPENAI_COMPATIBLE_API_KEY=your_openai_compatible_api_key
+OPENAI_COMPATIBLE_BASE_URL=https://api.example.com/v1
+OPENAI_COMPATIBLE_MODEL=your_model_name
+
+TUSHARE_TOKEN=your_tushare_api_key
 ```
 
 ## 使用方法
 
 ### 运行方式
 
+主程序：
+
 ```bash
-# 基本运行
-python src/main.py --ticker 301155
+# 基本用法
+python -m src.main --ticker 600054 --show-reasoning
 
-# 显示分析推理过程
-python src/main.py --ticker 301155 --show-reasoning
+# 指定日期范围
+python -m src.main --ticker 600054 --start-date 2023-01-01 --end-date 2023-12-31 --show-reasoning
 
-# 显示汇总报告
-python src/main.py --ticker 301155 --summary
+# 指定初始资金和新闻数量
+python -m src.main --ticker 600054 --initial-capital 200000 --num-of-news 10
+
+# 显示详细的总结报告
+python -m src.main --ticker 600054 --summary
+```
+
+回测：
+
+```bash
+# 基本回测
+python -m src.backtester --ticker 600054
+
+# 指定回测时间范围
+python -m src.backtester --ticker 600054 --start-date 2022-01-01 --end-date 2022-12-31
+
+# 自定义初始资金
+python -m src.backtester --ticker 600054 --initial-capital 500000
+```
+
+数据处理工具：
+
+```bash
+# 数据分析和技术指标计算
+python -m src.tools.data_analyzer --ticker 600054
+
+# 新闻获取测试
+python -m src.tools.test_news_crawler
 ```
 
 ### 参数说明

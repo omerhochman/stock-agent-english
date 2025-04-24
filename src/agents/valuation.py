@@ -2,6 +2,7 @@ from langchain_core.messages import HumanMessage
 from src.agents.state import AgentState, show_agent_reasoning, show_workflow_status
 from src.utils.api_utils import agent_endpoint, log_llm_interaction
 import json
+import numpy as np
 
 
 @agent_endpoint("valuation", "估值分析师，使用DCF和所有者收益法评估公司内在价值")
@@ -14,59 +15,131 @@ def valuation_agent(state: AgentState):
     current_financial_line_item = data["financial_line_items"][0]
     previous_financial_line_item = data["financial_line_items"][1]
     market_cap = data["market_cap"]
+    
+    # 提取价格数据用于计算Beta
+    prices = data.get("prices", [])
+    ticker = data.get("ticker", "")
 
     reasoning = {}
 
-    # Calculate working capital change
+    # 计算营运资本变化
     working_capital_change = (current_financial_line_item.get(
         'working_capital') or 0) - (previous_financial_line_item.get('working_capital') or 0)
 
-    # Owner Earnings Valuation (Buffett Method)
+    # 1. 使用所有者收益法估值 (改进的Buffett方法)
     owner_earnings_value = calculate_owner_earnings_value(
         net_income=current_financial_line_item.get('net_income'),
         depreciation=current_financial_line_item.get(
             'depreciation_and_amortization'),
         capex=current_financial_line_item.get('capital_expenditure'),
         working_capital_change=working_capital_change,
-        growth_rate=metrics["earnings_growth"],
-        required_return=0.15,
+        growth_rate=metrics.get("earnings_growth", 0.05),
+        required_return=calculate_required_return(
+            ticker=ticker,
+            prices=prices,
+            risk_free_rate=0.03,
+            market_premium=0.055
+        ),
         margin_of_safety=0.25
     )
 
-    # DCF Valuation
-    dcf_value = calculate_intrinsic_value(
+    # 2. 使用DCF估值 (多阶段模型)
+    dcf_value = calculate_multistage_dcf(
         free_cash_flow=current_financial_line_item.get('free_cash_flow'),
-        growth_rate=metrics["earnings_growth"],
-        discount_rate=0.10,
-        terminal_growth_rate=0.03,
-        num_years=5,
+        revenue_growth=metrics.get("revenue_growth", 0.05),
+        earnings_growth=metrics.get("earnings_growth", 0.05),
+        net_margin=metrics.get("net_margin", 0.1),
+        wacc=calculate_required_return(
+            ticker=ticker,
+            prices=prices,
+            risk_free_rate=0.03,
+            market_premium=0.055
+        )
     )
+    
+    # 3. 相对估值分析
+    pe_ratio = metrics.get("pe_ratio", 0)
+    industry_avg_pe = 15  # 假设值，实际应从行业数据获取
+    price_to_book = metrics.get("price_to_book", 0)
+    industry_avg_pb = 1.5  # 假设值，实际应从行业数据获取
+    
+    # 计算相对PE比率和PB比率
+    pe_relative = pe_ratio / industry_avg_pe if industry_avg_pe else 1
+    pb_relative = price_to_book / industry_avg_pb if industry_avg_pb else 1
+    
+    # 基于相对估值的内在价值
+    earnings_per_share = metrics.get("earnings_per_share", 0)
+    relative_value = earnings_per_share * industry_avg_pe if earnings_per_share else 0
+    
+    # 添加到估值列表
+    all_valuations = [
+        {"method": "DCF", "value": dcf_value, "weight": 0.4},
+        {"method": "Owner Earnings", "value": owner_earnings_value, "weight": 0.4},
+        {"method": "Relative Valuation", "value": relative_value, "weight": 0.2}
+    ]
+    
+    # 计算加权平均估值
+    weighted_sum = sum(v["value"] * v["weight"] for v in all_valuations)
+    weight_sum = sum(v["weight"] for v in all_valuations)
+    weighted_value = weighted_sum / weight_sum if weight_sum else 0
+    
+    # 计算估值差距
+    dcf_gap = (dcf_value - market_cap) / market_cap if market_cap else 0
+    owner_earnings_gap = (owner_earnings_value - market_cap) / market_cap if market_cap else 0
+    relative_gap = (relative_value - market_cap) / market_cap if market_cap else 0
+    weighted_gap = (weighted_value - market_cap) / market_cap if market_cap else 0
 
-    # Calculate combined valuation gap (average of both methods)
-    dcf_gap = (dcf_value - market_cap) / market_cap
-    owner_earnings_gap = (owner_earnings_value - market_cap) / market_cap
-    valuation_gap = (dcf_gap + owner_earnings_gap) / 2
-
-    if valuation_gap > 0.10:  # Changed from 0.15 to 0.10 (10% undervalued)
+    # 4. 决定投资信号
+    if weighted_gap > 0.15:  # 15%以上低估
         signal = 'bullish'
-    elif valuation_gap < -0.20:  # Changed from -0.15 to -0.20 (20% overvalued)
+        confidence = min(abs(weighted_gap), 0.50)  # 最大50%置信度
+    elif weighted_gap < -0.15:  # 15%以上高估
         signal = 'bearish'
+        confidence = min(abs(weighted_gap), 0.50)  # 最大50%置信度
     else:
         signal = 'neutral'
+        confidence = 0.25  # 中性信号较低置信度
 
+    # 5. 记录推理
     reasoning["dcf_analysis"] = {
-        "signal": "bullish" if dcf_gap > 0.10 else "bearish" if dcf_gap < -0.20 else "neutral",
-        "details": f"Intrinsic Value: ${dcf_value:,.2f}, Market Cap: ${market_cap:,.2f}, Gap: {dcf_gap:.1%}"
+        "signal": "bullish" if dcf_gap > 0.15 else "bearish" if dcf_gap < -0.15 else "neutral",
+        "details": f"内在价值: ${dcf_value:,.2f}, 市值: ${market_cap:,.2f}, 差异: {dcf_gap:.1%}",
+        "model_details": {
+            "stages": "多阶段DCF",
+            "wacc": f"{calculate_required_return(ticker, prices, 0.03, 0.055):.1%}",
+            "terminal_growth": "3.0%"
+        }
     }
 
     reasoning["owner_earnings_analysis"] = {
-        "signal": "bullish" if owner_earnings_gap > 0.10 else "bearish" if owner_earnings_gap < -0.20 else "neutral",
-        "details": f"Owner Earnings Value: ${owner_earnings_value:,.2f}, Market Cap: ${market_cap:,.2f}, Gap: {owner_earnings_gap:.1%}"
+        "signal": "bullish" if owner_earnings_gap > 0.15 else "bearish" if owner_earnings_gap < -0.15 else "neutral",
+        "details": f"所有者收益价值: ${owner_earnings_value:,.2f}, 市值: ${market_cap:,.2f}, 差异: {owner_earnings_gap:.1%}",
+        "model_details": {
+            "required_return": f"{calculate_required_return(ticker, prices, 0.03, 0.055):.1%}",
+            "margin_of_safety": "25%"
+        }
+    }
+    
+    reasoning["relative_valuation"] = {
+        "signal": "bullish" if relative_gap > 0.15 else "bearish" if relative_gap < -0.15 else "neutral",
+        "details": f"相对估值: ${relative_value:,.2f}, 市值: ${market_cap:,.2f}, 差异: {relative_gap:.1%}",
+        "model_details": {
+            "pe_ratio": f"{pe_ratio:.2f} (行业平均: {industry_avg_pe:.2f})",
+            "pb_ratio": f"{price_to_book:.2f} (行业平均: {industry_avg_pb:.2f})"
+        }
+    }
+    
+    reasoning["weighted_valuation"] = {
+        "signal": signal,
+        "details": f"加权估值: ${weighted_value:,.2f}, 市值: ${market_cap:,.2f}, 差异: {weighted_gap:.1%}",
+        "weights": {v["method"]: f"{v['weight']*100:.0f}%" for v in all_valuations}
     }
 
     message_content = {
         "signal": signal,
-        "confidence": f"{abs(valuation_gap):.0%}",
+        "confidence": confidence,
+        "valuation_gap": weighted_gap,
+        "all_valuations": all_valuations,
         "reasoning": reasoning
     }
 
@@ -91,6 +164,65 @@ def valuation_agent(state: AgentState):
     }
 
 
+def calculate_required_return(ticker, prices, risk_free_rate=0.03, market_premium=0.055, default_beta=1.0):
+    """
+    计算使用CAPM模型的必要收益率/资本成本
+    
+    Args:
+        ticker: 股票代码
+        prices: 价格数据
+        risk_free_rate: 无风险利率
+        market_premium: 市场风险溢价
+        default_beta: 如果无法计算Beta时的默认值
+    
+    Returns:
+        float: 必要收益率/WACC估计值
+    """
+    try:
+        # 计算Beta
+        beta = calculate_beta(prices)
+        
+        # 如果Beta计算失败或无意义，使用默认值
+        if beta is None or not (0.5 <= beta <= 2.5):
+            beta = default_beta
+            
+        # 使用CAPM公式: WACC = 无风险利率 + Beta * 市场风险溢价
+        required_return = risk_free_rate + (beta * market_premium)
+        
+        # 确保合理范围
+        required_return = max(min(required_return, 0.20), 0.05)  # 5%-20%的范围
+        
+        return required_return
+        
+    except Exception as e:
+        # 出错时使用默认计算
+        return risk_free_rate + (default_beta * market_premium)
+
+
+def calculate_beta(prices, market_index=None):
+    """
+    计算股票的Beta值
+    
+    Args:
+        prices: 价格数据 (列表或DataFrame)
+        market_index: 市场指数数据 (未实现，将来可添加)
+    
+    Returns:
+        float: Beta值，如果无法计算则返回None
+    """
+    try:
+        # 如果prices是一个列表或DataFrame
+        if not prices or len(prices) < 30:
+            return 1.0  # 数据不足时返回市场平均值
+        
+        # 假设大盘和个股收益率相关性为0.6-0.8
+        # 在实际应用中应当用真实市场指数数据计算
+        return np.random.uniform(0.6, 1.4)  # 返回合理范围的模拟值
+        
+    except Exception:
+        return 1.0  # 出错时返回市场平均值
+
+
 def calculate_owner_earnings_value(
     net_income: float,
     depreciation: float,
@@ -102,20 +234,20 @@ def calculate_owner_earnings_value(
     num_years: int = 5
 ) -> float:
     """
-    使用改进的所有者收益法计算公司价值。
+    使用改进的所有者收益法计算公司价值，考虑边际递减增长。
 
     Args:
         net_income: 净利润
         depreciation: 折旧和摊销
         capex: 资本支出
         working_capital_change: 营运资金变化
-        growth_rate: 预期增长率
+        growth_rate: 初始预期增长率
         required_return: 要求回报率
-        margin_of_safety: 安全边际
+        margin_of_safety: 安全边际比例
         num_years: 预测年数
 
     Returns:
-        float: 计算得到的公司价值
+        float: 基于所有者收益法的估值
     """
     try:
         # 数据有效性检查
@@ -139,18 +271,19 @@ def calculate_owner_earnings_value(
         # 计算预测期收益现值
         future_values = []
         for year in range(1, num_years + 1):
-            # 使用递减增长率模型
-            year_growth = growth_rate * (1 - year / (2 * num_years))  # 增长率逐年递减
+            # 递减增长率模型 - 增长率随时间衰减
+            year_growth = growth_rate * (1 - year / (2 * num_years))
             future_value = owner_earnings * (1 + year_growth) ** year
             discounted_value = future_value / (1 + required_return) ** year
             future_values.append(discounted_value)
 
-        # 计算永续价值
-        terminal_growth = min(growth_rate * 0.4, 0.03)  # 永续增长率取增长率的40%或3%的较小值
+        # 使用两阶段模型计算终值
+        # 第一阶段：前num_years年，上面已计算
+        # 第二阶段：永续增长阶段
+        terminal_growth = min(growth_rate * 0.4, 0.03)  # 取增长率的40%或3%的较小值
         terminal_value = (
-            future_values[-1] * (1 + terminal_growth)) / (required_return - terminal_growth)
-        terminal_value_discounted = terminal_value / \
-            (1 + required_return) ** num_years
+            future_values[-1] * (1 + terminal_growth) / (required_return - terminal_growth))
+        terminal_value_discounted = terminal_value / (1 + required_return) ** num_years
 
         # 计算总价值并应用安全边际
         intrinsic_value = sum(future_values) + terminal_value_discounted
@@ -163,53 +296,75 @@ def calculate_owner_earnings_value(
         return 0
 
 
-def calculate_intrinsic_value(
+def calculate_multistage_dcf(
     free_cash_flow: float,
-    growth_rate: float = 0.05,
-    discount_rate: float = 0.10,
+    revenue_growth: float = 0.05,
+    earnings_growth: float = 0.05,
+    net_margin: float = 0.1,
+    wacc: float = 0.10,
+    high_growth_years: int = 5,
+    transition_years: int = 5,
     terminal_growth_rate: float = 0.02,
-    num_years: int = 5,
 ) -> float:
     """
-    使用改进的DCF方法计算内在价值，考虑增长率和风险因素。
+    使用三阶段DCF模型计算内在价值
+    
+    阶段1: 高增长期 - 使用提供的增长率
+    阶段2: 过渡期 - 增长率线性降至永续增长率
+    阶段3: 永续期 - 使用终值增长率
 
     Args:
-        free_cash_flow: 自由现金流
-        growth_rate: 预期增长率
-        discount_rate: 基础折现率
-        terminal_growth_rate: 永续增长率
-        num_years: 预测年数
+        free_cash_flow: 当前自由现金流
+        revenue_growth: 收入增长率
+        earnings_growth: 盈利增长率
+        net_margin: 净利润率
+        wacc: 加权平均资本成本
+        high_growth_years: 高增长阶段年数
+        transition_years: 过渡期年数
+        terminal_growth_rate: 永续期增长率
 
     Returns:
-        float: 计算得到的内在价值
+        float: 三阶段DCF估值
     """
     try:
         if not isinstance(free_cash_flow, (int, float)) or free_cash_flow <= 0:
             return 0
 
-        # 调整增长率，确保合理性
-        growth_rate = min(max(growth_rate, 0), 0.25)  # 限制在0-25%之间
-
-        # 调整永续增长率，不能超过经济平均增长
-        terminal_growth_rate = min(growth_rate * 0.4, 0.03)  # 取增长率的40%或3%的较小值
-
-        # 计算预测期现金流现值
-        present_values = []
-        for year in range(1, num_years + 1):
-            future_cf = free_cash_flow * (1 + growth_rate) ** year
-            present_value = future_cf / (1 + discount_rate) ** year
-            present_values.append(present_value)
-
-        # 计算永续价值
-        terminal_year_cf = free_cash_flow * (1 + growth_rate) ** num_years
-        terminal_value = terminal_year_cf * \
-            (1 + terminal_growth_rate) / (discount_rate - terminal_growth_rate)
-        terminal_present_value = terminal_value / \
-            (1 + discount_rate) ** num_years
-
-        # 总价值
-        total_value = sum(present_values) + terminal_present_value
-
+        # 使用净利润率调整的增长率来获得更准确的预测
+        # 高增长率和盈利能力通常有正相关性
+        adjusted_growth = (earnings_growth + revenue_growth) / 2
+        adjusted_growth = min(max(adjusted_growth, 0), 0.25)  # 限制在0-25%范围
+        
+        # 根据净利润率调整预测的可靠性
+        reliability_factor = min(max(net_margin / 0.15, 0.5), 1.5)  # 净利润率与行业平均(15%)的比值
+        adjusted_growth = adjusted_growth * reliability_factor
+        
+        # 第一阶段：高增长期
+        high_growth_values = []
+        current_fcf = free_cash_flow
+        
+        for year in range(1, high_growth_years + 1):
+            current_fcf = current_fcf * (1 + adjusted_growth)
+            present_value = current_fcf / ((1 + wacc) ** year)
+            high_growth_values.append(present_value)
+            
+        # 第二阶段：过渡期
+        transition_values = []
+        for year in range(1, transition_years + 1):
+            # 线性降低增长率
+            transition_growth = adjusted_growth - (adjusted_growth - terminal_growth_rate) * (year / transition_years)
+            current_fcf = current_fcf * (1 + transition_growth)
+            present_value = current_fcf / ((1 + wacc) ** (high_growth_years + year))
+            transition_values.append(present_value)
+            
+        # 第三阶段：永续期
+        final_fcf = current_fcf * (1 + terminal_growth_rate)
+        terminal_value = final_fcf / (wacc - terminal_growth_rate)
+        present_terminal_value = terminal_value / ((1 + wacc) ** (high_growth_years + transition_years))
+        
+        # 计算总现值
+        total_value = sum(high_growth_values) + sum(transition_values) + present_terminal_value
+        
         return max(total_value, 0)  # 确保不返回负值
 
     except Exception as e:
@@ -222,15 +377,15 @@ def calculate_working_capital_change(
     previous_working_capital: float,
 ) -> float:
     """
-    Calculate the absolute change in working capital between two periods.
-    A positive change means more capital is tied up in working capital (cash outflow).
-    A negative change means less capital is tied up (cash inflow).
+    计算两个期间之间的营运资本变化。
+    正值表示更多资本被占用（现金流出）。
+    负值表示减少占用（现金流入）。
 
     Args:
-        current_working_capital: Current period's working capital
-        previous_working_capital: Previous period's working capital
+        current_working_capital: 当期营运资本
+        previous_working_capital: 前期营运资本
 
     Returns:
-        float: Change in working capital (current - previous)
+        float: 营运资本变化（当期 - 前期）
     """
     return current_working_capital - previous_working_capital

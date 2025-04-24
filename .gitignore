@@ -4,5 +4,6 @@ __pycache__/
 .ipynb_checkpoints
 logs/
 *.egg-info/
-src/data/
+src/data/*
 report.txt
+data/*
