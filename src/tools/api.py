@@ -18,6 +18,12 @@ logger = setup_logger('api')
 # 创建数据API实例
 data_api = DataAPI()
 
+def handle_exception(func_name: str, exception: Exception, default_return=None):
+    """统一处理异常并返回默认值"""
+    logger.error(f"Error in {func_name}: {exception}")
+    logger.debug(f"Error details: {traceback.format_exc()}")
+    return default_return
+
 def get_financial_metrics(symbol: str) -> Dict[str, Any]:
     """获取财务指标数据"""
     logger.info(f"Getting financial indicators for {symbol}...")
@@ -30,8 +36,7 @@ def get_financial_metrics(symbol: str) -> Dict[str, Any]:
         
         return processed_metrics
     except Exception as e:
-        logger.error(f"Error getting financial indicators: {e}")
-        return [{}]
+        return handle_exception("get_financial_metrics", e, [{}])
 
 
 def get_financial_statements(symbol: str) -> Dict[str, Any]:
@@ -46,7 +51,6 @@ def get_financial_statements(symbol: str) -> Dict[str, Any]:
         
         return processed_statements
     except Exception as e:
-        logger.error(f"Error getting financial statements: {e}")
         default_item = {
             "net_income": 0,
             "operating_revenue": 0,
@@ -56,7 +60,7 @@ def get_financial_statements(symbol: str) -> Dict[str, Any]:
             "capital_expenditure": 0,
             "free_cash_flow": 0
         }
-        return [default_item, default_item]
+        return handle_exception("get_financial_statements", e, [default_item, default_item])
 
 
 def get_market_data(symbol: str) -> Dict[str, Any]:
@@ -66,8 +70,7 @@ def get_market_data(symbol: str) -> Dict[str, Any]:
         market_data = data_api.get_market_data(symbol)
         return market_data
     except Exception as e:
-        logger.error(f"Error getting market data: {e}")
-        return {}
+        return handle_exception("get_market_data", e, {})
 
 
 def get_price_history(symbol: str, start_date: str = None, end_date: str = None, adjust: str = "qfq") -> pd.DataFrame:
@@ -92,82 +95,13 @@ def get_price_history(symbol: str, start_date: str = None, end_date: str = None,
         # 数据处理和验证
         if df is None or df.empty:
             logger.warning(f"No price history data available for {symbol}")
-            # 尝试使用TuShare作为最后手段，即使适配器已经尝试过
-            try:
-                import tushare as ts
-                token = os.environ.get('TUSHARE_TOKEN', '')
-                if token:
-                    ts.set_token(token)
-                    pro = ts.pro_api()
-                    
-                    # 处理日期
-                    if not end_date:
-                        end_date = datetime.now() - timedelta(days=1)
-                    else:
-                        if isinstance(end_date, str):
-                            end_date = datetime.strptime(end_date, '%Y-%m-%d')
-                            
-                    if not start_date:
-                        start_date = end_date - timedelta(days=365)
-                    else:
-                        if isinstance(start_date, str):
-                            start_date = datetime.strptime(start_date, '%Y-%m-%d')
-                    
-                    # 转换为TuShare格式
-                    ts_start = start_date.strftime('%Y%m%d')
-                    ts_end = end_date.strftime('%Y%m%d')
-                    
-                    # 添加前缀
-                    if symbol.startswith(('sh', 'sz', 'bj')):
-                        code = symbol[2:]
-                        prefix = symbol[:2].upper()
-                        ts_code = f"{code}.{prefix}"
-                    else:
-                        if symbol.startswith('6'):
-                            ts_code = f"{symbol}.SH"
-                        elif symbol.startswith(('0', '3')):
-                            ts_code = f"{symbol}.SZ"
-                        else:
-                            ts_code = f"{symbol}.SH"
-                    
-                    # 直接使用TuShare API
-                    logger.info(f"直接尝试TuShare获取数据: {ts_code}")
-                    ts_df = pro.daily(ts_code=ts_code, start_date=ts_start, end_date=ts_end)
-                    
-                    if not ts_df.empty:
-                        logger.info(f"TuShare最后手段成功获取到{len(ts_df)}条记录")
-                        # 重命名列
-                        ts_df = ts_df.rename(columns={
-                            "trade_date": "date",
-                            "vol": "volume",
-                            "pct_chg": "pct_change",
-                            "change": "change_amount"
-                        })
-                        
-                        # 转换日期
-                        ts_df["date"] = pd.to_datetime(ts_df["date"], format="%Y%m%d")
-                        
-                        # 排序
-                        ts_df = ts_df.sort_values("date", ascending=True)
-                        
-                        # 处理数据
-                        processed_df = data_processor.process_price_data(ts_df)
-                        return processed_df
-            except Exception as e:
-                logger.error(f"直接使用TuShare也失败: {e}")
-            
-            # 如果所有尝试都失败，返回空DataFrame
-            return pd.DataFrame()
+            # 尝试使用TuShare作为最后手段
+            df = _try_tushare_last_resort(symbol, start_date, end_date)
+            if df.empty:
+                return pd.DataFrame()
         
         # 检查DataFrame中必须包含的列
-        required_columns = ['date', 'open', 'high', 'low', 'close', 'volume']
-        missing_columns = [col for col in required_columns if col not in df.columns]
-        
-        if missing_columns:
-            logger.warning(f"Missing required columns: {missing_columns}")
-            # 添加缺失的列
-            for col in missing_columns:
-                df[col] = 0.0 if col != 'date' else pd.to_datetime('today')
+        df = _ensure_required_columns(df)
         
         # 使用数据处理器增强数据质量
         processed_df = data_processor.process_price_data(df)
@@ -176,9 +110,98 @@ def get_price_history(symbol: str, start_date: str = None, end_date: str = None,
         return processed_df
 
     except Exception as e:
-        logger.error(f"Error getting price history: {e}")
-        logger.debug(f"Error details: {traceback.format_exc()}")
-        return pd.DataFrame()
+        return handle_exception("get_price_history", e, pd.DataFrame())
+
+
+def _try_tushare_last_resort(symbol: str, start_date: str, end_date: str) -> pd.DataFrame:
+    """作为最后手段尝试使用TuShare获取数据"""
+    try:
+        import tushare as ts
+        token = os.environ.get('TUSHARE_TOKEN', '')
+        if token:
+            ts.set_token(token)
+            pro = ts.pro_api()
+            
+            # 处理日期
+            if not end_date:
+                end_date = datetime.now() - timedelta(days=1)
+            else:
+                if isinstance(end_date, str):
+                    end_date = datetime.strptime(end_date, '%Y-%m-%d')
+                    
+            if not start_date:
+                start_date = end_date - timedelta(days=365)
+            else:
+                if isinstance(start_date, str):
+                    start_date = datetime.strptime(start_date, '%Y-%m-%d')
+            
+            # 转换为TuShare格式
+            ts_start = start_date.strftime('%Y%m%d')
+            ts_end = end_date.strftime('%Y%m%d')
+            
+            # 添加前缀
+            ts_code = _convert_to_tushare_code(symbol)
+            
+            # 直接使用TuShare API
+            logger.info(f"直接尝试TuShare获取数据: {ts_code}")
+            ts_df = pro.daily(ts_code=ts_code, start_date=ts_start, end_date=ts_end)
+            
+            if not ts_df.empty:
+                logger.info(f"TuShare最后手段成功获取到{len(ts_df)}条记录")
+                # 重命名列
+                ts_df = ts_df.rename(columns={
+                    "trade_date": "date",
+                    "vol": "volume",
+                    "pct_chg": "pct_change",
+                    "change": "change_amount"
+                })
+                
+                # 转换日期
+                ts_df["date"] = pd.to_datetime(ts_df["date"], format="%Y%m%d")
+                
+                # 排序
+                ts_df = ts_df.sort_values("date", ascending=True)
+                
+                # 处理数据
+                processed_df = data_processor.process_price_data(ts_df)
+                return processed_df
+    except Exception as e:
+        logger.error(f"直接使用TuShare也失败: {e}")
+    
+    # 如果所有尝试都失败，返回空DataFrame
+    return pd.DataFrame()
+
+
+def _convert_to_tushare_code(symbol: str) -> str:
+    """将股票代码转换为TuShare格式"""
+    # 添加前缀
+    if symbol.startswith(('sh', 'sz', 'bj')):
+        code = symbol[2:]
+        prefix = symbol[:2].upper()
+        ts_code = f"{code}.{prefix}"
+    else:
+        if symbol.startswith('6'):
+            ts_code = f"{symbol}.SH"
+        elif symbol.startswith(('0', '3')):
+            ts_code = f"{symbol}.SZ"
+        else:
+            ts_code = f"{symbol}.SH"
+    
+    return ts_code
+
+
+def _ensure_required_columns(df: pd.DataFrame) -> pd.DataFrame:
+    """确保DataFrame包含所有必须的列"""
+    required_columns = ['date', 'open', 'high', 'low', 'close', 'volume']
+    missing_columns = [col for col in required_columns if col not in df.columns]
+    
+    if missing_columns:
+        logger.warning(f"Missing required columns: {missing_columns}")
+        # 添加缺失的列
+        for col in missing_columns:
+            df[col] = 0.0 if col != 'date' else pd.to_datetime('today')
+    
+    return df
 
 
 def prices_to_df(prices):
@@ -216,16 +239,10 @@ def prices_to_df(prices):
 
         return df
     except Exception as e:
-        logger.error(f"Error converting price data: {str(e)}")
-        # 返回一个包含必要列的空DataFrame
-        return pd.DataFrame(columns=['close', 'open', 'high', 'low', 'volume'])
+        return handle_exception("prices_to_df", e, pd.DataFrame(columns=['close', 'open', 'high', 'low', 'volume']))
 
 
-def get_price_data(
-    ticker: str,
-    start_date: str,
-    end_date: str
-) -> pd.DataFrame:
+def get_price_data(ticker: str, start_date: str, end_date: str) -> pd.DataFrame:
     """获取股票价格数据
 
     Args:
