@@ -1,21 +1,23 @@
 import math
 import numpy as np
-import pandas as pd
-from scipy import stats
 from langchain_core.messages import HumanMessage
 
 from src.agents.state import AgentState, show_agent_reasoning, show_workflow_status
 from src.tools.api import prices_to_df
-from src.utils.api_utils import agent_endpoint, log_llm_interaction
+from src.utils.api_utils import agent_endpoint
+from src.utils.logging_config import setup_logger
+from src.calc.tail_risk_measures import calculate_historical_var, calculate_conditional_var
+from src.calc.volatility_models import fit_garch, forecast_garch_volatility
 
 import json
 import ast
 
 ##### Risk Management Agent #####
 
+logger = setup_logger('risk_management_agent')
+
 @agent_endpoint("risk_management", "风险管理专家，评估投资风险并给出风险调整后的交易建议")
 def risk_management_agent(state: AgentState):
-    """Responsible for risk management"""
     show_workflow_status("Risk Manager")
     show_reasoning = state["metadata"]["show_reasoning"]
     portfolio = state["data"]["portfolio"]
@@ -35,8 +37,8 @@ def risk_management_agent(state: AgentState):
     # 1. 计算基础风险指标
     returns = prices_df['close'].pct_change().dropna()
     
-    # 计算波动率（使用指数加权移动平均改进）
-    daily_vol = returns.ewm(span=20).std().iloc[-1]  # 改用EWMA波动率
+    # 计算波动率（使用指数加权移动平均）
+    daily_vol = returns.ewm(span=20).std().iloc[-1]  # EWMA波动率
     volatility = daily_vol * (252 ** 0.5)  # 年化
 
     # 计算波动率的历史分布
@@ -47,12 +49,12 @@ def risk_management_agent(state: AgentState):
 
     # 2. 高级风险指标计算
     # 2.1 历史VaR (95%置信度)
-    var_95 = returns.quantile(0.05)
+    var_95 = calculate_historical_var(returns, confidence_level=0.95)
     
-    # 2.2 条件VaR/Expected Shortfall (更好的尾部风险度量)
-    cvar_95 = returns[returns <= var_95].mean()
+    # 2.2 条件VaR/Expected Shortfall
+    cvar_95 = calculate_conditional_var(returns, confidence_level=0.95)
     
-    # 2.3 最大回撤计算 (改进算法更高效)
+    # 2.3 最大回撤计算
     cum_returns = (1 + returns).cumprod()
     running_max = cum_returns.cummax()
     drawdown = (cum_returns / running_max - 1)
@@ -68,7 +70,7 @@ def risk_management_agent(state: AgentState):
     mean_return = returns.mean() * 252
     sortino_ratio = mean_return / downside_deviation if downside_deviation != 0 else 0
 
-    # 3. 市场风险评估 (增强评分系统)
+    # 3. 市场风险评估 (评分系统)
     market_risk_score = 0
 
     # 波动率评分 (基于百分位)
@@ -94,8 +96,8 @@ def risk_management_agent(state: AgentState):
     if abs(skewness) > 1.0 or kurtosis > 5.0:
         market_risk_score += 1
 
-    # 4. 头寸规模计算 (更先进的方法)
-    # 考虑总组合价值而非仅现金
+    # 4. 头寸规模计算
+    # 考虑总组合价值，非仅现金
     current_stock_value = portfolio['stock'] * prices_df['close'].iloc[-1]
     total_portfolio_value = portfolio['cash'] + current_stock_value
 
@@ -114,7 +116,7 @@ def risk_management_agent(state: AgentState):
     # 计算平均胜利收益和亏损比率
     win_loss_ratio = 1.5  # 默认假设
     
-    # 应用分数Kelly公式 (更保守)
+    # 应用分数Kelly公式
     kelly_fraction = win_rate - ((1 - win_rate) / win_loss_ratio)
     
     # 保守系数和风险调整
@@ -191,11 +193,11 @@ def risk_management_agent(state: AgentState):
         "risk_metrics": {
             "volatility": float(volatility),
             "value_at_risk_95": float(var_95),
-            "conditional_var_95": float(cvar_95),  # 新增条件VaR
+            "conditional_var_95": float(cvar_95),  
             "max_drawdown": float(max_drawdown),
-            "skewness": float(skewness),           # 新增偏度
-            "kurtosis": float(kurtosis),           # 新增峰度
-            "sortino_ratio": float(sortino_ratio), # 新增Sortino比率
+            "skewness": float(skewness),           
+            "kurtosis": float(kurtosis),           
+            "sortino_ratio": float(sortino_ratio), 
             "market_risk_score": market_risk_score,
             "stress_test_results": stress_test_results
         },
@@ -216,6 +218,31 @@ def risk_management_agent(state: AgentState):
                      f"最大回撤={max_drawdown:.2%}, 偏度={skewness:.2f}, "
                      f"辩论信号={debate_signal}, Kelly建议占比={kelly_fraction:.2f}"
     }
+
+    # GARCH模型拟合和预测
+    try:
+        # 获取足够长的数据进行GARCH拟合
+        if len(returns) >= 100:  # 确保有足够的数据
+            garch_params, _ = fit_garch(returns.values)
+            volatility_forecast = forecast_garch_volatility(returns.values, garch_params, 
+                                                          forecast_horizon=10)
+            
+            # 将结果添加到分析中
+            market_risk_score += 1 if garch_params['persistence'] > 0.95 else 0  # 高持续性表示更高风险
+            
+            # 添加到输出
+            message_content['volatility_model'] = {
+                'model_type': 'GARCH(1,1)',
+                'parameters': {
+                    'omega': float(garch_params['omega']),
+                    'alpha': float(garch_params['alpha']),
+                    'beta': float(garch_params['beta']),
+                    'persistence': float(garch_params['persistence'])
+                },
+                'forecast': [float(v) for v in volatility_forecast]
+            }
+    except Exception as e:
+        logger.warning(f"GARCH模型拟合失败: {e}")
 
     # 创建风险管理消息
     message = HumanMessage(

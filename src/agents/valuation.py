@@ -1,8 +1,11 @@
 from langchain_core.messages import HumanMessage
-from src.agents.state import AgentState, show_agent_reasoning, show_workflow_status
-from src.utils.api_utils import agent_endpoint, log_llm_interaction
 import json
 import numpy as np
+
+from src.agents.state import AgentState, show_agent_reasoning, show_workflow_status
+from src.utils.api_utils import agent_endpoint
+from src.calc.factor_models import estimate_capm
+from src.calc.portfolio_optimization import optimize_portfolio    
 
 
 @agent_endpoint("valuation", "估值分析师，使用DCF和所有者收益法评估公司内在价值")
@@ -370,22 +373,3 @@ def calculate_multistage_dcf(
     except Exception as e:
         print(f"DCF计算错误: {e}")
         return 0
-
-
-def calculate_working_capital_change(
-    current_working_capital: float,
-    previous_working_capital: float,
-) -> float:
-    """
-    计算两个期间之间的营运资本变化。
-    正值表示更多资本被占用（现金流出）。
-    负值表示减少占用（现金流入）。
-
-    Args:
-        current_working_capital: 当期营运资本
-        previous_working_capital: 前期营运资本
-
-    Returns:
-        float: 营运资本变化（当期 - 前期）
-    """
-    return current_working_capital - previous_working_capital

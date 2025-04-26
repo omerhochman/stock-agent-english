@@ -1,12 +1,11 @@
 from langchain_core.messages import HumanMessage
-from langchain_core.prompts import ChatPromptTemplate
 import json
-import math
-import numpy as np
 
 from src.agents.state import AgentState, show_agent_reasoning, show_workflow_status
 from src.tools.openrouter_config import get_chat_completion
 from src.utils.api_utils import agent_endpoint, log_llm_interaction
+from src.calc.portfolio_optimization import optimize_portfolio
+from src.calc.covariance_estimation import estimate_covariance_ewma
 
 
 ##### Portfolio Management Agent #####
