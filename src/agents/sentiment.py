@@ -2,7 +2,7 @@ from langchain_core.messages import HumanMessage
 from src.agents.state import AgentState, show_agent_reasoning, show_workflow_status
 from src.tools.news_crawler import get_stock_news, get_news_sentiment
 from src.utils.logging_config import setup_logger
-from src.utils.api_utils import agent_endpoint, log_llm_interaction
+from src.utils.api_utils import agent_endpoint
 import json
 from datetime import datetime, timedelta
 

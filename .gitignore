@@ -5,5 +5,6 @@ __pycache__/
 logs/
 *.egg-info/
 src/data/*
+src/data/sentiment_cache.json
 report.txt
 data/*

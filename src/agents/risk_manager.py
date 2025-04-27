@@ -1,4 +1,3 @@
-import math
 import numpy as np
 from langchain_core.messages import HumanMessage
 
@@ -18,6 +17,7 @@ logger = setup_logger('risk_management_agent')
 
 @agent_endpoint("risk_management", "风险管理专家，评估投资风险并给出风险调整后的交易建议")
 def risk_management_agent(state: AgentState):
+    """负责风险管理和风险调整后的交易决策"""
     show_workflow_status("Risk Manager")
     show_reasoning = state["metadata"]["show_reasoning"]
     portfolio = state["data"]["portfolio"]
@@ -34,21 +34,21 @@ def risk_management_agent(state: AgentState):
     except Exception as e:
         debate_results = ast.literal_eval(debate_message.content)
 
-    # 1. 计算基础风险指标
+    # 1. 计算基础风险指标 - 使用更高级的计算方法
     returns = prices_df['close'].pct_change().dropna()
     
-    # 计算波动率（使用指数加权移动平均）
-    daily_vol = returns.ewm(span=20).std().iloc[-1]  # EWMA波动率
+    # 使用EWMA优化波动率计算
+    daily_vol = returns.ewm(span=20, adjust=False).std().iloc[-1]  # EWMA波动率
     volatility = daily_vol * (252 ** 0.5)  # 年化
-
+    
     # 计算波动率的历史分布
     rolling_std = returns.rolling(window=120).std() * (252 ** 0.5)
     volatility_mean = rolling_std.mean()
     volatility_std = rolling_std.std()
-    volatility_percentile = (volatility - volatility_mean) / volatility_std
+    volatility_percentile = (volatility - volatility_mean) / volatility_std if volatility_std != 0 else 0
 
-    # 2. 高级风险指标计算
-    # 2.1 历史VaR (95%置信度)
+    # 2. 高级风险指标计算 - 使用 calc 模块中的函数
+    # 2.1 历史VaR (95%置信度) - 使用 calc/tail_risk_measures 模块
     var_95 = calculate_historical_var(returns, confidence_level=0.95)
     
     # 2.2 条件VaR/Expected Shortfall
@@ -66,7 +66,7 @@ def risk_management_agent(state: AgentState):
     
     # 2.5 Sortino比率 (仅考虑下行风险)
     downside_returns = returns[returns < 0]
-    downside_deviation = downside_returns.std() * np.sqrt(252)
+    downside_deviation = downside_returns.std() * np.sqrt(252) if len(downside_returns) > 0 else 0
     mean_return = returns.mean() * 252
     sortino_ratio = mean_return / downside_deviation if downside_deviation != 0 else 0
 
@@ -80,31 +80,28 @@ def risk_management_agent(state: AgentState):
         market_risk_score += 1
 
     # VaR评分 (基于历史分布)
-    # 注意：var_95通常为负数，越负风险越高
-    if var_95 < -0.03:
+    # 注意：var_95通常为正值（我们返回绝对值）
+    if var_95 > 0.03:
         market_risk_score += 2
-    elif var_95 < -0.02:
+    elif var_95 > 0.02:
         market_risk_score += 1
 
     # 最大回撤评分
-    if max_drawdown < -0.20:  # 严重回撤
+    if abs(max_drawdown) > 0.20:  # 严重回撤
         market_risk_score += 2
-    elif max_drawdown < -0.10:
+    elif abs(max_drawdown) > 0.10:
         market_risk_score += 1
         
     # 分布异常性评分 (显著非正态)
     if abs(skewness) > 1.0 or kurtosis > 5.0:
         market_risk_score += 1
 
-    # 4. 头寸规模计算
+    # 4. 头寸规模计算 - 使用凯利准则的优化版本
     # 考虑总组合价值，非仅现金
     current_stock_value = portfolio['stock'] * prices_df['close'].iloc[-1]
     total_portfolio_value = portfolio['cash'] + current_stock_value
 
-    # 基于Kelly准则的头寸规模
-    # 计算胜率和赔率
-    win_rate = 0.5  # 默认假设
-    
+    # 基于凯利准则的头寸规模
     # 从辩论结果调整胜率
     bull_confidence = debate_results.get("bull_confidence", 0.5)
     bear_confidence = debate_results.get("bear_confidence", 0.5)
@@ -113,14 +110,39 @@ def risk_management_agent(state: AgentState):
     else:
         win_rate = 1 - bear_confidence
         
-    # 计算平均胜利收益和亏损比率
-    win_loss_ratio = 1.5  # 默认假设
+    # 结合波动率模型优化收益预期
+    try:
+        # 使用GARCH模型预测未来波动率
+        if len(returns) >= 100:  # 确保有足够的数据
+            garch_params, _ = fit_garch(returns.values)
+            volatility_forecast = forecast_garch_volatility(returns.values, garch_params, 
+                                                         forecast_horizon=10)
+            
+            # 根据波动率预测调整胜率
+            # 如果预测波动率上升，降低胜率；如果预测波动率下降，提高胜率
+            avg_forecast = np.mean(volatility_forecast)
+            volatility_trend = avg_forecast / volatility - 1  # 正值表示波动率上升趋势
+            
+            # 调整胜率
+            if volatility_trend > 0.1:  # 波动率预期显著上升
+                win_rate = max(0.3, win_rate - 0.1)  # 最低设为0.3
+            elif volatility_trend < -0.1:  # 波动率预期显著下降
+                win_rate = min(0.8, win_rate + 0.05)  # 最高设为0.8
+    except Exception as e:
+        logger.warning(f"GARCH模型计算失败: {e}")
+        
+    # 计算平均胜利收益和亏损比率 - 使用历史数据优化
+    # 分析历史正负收益比例
+    avg_gain = returns[returns > 0].mean() if len(returns[returns > 0]) > 0 else 0.005
+    avg_loss = abs(returns[returns < 0].mean()) if len(returns[returns < 0]) > 0 else 0.005
+    win_loss_ratio = avg_gain / avg_loss if avg_loss != 0 else 1.5
     
-    # 应用分数Kelly公式
+    # 应用改进的凯利公式
     kelly_fraction = win_rate - ((1 - win_rate) / win_loss_ratio)
+    kelly_fraction = max(0, kelly_fraction)  # 确保非负
     
     # 保守系数和风险调整
-    conservative_factor = 0.5  # 只用一半Kelly建议
+    conservative_factor = 0.5  # 只用一半凯利建议
     risk_adjustment = max(0, 1 - (market_risk_score / 10))
     
     # 最终头寸大小
@@ -144,10 +166,14 @@ def risk_management_agent(state: AgentState):
 
     for scenario, decline in stress_test_scenarios.items():
         potential_loss = current_position_value * decline
-        portfolio_impact = potential_loss / total_portfolio_value if total_portfolio_value != 0 else math.nan
+        portfolio_impact = potential_loss / total_portfolio_value if total_portfolio_value != 0 else float('nan')
+        
+        # 对每种情景进行VaR分析
+        scenario_var = potential_loss * (var_95 / 0.05)  # 调整VaR以反映情景严重程度
         stress_test_results[scenario] = {
-            "potential_loss": potential_loss,
-            "portfolio_impact": portfolio_impact
+            "potential_loss": float(potential_loss),
+            "portfolio_impact": float(portfolio_impact),
+            "scenario_var": float(scenario_var)
         }
 
     # 6. 风险调整信号分析
@@ -185,7 +211,36 @@ def risk_management_agent(state: AgentState):
         else:
             trading_action = "hold"  # 其他情况 = 持有
 
-    # 8. 构建输出消息
+    # 8. GARCH模型拟合和预测
+    garch_results = {}
+    try:
+        # 获取足够长的数据进行GARCH拟合
+        if len(returns) >= 100:  # 确保有足够的数据
+            garch_params, log_likelihood = fit_garch(returns.values)
+            volatility_forecast = forecast_garch_volatility(returns.values, garch_params, 
+                                                         forecast_horizon=10)
+            
+            # 将结果添加到分析中
+            market_risk_score += 1 if garch_params['persistence'] > 0.95 else 0  # 高持续性表示更高风险
+            
+            # 保存GARCH结果
+            garch_results = {
+                'model_type': 'GARCH(1,1)',
+                'parameters': {
+                    'omega': float(garch_params['omega']),
+                    'alpha': float(garch_params['alpha']),
+                    'beta': float(garch_params['beta']),
+                    'persistence': float(garch_params['persistence'])
+                },
+                'log_likelihood': float(log_likelihood),
+                'forecast': [float(v) for v in volatility_forecast],
+                'forecast_annualized': [float(v * np.sqrt(252)) for v in volatility_forecast]
+            }
+    except Exception as e:
+        logger.warning(f"GARCH模型拟合失败: {e}")
+        garch_results = {"error": str(e)}
+
+    # 9. 构建输出消息
     message_content = {
         "max_position_size": float(max_position_size),
         "risk_score": risk_score,
@@ -204,6 +259,7 @@ def risk_management_agent(state: AgentState):
         "position_sizing": {
             "kelly_fraction": float(kelly_fraction),
             "win_rate": float(win_rate),
+            "win_loss_ratio": float(win_loss_ratio),
             "risk_adjustment": float(risk_adjustment),
             "total_portfolio_value": float(total_portfolio_value)
         },
@@ -213,36 +269,12 @@ def risk_management_agent(state: AgentState):
             "debate_confidence": debate_confidence,
             "debate_signal": debate_signal
         },
+        "volatility_model": garch_results,
         "reasoning": f"风险评分 {risk_score}/10: 市场风险={market_risk_score}, "
                      f"波动率={volatility:.2%}, VaR={var_95:.2%}, CVaR={cvar_95:.2%}, "
                      f"最大回撤={max_drawdown:.2%}, 偏度={skewness:.2f}, "
                      f"辩论信号={debate_signal}, Kelly建议占比={kelly_fraction:.2f}"
     }
-
-    # GARCH模型拟合和预测
-    try:
-        # 获取足够长的数据进行GARCH拟合
-        if len(returns) >= 100:  # 确保有足够的数据
-            garch_params, _ = fit_garch(returns.values)
-            volatility_forecast = forecast_garch_volatility(returns.values, garch_params, 
-                                                          forecast_horizon=10)
-            
-            # 将结果添加到分析中
-            market_risk_score += 1 if garch_params['persistence'] > 0.95 else 0  # 高持续性表示更高风险
-            
-            # 添加到输出
-            message_content['volatility_model'] = {
-                'model_type': 'GARCH(1,1)',
-                'parameters': {
-                    'omega': float(garch_params['omega']),
-                    'alpha': float(garch_params['alpha']),
-                    'beta': float(garch_params['beta']),
-                    'persistence': float(garch_params['persistence'])
-                },
-                'forecast': [float(v) for v in volatility_forecast]
-            }
-    except Exception as e:
-        logger.warning(f"GARCH模型拟合失败: {e}")
 
     # 创建风险管理消息
     message = HumanMessage(

@@ -13,6 +13,8 @@ import matplotlib
 import os
 import uuid  # 添加uuid模块用于生成run_id
 
+from src.tools.factor_data_api import get_risk_free_rate
+
 # 根据操作系统配置中文字体
 if sys.platform.startswith('win'):
     # Windows系统
@@ -402,8 +404,23 @@ class Backtester:
         annual_return = mean_daily_return * 252
         annual_volatility = std_daily_return * np.sqrt(252)
         
+        # 获取无风险利率
+        try:
+            # 使用get_risk_free_rate函数获取日度无风险利率
+            risk_free_rate_series = get_risk_free_rate(
+                start_date=self.start_date, 
+                end_date=self.end_date, 
+                freq='D'  # 获取日频数据
+            )
+            # 计算平均日度无风险利率
+            risk_free_rate = risk_free_rate_series.mean()
+            self.logger.info(f"成功获取无风险利率，平均值：{risk_free_rate:.6f}")
+        except Exception as e:
+            # 如果获取失败，使用默认值
+            risk_free_rate = 0.03 / 252  # 默认年化3%无风险利率的日度值
+            self.logger.warning(f"获取无风险利率失败: {str(e)}，使用默认值 {risk_free_rate:.6f}")
+        
         # 夏普比率
-        risk_free_rate = 0.03 / 252  # 假设年化3%无风险利率
         sharpe_ratio = (mean_daily_return - risk_free_rate) / std_daily_return * np.sqrt(252) if std_daily_return != 0 else 0
         
         # 索提诺比率 (只考虑下行风险)
@@ -463,11 +480,12 @@ class Backtester:
         max_profit_streak = max(profit_streaks) if profit_streaks else 0
         max_loss_streak = max(loss_streaks) if loss_streaks else 0
         
-        # 记录和打印性能指标
+        # 添加使用的无风险利率值到指标中
         self.metrics = {
             "总收益率": f"{(performance_df['Portfolio Value'].iloc[-1] / self.initial_capital - 1) * 100:.2f}%",
             "年化收益率": f"{annual_return * 100:.2f}%",
             "年化波动率": f"{annual_volatility * 100:.2f}%",
+            "无风险利率": f"{risk_free_rate * 252 * 100:.2f}%",  # 显示年化无风险利率
             "夏普比率": f"{sharpe_ratio:.2f}",
             "索提诺比率": f"{sortino_ratio:.2f}",
             "最大回撤": f"{max_drawdown:.2f}%",

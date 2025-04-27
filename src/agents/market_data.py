@@ -1,9 +1,7 @@
-from langchain_core.messages import HumanMessage
-from src.tools.openrouter_config import get_chat_completion
 from src.agents.state import AgentState, show_agent_reasoning, show_workflow_status
 from src.tools.api import get_financial_metrics, get_financial_statements, get_market_data, get_price_history
 from src.utils.logging_config import setup_logger
-from src.utils.api_utils import agent_endpoint, log_llm_interaction
+from src.utils.api_utils import agent_endpoint
 
 from datetime import datetime, timedelta
 import pandas as pd
@@ -86,8 +84,8 @@ def market_data_agent(state: AgentState):
         "data_collected": {
             "price_history": len(prices_dict) > 0,
             "financial_metrics": len(financial_metrics) > 0,
-            "financial_statements": len(financial_line_items) > 0,
-            "market_data": len(market_data) > 0
+            "financial_statements": len(financial_line_items) ,
+            "market_data": len(market_data) > 0 ,
         },
         "summary": f"为{ticker}收集了从{start_date}到{end_date}的市场数据，包括价格历史、财务指标和市场信息"
     }
