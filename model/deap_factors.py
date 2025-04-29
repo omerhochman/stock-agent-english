@@ -1,6 +1,8 @@
 import numpy as np
 import pandas as pd
 import random
+import re
+import ast
 import operator
 from deap import algorithms, base, creator, tools, gp
 import os
@@ -140,18 +142,57 @@ class FactorMiningModule:
         self.pset.addPrimitive(protected_inv, [float], float)
         
         # 添加时间序列函数
-        self.pset.addPrimitive(partial(rolling_mean, window=5), [float], float)
-        self.pset.addPrimitive(partial(rolling_mean, window=10), [float], float)
-        self.pset.addPrimitive(partial(rolling_mean, window=20), [float], float)
-        self.pset.addPrimitive(partial(rolling_std, window=5), [float], float)
-        self.pset.addPrimitive(partial(rolling_std, window=10), [float], float)
-        self.pset.addPrimitive(partial(ts_delta, period=1), [float], float)
-        self.pset.addPrimitive(partial(ts_delta, period=5), [float], float)
-        self.pset.addPrimitive(partial(ts_delay, period=1), [float], float)
-        self.pset.addPrimitive(partial(ts_delay, period=5), [float], float)
-        self.pset.addPrimitive(partial(ts_return, period=1), [float], float)
-        self.pset.addPrimitive(partial(ts_return, period=5), [float], float)
-        self.pset.addPrimitive(partial(ts_rank, window=10), [float], float)
+        
+        # 创建命名的partial函数
+        rolling_mean_5 = partial(rolling_mean, window=5)
+        rolling_mean_5.__name__ = "rolling_mean_5"
+        
+        rolling_mean_10 = partial(rolling_mean, window=10)
+        rolling_mean_10.__name__ = "rolling_mean_10"
+        
+        rolling_mean_20 = partial(rolling_mean, window=20)
+        rolling_mean_20.__name__ = "rolling_mean_20"
+        
+        rolling_std_5 = partial(rolling_std, window=5)
+        rolling_std_5.__name__ = "rolling_std_5"
+        
+        rolling_std_10 = partial(rolling_std, window=10)
+        rolling_std_10.__name__ = "rolling_std_10"
+        
+        ts_delta_1 = partial(ts_delta, period=1)
+        ts_delta_1.__name__ = "ts_delta_1"
+        
+        ts_delta_5 = partial(ts_delta, period=5)
+        ts_delta_5.__name__ = "ts_delta_5"
+        
+        ts_delay_1 = partial(ts_delay, period=1)
+        ts_delay_1.__name__ = "ts_delay_1"
+        
+        ts_delay_5 = partial(ts_delay, period=5)
+        ts_delay_5.__name__ = "ts_delay_5"
+        
+        ts_return_1 = partial(ts_return, period=1)
+        ts_return_1.__name__ = "ts_return_1"
+        
+        ts_return_5 = partial(ts_return, period=5)
+        ts_return_5.__name__ = "ts_return_5"
+        
+        ts_rank_10 = partial(ts_rank, window=10)
+        ts_rank_10.__name__ = "ts_rank_10"
+        
+        # 使用命名的partial函数
+        self.pset.addPrimitive(rolling_mean_5, [float], float)
+        self.pset.addPrimitive(rolling_mean_10, [float], float)
+        self.pset.addPrimitive(rolling_mean_20, [float], float)
+        self.pset.addPrimitive(rolling_std_5, [float], float)
+        self.pset.addPrimitive(rolling_std_10, [float], float)
+        self.pset.addPrimitive(ts_delta_1, [float], float)
+        self.pset.addPrimitive(ts_delta_5, [float], float)
+        self.pset.addPrimitive(ts_delay_1, [float], float)
+        self.pset.addPrimitive(ts_delay_5, [float], float)
+        self.pset.addPrimitive(ts_return_1, [float], float)
+        self.pset.addPrimitive(ts_return_5, [float], float)
+        self.pset.addPrimitive(ts_rank_10, [float], float)
         
         # 添加常数
         self.pset.addEphemeralConstant("rand", lambda: random.uniform(-1, 1), float)
@@ -634,51 +675,171 @@ class FactorMiningModule:
         if not self.best_factors:
             return {}
         
-        # 准备特征数据
-        X, _, feature_names = self._prepare_data(price_data)
-        
-        # 确保已设置原语集和工具箱
-        if self.pset is None:
-            self._setup_primitives(feature_names)
+        try:
+            # 准备特征数据
+            X, _, feature_names = self._prepare_data(price_data)
             
-        if self.toolbox is None:
-            # 简单初始化工具箱
-            self.toolbox = base.Toolbox()
-            self.toolbox.register("compile", gp.compile, pset=self.pset)
-        
-        # 计算因子值
-        factor_values = {}
-        
-        for factor_info in self.best_factors:
-            try:
-                # 解析表达式
-                expr = eval(factor_info['expression'])
-                # 编译为函数
-                func = self.toolbox.compile(expr=expr)
+            # 确保已设置原语集和工具箱
+            if self.pset is None:
+                self._setup_primitives(feature_names)
                 
-                # 计算因子值
-                values = np.zeros(X.shape[0])
-                
-                for i in range(X.shape[0]):
-                    sample = [X[i, j] for j in range(X.shape[1])]
+            if self.toolbox is None:
+                # 简单初始化工具箱
+                self.toolbox = base.Toolbox()
+                self.toolbox.register("compile", gp.compile, pset=self.pset)
+            
+            # 计算因子值
+            factor_values = {}
+            
+            for factor_info in self.best_factors:
+                try:
+                    # 解析表达式
+                    expr_str = factor_info['expression']
+                    
+                    # 分析表达式中使用的变量名
+                    used_vars = self._extract_variable_names(expr_str)
+                    
+                    # 检查表达式中使用的变量是否都在我们的特征中
+                    missing_vars = [var for var in used_vars if var not in feature_names]
+                    
+                    # 如果有缺失的变量，可能需要生成它们
+                    if missing_vars:
+                        self.logger.info(f"因子 {factor_info['name']} 需要计算额外特征: {missing_vars}")
+                        price_data = self._generate_missing_features(price_data, missing_vars)
+                        
+                        # 重新准备特征数据以包含新生成的特征
+                        X, _, feature_names = self._prepare_data(price_data)
+                        
+                        # 重新设置原语集和工具箱
+                        self.pset = None
+                        self.toolbox = None
+                        self._setup_primitives(feature_names)
+                        self.toolbox = base.Toolbox()
+                        self.toolbox.register("compile", gp.compile, pset=self.pset)
+                    
+                    # 尝试编译因子表达式
                     try:
-                        values[i] = func(*sample)
-                    except:
-                        values[i] = np.nan
-                
-                # 替换无效值
-                values = np.nan_to_num(values, nan=0.0, posinf=0.0, neginf=0.0)
-                
-                # 标准化因子值
-                values = (values - np.mean(values)) / (np.std(values) + 1e-8)
-                
-                # 存储因子值
-                factor_values[factor_info['name']] = values
-                
-            except Exception as e:
-                self.logger.error(f"计算因子 {factor_info['name']} 值时出错: {str(e)}")
+                        expr = eval(expr_str)
+                        func = self.toolbox.compile(expr=expr)
+                    except Exception as e:
+                        self.logger.error(f"编译因子 {factor_info['name']} 出错: {e}")
+                        continue
+                    
+                    # 计算因子值
+                    values = np.zeros(X.shape[0])
+                    for i in range(X.shape[0]):
+                        try:
+                            sample = [X[i, j] for j in range(X.shape[1])]
+                            values[i] = func(*sample)
+                        except Exception as e:
+                            values[i] = np.nan
+                    
+                    # 替换无效值
+                    values = np.nan_to_num(values, nan=0.0, posinf=0.0, neginf=0.0)
+                    
+                    # 标准化因子值
+                    values = (values - np.mean(values)) / (np.std(values) + 1e-8)
+                    
+                    # 存储因子值
+                    factor_values[factor_info['name']] = values
+                    
+                except Exception as e:
+                    self.logger.error(f"计算因子 {factor_info['name']} 值时出错: {str(e)}")
+            
+            return factor_values
         
-        return factor_values
+        except Exception as e:
+            self.logger.error(f"计算因子值过程中发生错误: {str(e)}")
+            return {}
+
+    def _extract_variable_names(self, expr_str: str) -> List[str]:
+        """
+        从表达式字符串中提取变量名
+        
+        Args:
+            expr_str: 表达式字符串
+            
+        Returns:
+            变量名列表
+        """
+        # 基本变量模式
+        var_pattern = r'[a-zA-Z][a-zA-Z0-9_]*'
+        
+        # 尝试从表达式中提取所有可能的变量名
+        potential_vars = re.findall(var_pattern, expr_str)
+        
+        # 排除基本运算符、函数名和常量
+        exclude_list = [
+            'add', 'sub', 'mul', 'protected_div', 'neg', 'abs', 
+            'protected_sqrt', 'protected_log', 'protected_inv',
+            'rolling_mean', 'rolling_std', 'ts_delta', 'ts_delay', 
+            'ts_return', 'ts_rank', 'partial', 'window', 'period',
+            'ARG', 'True', 'False', 'None'
+        ]
+        
+        # 过滤掉不是变量名的内容
+        variables = [var for var in potential_vars if var not in exclude_list and not var.startswith('ARG')]
+        
+        return list(set(variables))  # 去重
+
+    def _generate_missing_features(self, df: pd.DataFrame, missing_vars: List[str]) -> pd.DataFrame:
+        """
+        生成缺失的特征
+        
+        Args:
+            df: 原始数据框
+            missing_vars: 缺失的特征名列表
+            
+        Returns:
+            增强的数据框
+        """
+        enhanced_df = df.copy()
+        
+        # 处理常见的特征命名模式
+        for var in missing_vars:
+            try:
+                # 移动平均线
+                if var.startswith('ma') and var[2:].isdigit():
+                    window = int(var[2:])
+                    enhanced_df[var] = enhanced_df['close'].rolling(window=window).mean()
+                    self.logger.info(f"生成了移动平均线特征: {var}")
+                
+                # 均线差离
+                elif '_' in var and var.startswith('ma'):
+                    parts = var.split('_')
+                    if len(parts) == 2 and parts[0].startswith('ma') and parts[1].startswith('ma'):
+                        window1 = int(parts[0][2:])
+                        window2 = int(parts[1][2:])
+                        if f"{parts[0]}" not in enhanced_df.columns:
+                            enhanced_df[parts[0]] = enhanced_df['close'].rolling(window=window1).mean()
+                        if f"{parts[1]}" not in enhanced_df.columns:
+                            enhanced_df[parts[1]] = enhanced_df['close'].rolling(window=window2).mean()
+                        enhanced_df[var] = enhanced_df[parts[0]] / enhanced_df[parts[1]] - 1
+                        self.logger.info(f"生成了均线差离特征: {var}")
+                
+                # 收益率
+                elif var.startswith('returns_') and var[8:].isdigit():
+                    period = int(var[8:])
+                    enhanced_df[var] = enhanced_df['close'].pct_change(period)
+                    self.logger.info(f"生成了收益率特征: {var}")
+                
+                # 波动率
+                elif var.startswith('volatility_') and var[11:].isdigit():
+                    window = int(var[11:])
+                    enhanced_df[var] = enhanced_df['close'].pct_change().rolling(window=window).std()
+                    self.logger.info(f"生成了波动率特征: {var}")
+                    
+                # 其他未知特征 - 记录无法生成的特征
+                else:
+                    self.logger.warning(f"无法自动生成特征: {var}")
+                    
+            except Exception as e:
+                self.logger.error(f"生成特征 {var} 时出错: {str(e)}")
+        
+        # 填充NaN值
+        enhanced_df = enhanced_df.fillna(0)
+        
+        return enhanced_df
 
 
 class FactorAgent:
@@ -695,25 +856,33 @@ class FactorAgent:
         self.logger = logging.getLogger('factor_agent')
         self.factors_generated = False
     
-    def generate_factors(self, price_data: pd.DataFrame, n_factors: int = 5):
+    def generate_factors(self, price_data, n_factors=5, **kwargs):
         """
         生成因子
         
         Args:
             price_data: 价格数据
             n_factors: 生成的因子数量
+            **kwargs: 其他参数，将传递给factor_module.evolve_factors
             
         Returns:
             生成的因子列表
         """
         try:
+            # 提取和准备参数
+            evolve_params = {
+                'price_data': price_data,
+                'n_factors': n_factors
+            }
+            
+            # 添加其他可能的参数
+            allowed_params = ['population_size', 'n_generations', 'future_return_periods', 'min_fitness']
+            for param in allowed_params:
+                if param in kwargs:
+                    evolve_params[param] = kwargs[param]
+            
             # 生成因子
-            factors = self.factor_module.evolve_factors(
-                price_data=price_data,
-                n_factors=n_factors,
-                population_size=100,
-                n_generations=20  # 减少代数以加快训练
-            )
+            factors = self.factor_module.evolve_factors(**evolve_params)
             
             self.factors_generated = len(factors) > 0
             return factors

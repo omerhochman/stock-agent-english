@@ -9,3 +9,4 @@ src/data/sentiment_cache.json
 report.txt
 data/*
 models/
+factors/

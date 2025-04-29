@@ -250,15 +250,23 @@ class StockTradingEnv(gym.Env):
         
         return observation, reward, done, info
     
-    def reset(self) -> np.ndarray:
+    def reset(self):
         """
         重置环境
         
         Returns:
             初始状态
         """
-        # 随机选择一个开始位置，确保有足够的数据用于窗口
-        self.current_step = np.random.randint(self.window_size, len(self.df) - self.max_steps)
+        max_start_idx = len(self.df) - self.max_steps - 1
+        min_start_idx = self.window_size
+        
+        if max_start_idx <= min_start_idx:
+            # 如果数据量不足，使用固定的起始点
+            self.current_step = min_start_idx
+            print(f"警告: 数据量不足，使用固定起始点 {min_start_idx}")
+        else:
+            # 正常情况，随机选择起始点
+            self.current_step = np.random.randint(min_start_idx, max_start_idx)
         
         # 重置资金和持仓
         self.balance = self.initial_balance
@@ -548,9 +556,9 @@ class RLTrader:
         
         self.logger = logging.getLogger('rl_trader')
     
-    def train(self, df: pd.DataFrame, initial_balance: float = 100000,
-             transaction_fee_percent: float = 0.001, n_episodes: int = 1000,
-             batch_size: int = 64, reward_scaling: float = 100.0, max_steps: int = 252):
+    def train(self, df, initial_balance=100000, transaction_fee_percent=0.001,
+          n_episodes=1000, batch_size=64, reward_scaling=100.0, max_steps=252,
+          window_size=20):
         """
         训练强化学习交易模型
         
@@ -569,7 +577,8 @@ class RLTrader:
             initial_balance=initial_balance,
             transaction_fee_percent=transaction_fee_percent,
             reward_scaling=reward_scaling,
-            max_steps=max_steps
+            max_steps=max_steps,
+            window_size=window_size,
         )
         
         # 创建PPO代理

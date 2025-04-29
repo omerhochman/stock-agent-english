@@ -89,17 +89,6 @@ def get_price_history(symbol: str, start_date: str = None, end_date: str = None,
         包含价格数据的DataFrame
     """
     try:
-        from pandas.tseries.offsets import BDay  # 银行工作日，A 股≈交易日
-        def adjust_to_business_day(date_str, forward=True):
-            d = pd.Timestamp(date_str)
-            if forward:
-                return d if d.weekday() < 5 else (d + BDay())
-            else:
-                return d if d.weekday() < 5 else (d - BDay())
-
-        start_date = adjust_to_business_day(start_date, forward=True).strftime('%Y-%m-%d')
-        end_date   = adjust_to_business_day(end_date,   forward=False).strftime('%Y-%m-%d')
-        
         # 使用数据API获取价格数据
         df = data_api.get_price_data(symbol, start_date, end_date)
         
