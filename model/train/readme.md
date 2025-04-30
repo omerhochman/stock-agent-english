@@ -15,6 +15,6 @@ python train.py --ticker 600054 --model factor --action test
 # 训练所有模型
 python train.py --ticker 600054 --model all
 
-# 指定自定义参数
+# 指定自定义参数（注意windows需要加\来转义双引号）
 python train.py --ticker 600054 --model dl --params '{"hidden_dim": 128, "epochs": 100}'
 ```

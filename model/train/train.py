@@ -102,7 +102,7 @@ def add_technical_indicators(df):
         df['volatility_20d'] = df['close'].pct_change().rolling(window=20).std()
     
     # 填充NaN值
-    df = df.fillna(method='ffill').fillna(method='bfill').fillna(0)
+    df = df.ffill().bfill().fillna(0)
     
     return df
 
@@ -183,14 +183,16 @@ def train_rl_model(prices_df, params=None, save_dir='models', verbose=True):
             print("尝试继续训练...")
         
         # 设置默认参数
+        window_size = 10
+        available_data_points = len(enhanced_df) - window_size
         default_params = {
             'n_episodes': 100,
             'batch_size': 32,
             'reward_scaling': 1.0,
             'initial_balance': 100000,
             'transaction_fee_percent': 0.001,
-            'window_size': 10,
-            'max_steps': min(30, len(enhanced_df) - 20)
+            'window_size': window_size,
+            'max_steps': max(20, available_data_points // 2)  # 使用一半可用数据点，但至少20步
         }
         
         # 合并用户提供的参数
@@ -431,12 +433,22 @@ def generate_signals(agent, model_type, prices_df, verbose=True):
             # 因子模型内部会根据需要计算各种特征
             signals = agent.generate_signals(prices_df)
         else:
-            signals = agent.generate_signals(prices_df)
+            # 详细的错误捕获
+            try:
+                signals = agent.generate_signals(prices_df)
+            except Exception as e:
+                import traceback
+                print(f"生成信号时出现错误: {e}")
+                traceback.print_exc()
+                # 尝试使用简单的字典返回
+                signals = {'signal': 'neutral', 'confidence': 0.5, 'error': str(e)}
         
         if verbose:
             print(f"生成的交易信号: {signals.get('signal', 'unknown')}, 置信度: {signals.get('confidence', 0)}")
             if 'reasoning' in signals:
                 print(f"决策理由: {signals['reasoning']}")
+            # 打印完整的信号字典以进行调试
+            print(f"完整信号信息: {signals}")
         
         return signals
     

@@ -61,10 +61,10 @@ class DataProcessor:
         
         if available_columns:
             # 对于价格列，使用前向填充
-            df[available_columns] = df[available_columns].fillna(method='ffill')
+            df[available_columns] = df[available_columns].ffill()
             
             # 如果仍有缺失值（比如序列开头），使用后向填充
-            df[available_columns] = df[available_columns].fillna(method='bfill')
+            df[available_columns] = df[available_columns].bfill()
         
         # 成交量列的缺失值处理
         volume_columns = ['volume', 'amount']

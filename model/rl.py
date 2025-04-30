@@ -204,9 +204,15 @@ class StockTradingEnv(gym.Env):
         # 应用奖励缩放
         reward = portfolio_return * self.reward_scaling
         
-        # 惩罚过度交易
-        if action != 0:  # 如果不是持有
-            reward -= 0.001  # 轻微惩罚
+        # 鼓励交易，减少持有惩罚
+        if action == 0:  # 持有
+            # 如果持仓比例低，给予小惩罚
+            position_ratio = self.current_position * current_price / new_portfolio_value
+            if position_ratio < 0.1:  # 持仓少于10%
+                reward -= 0.001  # 小惩罚，鼓励建仓
+        else:  # 交易(买入或卖出)
+            # 轻微的交易奖励，鼓励探索
+            reward += 0.0005
         
         self.total_reward += reward
         
@@ -257,16 +263,18 @@ class StockTradingEnv(gym.Env):
         Returns:
             初始状态
         """
-        max_start_idx = len(self.df) - self.max_steps - 1
+        max_start_idx = len(self.df) - self.max_steps
         min_start_idx = self.window_size
         
-        if max_start_idx <= min_start_idx:
-            # 如果数据量不足，使用固定的起始点
-            self.current_step = min_start_idx
-            print(f"警告: 数据量不足，使用固定起始点 {min_start_idx}")
-        else:
-            # 正常情况，随机选择起始点
-            self.current_step = np.random.randint(min_start_idx, max_start_idx)
+        if max_start_idx <= min_start_idx + 5:  # 添加一些容差
+            # 使用更小的max_steps
+            adjusted_max_steps = len(self.df) - min_start_idx - 5
+            self.max_steps = max(10, adjusted_max_steps)
+            max_start_idx = len(self.df) - self.max_steps
+            print(f"注意: 调整max_steps为{self.max_steps}以适应数据量")
+        
+        # 随机选择起始点
+        self.current_step = np.random.randint(min_start_idx, max_start_idx)
         
         # 重置资金和持仓
         self.balance = self.initial_balance
@@ -529,7 +537,8 @@ class PPOAgent:
         Args:
             path: 模型路径
         """
-        self.policy.load_state_dict(torch.load(path, map_location=self.device))
+        state_dict = torch.load(path, map_location=self.device, weights_only=True)
+        self.policy.load_state_dict(state_dict)
         self.old_policy.load_state_dict(self.policy.state_dict())
 
 
@@ -795,7 +804,7 @@ class RLTrader:
         self.trained = True
         self.logger.info(f"模型从 {model_path} 加载成功")
         return True
-    
+
     def generate_trading_signal(self, state):
         """
         生成交易信号
@@ -811,22 +820,46 @@ class RLTrader:
         
         # 获取动作和概率
         with torch.no_grad():
-            state_tensor = torch.FloatTensor(state).unsqueeze(0).to(self.agent.device)
-            action_probs, _ = self.agent.policy(state_tensor)
-            action_probs = action_probs.squeeze().cpu().numpy()
-            
-            # 选择动作
-            action = np.argmax(action_probs)
-            
-            # 转换为交易信号
-            signal_map = {0: 'neutral', 1: 'bullish', 2: 'bearish'}
-            confidence_map = {0: 0.5, 1: action_probs[1], 2: action_probs[2]}
-            
-            return {
-                'signal': signal_map[action],
-                'confidence': float(confidence_map[action]),
-                'action_probs': {signal_map[i]: float(p) for i, p in enumerate(action_probs)}
-            }
+            try:
+                state_tensor = torch.FloatTensor(state).unsqueeze(0).to(self.agent.device)
+                action_probs, _ = self.agent.policy(state_tensor)
+                action_probs = action_probs.squeeze().cpu().numpy()
+                
+                # 打印调试信息
+                print(f"动作概率: {action_probs}")
+                
+                # 选择动作
+                action = np.argmax(action_probs)
+                
+                # 转换为交易信号
+                signal_map = {0: 'neutral', 1: 'bullish', 2: 'bearish'}
+                
+                # 确保动作在有效范围内
+                if action not in signal_map:
+                    print(f"警告: 无效的动作索引 {action}")
+                    action = 0  # 默认为neutral
+                
+                # 计算置信度
+                confidence = float(action_probs[action])
+                
+                # 构建动作概率字典
+                action_prob_dict = {}
+                for i, prob in enumerate(action_probs):
+                    if i in signal_map:
+                        action_prob_dict[signal_map[i]] = float(prob)
+                
+                # 同时使用action_probs和action_probabilities两个键，保证兼容性
+                return {
+                    'signal': signal_map[action],
+                    'confidence': confidence,
+                    'action_probs': action_prob_dict,
+                    'action_probabilities': action_prob_dict
+                }
+            except Exception as e:
+                print(f"生成交易信号时出错: {e}")
+                import traceback
+                traceback.print_exc()
+                return {'signal': 'neutral', 'confidence': 0.5}
 
 
 class RLTradingAgent:
@@ -941,22 +974,26 @@ class RLTradingAgent:
             env = StockTradingEnv(
                 df=df,
                 window_size=self.window_size,
-                max_steps=len(df)
+                max_steps=10  # 小步数
             )
             
             # 获取状态
             state = env.reset()
+
+            print(f"\n用于信号生成的状态shape: {state.shape}\n")
             
             # 生成信号
             signal_info = self.rl_trader.generate_trading_signal(state)
             
-            # 基于动作概率调整信号
-            action_probs = signal_info['action_probs']
-            
             # 添加策略分析
             signals['rl_signal'] = signal_info['signal']
             signals['rl_confidence'] = signal_info['confidence']
-            signals['action_probabilities'] = action_probs
+            
+            # 同时尝试两种键名
+            if 'action_probabilities' in signal_info:
+                signals['action_probabilities'] = signal_info['action_probabilities']
+            if 'action_probs' in signal_info:
+                signals['action_probs'] = signal_info['action_probs']
             
             # 添加推理分析
             signals['reasoning'] = self._generate_reasoning(signal_info)
@@ -966,7 +1003,9 @@ class RLTradingAgent:
             signals['confidence'] = signal_info['confidence']
             
         except Exception as e:
-            self.logger.error(f"生成交易信号时出错: {str(e)}")
+            self.logger.error(f"生成交易信号时出错: {e}")
+            import traceback
+            traceback.print_exc()
             signals['signal'] = 'neutral'
             signals['confidence'] = 0.5
             signals['error'] = str(e)
@@ -1027,7 +1066,7 @@ class RLTradingAgent:
                     df[name] = indicator
         
         # 填充缺失值
-        df = df.fillna(method='ffill').fillna(method='bfill')
+        df = df.ffill().bfill()
         
         return df
     
@@ -1043,23 +1082,35 @@ class RLTradingAgent:
         """
         signal = signal_info['signal']
         confidence = signal_info['confidence']
-        action_probs = signal_info.get('action_probabilities', {})
+        
+        # 尝试两种可能的键名
+        action_probs = {}
+        if 'action_probabilities' in signal_info:
+            action_probs = signal_info['action_probabilities']
+        elif 'action_probs' in signal_info:
+            action_probs = signal_info['action_probs']
         
         reasoning = []
         
         # 分析信号
         if signal == 'bullish':
             reasoning.append(f"强化学习模型预测看多信号，置信度: {confidence:.2%}")
-            reasoning.append(f"买入概率: {action_probs.get('bullish', 0):.2%}")
+            if 'bullish' in action_probs:
+                reasoning.append(f"买入概率: {action_probs.get('bullish', 0):.2%}")
         elif signal == 'bearish':
             reasoning.append(f"强化学习模型预测看空信号，置信度: {confidence:.2%}")
-            reasoning.append(f"卖出概率: {action_probs.get('bearish', 0):.2%}")
+            if 'bearish' in action_probs:
+                reasoning.append(f"卖出概率: {action_probs.get('bearish', 0):.2%}")
         else:
             reasoning.append(f"强化学习模型预测中性信号，置信度: {confidence:.2%}")
-            reasoning.append(f"持有概率: {action_probs.get('neutral', 0):.2%}")
+            if 'neutral' in action_probs:
+                reasoning.append(f"持有概率: {action_probs.get('neutral', 0):.2%}")
         
         # 分析行为概率分布
-        probs_str = ", ".join([f"{k}: {v:.2%}" for k, v in action_probs.items()])
-        reasoning.append(f"行为概率分布: {probs_str}")
+        if action_probs:
+            probs_str = ", ".join([f"{k}: {v:.2%}" for k, v in action_probs.items()])
+            reasoning.append(f"行为概率分布: {probs_str}")
+        else:
+            reasoning.append("行为概率分布: 无有效数据")
         
         return "; ".join(reasoning)
