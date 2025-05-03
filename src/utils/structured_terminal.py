@@ -113,12 +113,15 @@ class StructuredTerminalOutput:
             is_last = i == len(items) - 1
             prefix = SYMBOLS["tree_last"] if is_last else SYMBOLS["tree_branch"]
             indent_str = "  " * indent
+            
+            # 格式化当前值
+            formatted_value = self._format_value(value)
 
             # 特殊处理market_data和一些大型数据结构
             if key in ["market_returns", "stock_returns"] and isinstance(value, str) and len(value) > max_str_len:
                 result.append(f"{indent_str}{prefix} {key}: [数据过长，已省略]")
                 continue
-                
+                    
             # 添加特殊处理大数值的逻辑
             if "price" in key.lower() and isinstance(value, (int, float)) and value > 1000000:
                 if value > 1000000000:  # 十亿以上
@@ -126,6 +129,17 @@ class StructuredTerminalOutput:
                 else:  # 百万到十亿
                     formatted_value = f"${value/1000000:.2f}M"
                 result.append(f"{indent_str}{prefix} {key}: {formatted_value}")
+                continue
+                
+            # 处理0.0值
+            if isinstance(value, (int, float)) and value == 0.0:
+                # 检查是否在应该显示0值的场景（如数量、计数等）
+                if any(keyword in key.lower() for keyword in ['count', 'quantity', 'number', 'index']):
+                    result.append(f"{indent_str}{prefix} {key}: {formatted_value}")
+                else:
+                    # 如果是在stress_test或其他默认为0的场景，可以选择不显示
+                    if "stress_test" not in key.lower() and "potential_loss" not in key.lower():
+                        result.append(f"{indent_str}{prefix} {key}: {formatted_value}")
                 continue
 
             if isinstance(value, dict) and value:
@@ -148,7 +162,6 @@ class StructuredTerminalOutput:
                             item_str = item_str[:max_str_len] + "..."
                         result.append(f"{indent_str}  {sub_prefix} {item_str}")
             else:
-                formatted_value = self._format_value(value)
                 # 截断过长的字符串
                 if isinstance(formatted_value, str) and len(formatted_value) > max_str_len:
                     formatted_value = formatted_value[:max_str_len] + "..."

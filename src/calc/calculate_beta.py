@@ -61,39 +61,59 @@ def calculate_beta(ticker, market_index="000300", start_date=None, end_date=None
                 logger.error(f"备选方法获取市场数据也失败: {subex}")
                 return 1.0  # 所有方法都失败时返回默认值
         
-        # 3. 确保两个序列有共同的日期索引
-        if not isinstance(stock_returns.index, pd.DatetimeIndex):
+        try:
+            # 3. 确保两个序列有共同的日期索引
+            # 先将两者转换为相同的时间格式
+            if not isinstance(stock_returns.index, pd.DatetimeIndex):
+                stock_returns.index = pd.to_datetime(stock_returns.index)
+            
+            if not isinstance(market_returns.index, pd.DatetimeIndex):
+                market_returns.index = pd.to_datetime(market_returns.index)
+                
+            # 将两者的日期索引转换为字符串以消除时区等细微差异的影响
+            stock_returns.index = stock_returns.index.strftime('%Y-%m-%d')
+            market_returns.index = market_returns.index.strftime('%Y-%m-%d')
+            
+            # 再次转换为日期类型以保持排序能力
             stock_returns.index = pd.to_datetime(stock_returns.index)
-        
-        if not isinstance(market_returns.index, pd.DatetimeIndex):
             market_returns.index = pd.to_datetime(market_returns.index)
+                
+            common_dates = stock_returns.index.intersection(market_returns.index)
             
-        common_dates = stock_returns.index.intersection(market_returns.index)
-        if len(common_dates) < 30:  # 需要足够的数据点
-            logger.warning(f"股票和市场数据重叠时间段不足，只有{len(common_dates)}个共同日期，使用默认Beta值")
-            return 1.0
-        
-        # 4. 计算Beta
-        stock_ret = stock_returns[common_dates]
-        market_ret = market_returns[common_dates]
-        
-        covariance = stock_ret.cov(market_ret)
-        market_variance = market_ret.var()
-        
-        if market_variance > 0:
-            beta = covariance / market_variance
-            logger.info(f"成功计算 {ticker} 的Beta值: {beta:.2f}")
-        else:
-            logger.warning(f"市场方差为零，无法计算Beta值，使用默认值")
-            beta = 1.0
-        
-        # 确保beta在合理范围内
-        if not (0.2 <= beta <= 3.0):
-            logger.warning(f"计算的Beta值 {beta:.2f} 超出合理范围，调整为限制范围")
-            beta = max(min(beta, 3.0), 0.2)
+            # 调试输出
+            logger.info(f"股票日期范围: {stock_returns.index.min()} 到 {stock_returns.index.max()}")
+            logger.info(f"市场日期范围: {market_returns.index.min()} 到 {market_returns.index.max()}")
+            logger.info(f"共同日期数量: {len(common_dates)}")
             
-        return beta
+            if len(common_dates) < 30:  # 需要足够的数据点
+                logger.warning(f"股票和市场数据重叠时间段不足，只有{len(common_dates)}个共同日期，使用默认Beta值")
+                return 1.0
             
+            # 4. 计算Beta
+            stock_ret = stock_returns[common_dates]
+            market_ret = market_returns[common_dates]
+            
+            covariance = stock_ret.cov(market_ret)
+            market_variance = market_ret.var()
+            
+            if market_variance > 0:
+                beta = covariance / market_variance
+                logger.info(f"成功计算 {ticker} 的Beta值: {beta:.2f}")
+            else:
+                logger.warning(f"市场方差为零，无法计算Beta值，使用默认值")
+                beta = 1.0
+            
+            # 确保beta在合理范围内
+            if not (0.2 <= beta <= 3.0):
+                logger.warning(f"计算的Beta值 {beta:.2f} 超出合理范围，调整为限制范围")
+                beta = max(min(beta, 3.0), 0.2)
+                
+            return beta
+        except Exception as e:
+            logger.error(f"计算Beta时出错: {e}")
+            logger.error(f"股票收益率索引类型: {type(stock_returns.index)}")
+            logger.error(f"市场收益率索引类型: {type(market_returns.index)}")
+            return 1.0  # 出错时返回市场平均值
     except Exception as e:
         logger.error(f"计算Beta值出错: {e}")
         return 1.0  # 出错时返回市场平均值

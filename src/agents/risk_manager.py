@@ -163,18 +163,21 @@ def risk_management_agent(state: AgentState):
 
     stress_test_results = {}
     current_position_value = current_stock_value
-
-    for scenario, decline in stress_test_scenarios.items():
-        potential_loss = current_position_value * decline
-        portfolio_impact = potential_loss / total_portfolio_value if total_portfolio_value != 0 else float('nan')
-        
-        # 对每种情景进行VaR分析
-        scenario_var = potential_loss * (var_95 / 0.05)  # 调整VaR以反映情景严重程度
-        stress_test_results[scenario] = {
-            "potential_loss": float(potential_loss),
-            "portfolio_impact": float(portfolio_impact),
-            "scenario_var": float(scenario_var)
-        }
+    if current_position_value > 0:
+        for scenario, decline in stress_test_scenarios.items():
+            potential_loss = current_position_value * decline
+            portfolio_impact = potential_loss / total_portfolio_value if total_portfolio_value != 0 else float('nan')
+            
+            # 对每种情景进行VaR分析
+            scenario_var = potential_loss * (var_95 / 0.05)  # 调整VaR以反映情景严重程度
+            stress_test_results[scenario] = {
+                "potential_loss": float(potential_loss),
+                "portfolio_impact": float(portfolio_impact),
+                "scenario_var": float(scenario_var)
+            }
+    else:
+        # 空持仓时使用空字典或None
+        stress_test_results = {"no_position": True}
 
     # 6. 风险调整信号分析
     # 考虑辩论室置信度

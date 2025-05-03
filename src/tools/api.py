@@ -205,7 +205,7 @@ def _ensure_required_columns(df: pd.DataFrame) -> pd.DataFrame:
 
 
 def prices_to_df(prices):
-    """Convert price data to DataFrame with standardized column names"""
+    """Convert price data to DataFrame with proper date index"""
     try:
         df = pd.DataFrame(prices)
 
@@ -233,13 +233,21 @@ def prices_to_df(prices):
         for col in required_columns:
             if col not in df.columns:
                 df[col] = 0.0  # 使用0填充缺失的必要列
+        
+        # 确保日期列是正确的日期格式
+        if 'date' in df.columns:
+            df['date'] = pd.to_datetime(df['date'])
+            # 设置日期作为索引并排序
+            df.set_index('date', inplace=True)
+            df.sort_index(inplace=True)
                 
         # 使用数据处理器增强数据质量
         df = data_processor.process_price_data(df)
 
         return df
     except Exception as e:
-        return handle_exception("prices_to_df", e, pd.DataFrame(columns=['close', 'open', 'high', 'low', 'volume']))
+        logger.error(f"prices_to_df错误: {e}")
+        return pd.DataFrame(columns=['close', 'open', 'high', 'low', 'volume'])
 
 
 def get_price_data(ticker: str, start_date: str, end_date: str) -> pd.DataFrame:
