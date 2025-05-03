@@ -1,12 +1,5 @@
-"""
-Summary Report Module - 生成投资分析汇总报告
-
-此模块负责将Agent分析结果转化为格式化的汇总报告。
-"""
-
-import json
 import logging
-from typing import Dict, Any, List
+from typing import Dict, Any
 from datetime import datetime
 
 # 日志设置
@@ -250,6 +243,39 @@ def print_summary_report(state: Dict[str, Any]) -> None:
             print(f"  风险价值(95%): {var:.2%}" if isinstance(var, float) else f"  风险价值(95%): {var}")
             print(f"  最大回撤: {max_dd:.2%}" if isinstance(max_dd, float) else f"  最大回撤: {max_dd}")
     
+    # 打印宏观分析结果
+    if "macro" in analyses:
+        macro = analyses.get("macro", {})
+        macro_env = macro.get("macro_environment", "未知")
+        impact = macro.get("impact_on_stock", "未知")
+        key_factors = macro.get("key_factors", [])
+        reasoning = macro.get("reasoning", "未提供理由")
+        
+        print(f"\n{COLORS['bold']}{COLORS['bg_blue']} 宏观分析 {COLORS['reset']}")
+        
+        env_color = {
+            "positive": f"{COLORS['green']}积极{COLORS['reset']}",
+            "negative": f"{COLORS['red']}消极{COLORS['reset']}",
+            "neutral": f"{COLORS['yellow']}中性{COLORS['reset']}"
+        }.get(macro_env.lower(), macro_env)
+        
+        impact_color = {
+            "positive": f"{COLORS['green']}利好{COLORS['reset']}",
+            "negative": f"{COLORS['red']}利空{COLORS['reset']}",
+            "neutral": f"{COLORS['yellow']}中性{COLORS['reset']}"
+        }.get(impact.lower(), impact)
+        
+        print(f"{COLORS['bold']}宏观环境:{COLORS['reset']} {env_color}")
+        print(f"{COLORS['bold']}对股票影响:{COLORS['reset']} {impact_color}")
+        
+        if key_factors:
+            print(f"{COLORS['bold']}关键因素:{COLORS['reset']}")
+            for i, factor in enumerate(key_factors):
+                print(f"  {i+1}. {factor}")
+        
+        print(f"{COLORS['bold']}分析理由:{COLORS['reset']} {reasoning[:200]}..." if len(reasoning) > 200 else f"{COLORS['bold']}分析理由:{COLORS['reset']} {reasoning}")
+        print("-" * width)
+        
     # 打印结尾
     print("\n" + "=" * width)
     print(f"{COLORS['bold']}{COLORS['bg_green']}{'':^15}分析报告结束{'':^15}{COLORS['reset']}")

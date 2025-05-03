@@ -10,6 +10,7 @@ from src.tools.api import prices_to_df
 from src.tools.factor_data_api import get_multiple_index_data, get_risk_free_rate
 from src.calc.portfolio_optimization import portfolio_volatility
 from src.utils.logging_config import setup_logger
+from src.utils.formatting_utils import format_market_data_summary
 
 # 设置日志记录器
 logger = setup_logger('portfolio_management_agent')
@@ -40,8 +41,9 @@ def portfolio_management_agent(state: AgentState):
         msg for msg in state["messages"] if msg.name == "valuation_agent")
     risk_message = next(
         msg for msg in state["messages"] if msg.name == "risk_management_agent")
+    macro_message = next(
+        msg for msg in state["messages"] if msg.name == "macro_analyst_agent")
 
-    # 创建系统消息
     system_message = {
         "role": "system",
         "content": """You are a portfolio manager making final trading decisions.
@@ -65,8 +67,12 @@ def portfolio_management_agent(state: AgentState):
             3. Technical Analysis (25% weight)
                - Secondary confirmation
                - Helps with entry/exit timing
+               
+            4. Macro Analysis (15% weight)
+               - Provides broader economic context
+               - Helps assess external risks and opportunities
             
-            4. Sentiment Analysis (10% weight)
+            5. Sentiment Analysis (10% weight)
                - Final consideration
                - Can influence sizing within risk limits
             
@@ -74,8 +80,9 @@ def portfolio_management_agent(state: AgentState):
             1. First check risk management constraints
             2. Then evaluate valuation signal
             3. Then evaluate fundamentals signal
-            4. Use technical analysis for timing
-            5. Consider sentiment for final adjustment
+            4. Consider macro environment analysis
+            5. Use technical analysis for timing
+            6. Consider sentiment for final adjustment
             
             Provide the following in your output:
             - "action": "buy" | "sell" | "hold",
@@ -92,7 +99,7 @@ def portfolio_management_agent(state: AgentState):
             - Quantity must be ≤ max_position_size from risk management"""
     }
 
-    # 创建用户消息，包含分析师信号
+    # 创建用户消息
     user_message = {
         "role": "user",
         "content": f"""Based on the team's analysis below, make your trading decision.
@@ -102,12 +109,12 @@ def portfolio_management_agent(state: AgentState):
             Sentiment Analysis Trading Signal: {sentiment_message.content}
             Valuation Analysis Trading Signal: {valuation_message.content}
             Risk Management Trading Signal: {risk_message.content}
+            Macro Analysis Trading Signal: {macro_message.content}
 
             Here is the current portfolio:
             Portfolio:
             Cash: {portfolio['cash']:.2f}
             Current Position: {portfolio['stock']} shares
-            Current Price: {current_price:.2f}
 
             Only include the action, quantity, reasoning, confidence, and agent_signals in your output as JSON.  Do not include any JSON markdown.
 
@@ -403,6 +410,22 @@ def optimize_portfolio_decision_advanced(llm_decision, portfolio, current_price,
     # 确保不超过风险管理指定的最大头寸
     suggested_position_value = min(suggested_position_value, max_position_size)
     
+    # 获取宏观分析结果
+    macro_signal = next((s for s in agent_signals if s.get("agent_name", "").lower() == "macro_analysis"), None)
+    
+    # 基于宏观分析调整资本分配
+    macro_adjustment = 1.0  # 默认不调整
+    if macro_signal:
+        # 宏观环境积极时增加资本分配
+        if macro_signal.get("signal", "").lower() == "bullish":
+            macro_adjustment = 1.2
+        # 宏观环境消极时减少资本分配
+        elif macro_signal.get("signal", "").lower() == "bearish":
+            macro_adjustment = 0.8
+        
+        # 将宏观调整应用到建议的仓位
+        suggested_position_value = suggested_position_value * macro_adjustment
+    
     # 转换为股数
     suggested_quantity = int(suggested_position_value / current_price) if current_price > 0 else 0
     
@@ -491,7 +514,10 @@ def optimize_portfolio_decision_advanced(llm_decision, portfolio, current_price,
             if new_quantity == 0:
                 action = "hold"
     
-    # 11. 最终决策整合
+    # 格式化市场数据
+    formatted_market_data = format_market_data_summary(market_data)
+
+    # 最终决策整合
     optimized_decision = {
         "action": action,
         "quantity": new_quantity,
@@ -506,9 +532,10 @@ def optimize_portfolio_decision_advanced(llm_decision, portfolio, current_price,
             "suggested_position_value": suggested_position_value,
             "total_portfolio_value": total_portfolio_value,
             "position_profit_pct": position_profit_pct,
+            "macro_adjustment": macro_adjustment,
             "analytics": portfolio_optimization_results,
-            "market_data": {k: str(v) if isinstance(v, pd.Series) else v for k, v in market_data.items()}
+            "market_data": formatted_market_data,
         }
     }
-    
+
     return optimized_decision

@@ -1,16 +1,5 @@
-"""
-结构化终端输出模块
-
-此模块提供了一个简单但灵活的系统，用于收集和格式化agent数据，
-然后在工作流结束时以美观、结构化的格式一次性展示。
-
-完全独立于后端，只负责终端输出的格式化。
-"""
-
 import json
-import logging
-from typing import Dict, Any, List, Optional
-from datetime import datetime
+from typing import Dict, Any, List
 
 from src.utils.logging_config import setup_logger
 
@@ -57,6 +46,7 @@ AGENT_MAP = {
     "researcher_bear_agent": {"icon": "🐻", "name": "空方研究"},
     "debate_room_agent": {"icon": "🗣️", "name": "辩论室分析"},
     "risk_management_agent": {"icon": "⚠️", "name": "风险管理"},
+    "macro_analyst_agent": {"icon": "🌍", "name": "宏观分析"},
     "portfolio_management_agent": {"icon": "📂", "name": "投资组合管理"}
 }
 
@@ -71,6 +61,7 @@ AGENT_ORDER = [
     "researcher_bear_agent",
     "debate_room_agent",
     "risk_management_agent",
+    "macro_analyst_agent",
     "portfolio_management_agent"
 ]
 
@@ -96,17 +87,25 @@ class StructuredTerminalOutput:
         if isinstance(value, bool):
             return "✅" if value else "❌"
         elif isinstance(value, (int, float)):
-            # 对百分比值进行特殊处理
-            if -1 <= value <= 1 and isinstance(value, float):
-                return f"{value:.2%}"
+            # 对大数进行特殊处理
+            if value > 1000000:
+                if value > 1000000000:  # 十亿以上
+                    return f"${value/1000000000:.2f}B"
+                else:  # 百万到十亿
+                    return f"${value/1000000:.2f}M"
+            # 对超过5位小数的数进行格式化
+            elif isinstance(value, float) and abs(value) < 0.00001:
+                return f"{value:.5f}"
+            elif isinstance(value, float):
+                return f"{value:.4f}"
             return str(value)
         elif value is None:
             return "N/A"
         else:
             return str(value)
 
-    def _format_dict_as_tree(self, data: Dict[str, Any], indent: int = 0) -> List[str]:
-        """将字典格式化为树形结构"""
+    def _format_dict_as_tree(self, data: Dict[str, Any], indent: int = 0, max_str_len: int = 500) -> List[str]:
+        """将字典格式化为树形结构，限制字符串长度"""
         result = []
         items = list(data.items())
 
@@ -115,9 +114,23 @@ class StructuredTerminalOutput:
             prefix = SYMBOLS["tree_last"] if is_last else SYMBOLS["tree_branch"]
             indent_str = "  " * indent
 
+            # 特殊处理market_data和一些大型数据结构
+            if key in ["market_returns", "stock_returns"] and isinstance(value, str) and len(value) > max_str_len:
+                result.append(f"{indent_str}{prefix} {key}: [数据过长，已省略]")
+                continue
+                
+            # 添加特殊处理大数值的逻辑
+            if "price" in key.lower() and isinstance(value, (int, float)) and value > 1000000:
+                if value > 1000000000:  # 十亿以上
+                    formatted_value = f"${value/1000000000:.2f}B"
+                else:  # 百万到十亿
+                    formatted_value = f"${value/1000000:.2f}M"
+                result.append(f"{indent_str}{prefix} {key}: {formatted_value}")
+                continue
+
             if isinstance(value, dict) and value:
                 result.append(f"{indent_str}{prefix} {key}:")
-                result.extend(self._format_dict_as_tree(value, indent + 1))
+                result.extend(self._format_dict_as_tree(value, indent + 1, max_str_len))
             elif isinstance(value, list) and value:
                 result.append(f"{indent_str}{prefix} {key}:")
                 for j, item in enumerate(value):
@@ -127,13 +140,78 @@ class StructuredTerminalOutput:
                         result.append(
                             f"{indent_str}  {sub_prefix} Agent {j+1}:")
                         result.extend(
-                            ["  " + line for line in self._format_dict_as_tree(item, indent + 2)])
+                            ["  " + line for line in self._format_dict_as_tree(item, indent + 2, max_str_len)])
                     else:
-                        result.append(f"{indent_str}  {sub_prefix} {item}")
+                        # 截断过长的列表项
+                        item_str = str(item)
+                        if len(item_str) > max_str_len:
+                            item_str = item_str[:max_str_len] + "..."
+                        result.append(f"{indent_str}  {sub_prefix} {item_str}")
             else:
                 formatted_value = self._format_value(value)
+                # 截断过长的字符串
+                if isinstance(formatted_value, str) and len(formatted_value) > max_str_len:
+                    formatted_value = formatted_value[:max_str_len] + "..."
                 result.append(f"{indent_str}{prefix} {key}: {formatted_value}")
 
+        return result
+    
+    def _format_market_data_section(self, data: Dict[str, Any]) -> List[str]:
+        """格式化市场数据部分为简洁摘要"""
+        result = []
+        width = 80
+        
+        # 创建标题
+        title = "📊 市场数据摘要"
+        result.append(
+            f"{SYMBOLS['header_left']}{SYMBOLS['border'] * ((width - len(title) - 2) // 2)} {title} {SYMBOLS['border'] * ((width - len(title) - 2) // 2)}{SYMBOLS['header_right']}")
+        
+        # 添加主要数据
+        if data.get("ticker"):
+            result.append(f"{SYMBOLS['vertical']} 股票代码: {data.get('ticker')}")
+        
+        if data.get("start_date") and data.get("end_date"):
+            result.append(f"{SYMBOLS['vertical']} 分析区间: {data.get('start_date')} 至 {data.get('end_date')}")
+        
+        # 价格摘要
+        prices = data.get("prices", [])
+        if prices:
+            # 计算价格统计数据
+            if len(prices) > 0:
+                latest_price = prices[-1].get('close', 0)
+                avg_price = sum(p.get('close', 0) for p in prices) / len(prices)
+                max_price = max(p.get('high', 0) for p in prices)
+                min_price = min(p.get('low', 0) for p in prices) if all(p.get('low', 0) > 0 for p in prices) else 0
+                
+                result.append(f"{SYMBOLS['vertical']} {SYMBOLS['section_prefix']}价格统计:")
+                result.append(f"{SYMBOLS['vertical']}   • 最新价格: {latest_price:.2f}")
+                result.append(f"{SYMBOLS['vertical']}   • 平均价格: {avg_price:.2f}")
+                result.append(f"{SYMBOLS['vertical']}   • 最高价格: {max_price:.2f}")
+                result.append(f"{SYMBOLS['vertical']}   • 最低价格: {min_price:.2f}")
+        
+        # 财务指标摘要
+        fin_metrics = data.get("financial_metrics", [{}])[0] if data.get("financial_metrics") else {}
+        if fin_metrics:
+            result.append(f"{SYMBOLS['vertical']} {SYMBOLS['section_prefix']}主要财务指标:")
+            
+            # 仅展示关键指标
+            key_metrics = {
+                "pe_ratio": "市盈率(P/E)",
+                "price_to_book": "市净率(P/B)",
+                "return_on_equity": "净资产收益率(ROE)",
+                "debt_to_equity": "负债/股本比",
+                "earnings_growth": "盈利增长率"
+            }
+            
+            for key, label in key_metrics.items():
+                if key in fin_metrics:
+                    value = fin_metrics[key]
+                    result.append(f"{SYMBOLS['vertical']}   • {label}: {value}")
+        
+        # 添加底部
+        result.append(
+            f"{SYMBOLS['footer_left']}{SYMBOLS['border'] * (width - 2)}{SYMBOLS['footer_right']}")
+        
         return result
 
     def _format_agent_section(self, agent_name: str, data: Any) -> List[str]:
@@ -154,7 +232,11 @@ class StructuredTerminalOutput:
 
         # 添加内容
         if isinstance(data, dict):
-            # 特殊处理portfolio_management_agent
+            if agent_name == "market_data_agent":
+                # 使用简化的市场数据展示
+                return self._format_market_data_section(data)
+            
+            # 特殊处理portfolio_management_agent 和 macro_analyst_agent
             if agent_name == "portfolio_management_agent":
                 # 尝试提取action和confidence
                 if "action" in data:
@@ -211,6 +293,34 @@ class StructuredTerminalOutput:
                         for i in range(0, len(reasoning), width-4):
                             line = reasoning[i:i+width-4]
                             result.append(f"{SYMBOLS['vertical']}   {line}")
+            elif agent_name == "macro_analyst_agent":
+                # 处理宏观分析
+                if isinstance(data, dict):
+                    # 提取关键信息
+                    macro_env = data.get("macro_environment", "")
+                    impact = data.get("impact_on_stock", "")
+                    key_factors = data.get("key_factors", [])
+                    
+                    # 添加高亮的宏观环境和影响
+                    env_icon = "📈" if macro_env == "positive" else "📉" if macro_env == "negative" else "◽"
+                    impact_icon = "📈" if impact == "positive" else "📉" if impact == "negative" else "◽"
+                    
+                    result.append(f"{SYMBOLS['vertical']} 宏观环境: {env_icon} {macro_env}")
+                    result.append(f"{SYMBOLS['vertical']} 对股票影响: {impact_icon} {impact}")
+                    
+                    # 添加关键因素列表
+                    if key_factors:
+                        result.append(f"{SYMBOLS['vertical']} {SYMBOLS['section_prefix']}关键因素:")
+                        for i, factor in enumerate(key_factors[:5]):  # 最多显示5个因素
+                            result.append(f"{SYMBOLS['vertical']}   • {factor}")
+                    
+                    # 添加简化的理由
+                    reasoning = data.get("reasoning", "")
+                    if reasoning:
+                        # 截取前100个字符作为摘要
+                        reasoning_summary = reasoning[:100] + "..." if len(reasoning) > 100 else reasoning
+                        result.append(f"{SYMBOLS['vertical']} {SYMBOLS['section_prefix']}分析摘要:")
+                        result.append(f"{SYMBOLS['vertical']}   {reasoning_summary}")
             else:
                 # 标准处理其他agent
                 # 提取信号和置信度（如果有）
@@ -279,8 +389,20 @@ class StructuredTerminalOutput:
     def print_output(self) -> None:
         """打印格式化输出"""
         output = self.generate_output()
+        
+        # 添加ANSI颜色代码
+        colored_output = output
+        colored_output = colored_output.replace("bullish", "\033[32mbullish\033[0m")  # 绿色
+        colored_output = colored_output.replace("bearish", "\033[31mbearish\033[0m")  # 红色
+        colored_output = colored_output.replace("neutral", "\033[33mneutral\033[0m")  # 黄色
+        colored_output = colored_output.replace("positive", "\033[32mpositive\033[0m")  # 绿色
+        colored_output = colored_output.replace("negative", "\033[31mnegative\033[0m")  # 红色
+        colored_output = colored_output.replace("BUY", "\033[32mBUY\033[0m")  # 绿色
+        colored_output = colored_output.replace("SELL", "\033[31mSELL\033[0m")  # 红色
+        colored_output = colored_output.replace("HOLD", "\033[33mHOLD\033[0m")  # 黄色
+        
         # 使用INFO级别记录，确保在控制台可见
-        logger.info("\n" + output)
+        logger.info("\n" + colored_output)
 
 
 # 创建全局实例

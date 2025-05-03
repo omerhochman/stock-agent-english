@@ -254,7 +254,12 @@ def risk_management_agent(state: AgentState):
             "kurtosis": float(kurtosis),           
             "sortino_ratio": float(sortino_ratio), 
             "market_risk_score": market_risk_score,
-            "stress_test_results": stress_test_results
+            "stress_test_results": stress_test_results,
+            "macro_environment_assessment": { 
+                "global_risks": market_risk_score > 5,
+                "liquidity_concerns": market_risk_score > 7,
+                "volatility_regime": "high" if volatility > 0.3 else "medium" if volatility > 0.2 else "low"
+            }
         },
         "position_sizing": {
             "kelly_fraction": float(kelly_fraction),

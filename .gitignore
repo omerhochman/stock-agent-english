@@ -10,3 +10,4 @@ report.txt
 data/*
 models/
 factors/
+src/data/macro_analysis_cache.json
