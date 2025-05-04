@@ -113,7 +113,7 @@ def monkey_patch_all_agents():
             valuation, fundamentals, sentiment, risk_manager, 
             technicals, portfolio_manager, market_data,
             researcher_bull, researcher_bear, debate_room, macro_analyst,
-            portfolio_analyzer,
+            portfolio_analyzer, ai_model_analyst,
         )
         
         # 修补各个代理类的JSON方法
@@ -121,7 +121,7 @@ def monkey_patch_all_agents():
             valuation, fundamentals, sentiment, risk_manager, 
             technicals, portfolio_manager, market_data,
             researcher_bull, researcher_bear, debate_room, macro_analyst,
-            portfolio_analyzer
+            portfolio_analyzer, ai_model_analyst,
         ]
         
         for module in agent_modules:

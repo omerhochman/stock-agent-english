@@ -67,6 +67,25 @@ def debate_room_agent(state: AgentState):
     logger.info(
         f"已获取看多观点(置信度: {bull_thesis.get('confidence', 0)})和看空观点(置信度: {bear_thesis.get('confidence', 0)})")
 
+    # 在获取研究员信息之后，获取AI模型分析结果
+    ai_model_message = next(
+        (msg for msg in state["messages"] if msg.name == "ai_model_analyst_agent"), None)
+
+    if ai_model_message:
+        try:
+            ai_model_results = json.loads(ai_model_message.content)
+            logger.info(
+                f"已获取AI模型分析结果(置信度: {ai_model_results.get('confidence', 0)})")
+        except (json.JSONDecodeError, TypeError):
+            try:
+                ai_model_results = ast.literal_eval(ai_model_message.content)
+                logger.debug(f"通过 ast.literal_eval 解析AI模型分析内容")
+            except (ValueError, SyntaxError, TypeError):
+                logger.warning(f"无法解析AI模型分析结果，已跳过")
+                ai_model_results = None
+    else:
+        ai_model_results = None
+
     # 比较置信度级别
     bull_confidence = bull_thesis.get("confidence", 0)
     bear_confidence = bear_thesis.get("confidence", 0)
@@ -102,6 +121,28 @@ def debate_room_agent(state: AgentState):
         llm_prompt += f"\n{perspective.upper()} 观点 (置信度: {data['confidence']}):\n"
         for point in data["thesis_points"]:
             llm_prompt += f"- {point}\n"
+
+    # 在构建发送给LLM的提示时，添加AI模型分析结果
+    if ai_model_results:
+        llm_prompt += f"\nAI模型分析 (置信度: {ai_model_results.get('confidence', 0)}):\n"
+        
+        # 处理多资产情况
+        if ai_model_results.get("multi_asset", False):
+            llm_prompt += f"投资组合AI分析: {ai_model_results.get('signal', 'neutral')} (置信度: {ai_model_results.get('confidence', 0)})\n"
+            
+            # 添加部分资产信息
+            asset_signals = ai_model_results.get("asset_signals", {})
+            for ticker, signals in list(asset_signals.items())[:3]:  # 只显示前3个资产
+                llm_prompt += f"- {ticker}: {signals.get('signal', 'neutral')} (置信度: {signals.get('confidence', 0)})\n"
+            
+            if len(asset_signals) > 3:
+                llm_prompt += f"- 以及其他 {len(asset_signals) - 3} 个资产...\n"
+        else:
+            # 单资产情况
+            model_signals = ai_model_results.get("model_signals", {})
+            for model_name, model_data in model_signals.items():
+                llm_prompt += f"- {model_name}: {model_data.get('signal', 'neutral')} (置信度: {model_data.get('confidence', 0)})\n"
+            llm_prompt += f"综合AI预测: {ai_model_results.get('signal', 'neutral')}\n"
 
     llm_prompt += """
     在分析过程中，也请考虑以下宏观因素：
@@ -166,13 +207,21 @@ def debate_room_agent(state: AgentState):
     # 计算混合置信度差异
     confidence_diff = bull_confidence - bear_confidence
 
-    # 默认 LLM 权重为 30%
-    llm_weight = 0.3
-
-    # 将 LLM 评分（-1 到 1范围）转换为与 confidence_diff 相同的比例
-    # 计算混合置信度差异
-    mixed_confidence_diff = (1 - llm_weight) * \
-        confidence_diff + llm_weight * llm_score
+    # 将LLM权重调整为25%，AI模型权重为20%，研究员占55%
+    llm_weight = 0.25
+    ai_weight = 0.20
+    researcher_weight = 1 - llm_weight - ai_weight
+    
+    # 修改混合置信度计算
+    if ai_model_results:
+        ai_confidence = ai_model_results.get("confidence", 0.5)
+        ai_signal_value = 1 if ai_model_results.get("signal") == "bullish" else (-1 if ai_model_results.get("signal") == "bearish" else 0)
+        mixed_confidence_diff = (researcher_weight * confidence_diff + 
+                                llm_weight * llm_score + 
+                                ai_weight * ai_signal_value * ai_confidence)
+    else:
+        # 没有AI模型结果时的默认计算
+        mixed_confidence_diff = (1 - llm_weight) * confidence_diff + llm_weight * llm_score
 
     logger.info(
         f"计算混合置信度差异: 原始差异={confidence_diff:.4f}, LLM评分={llm_score:.4f}, 混合差异={mixed_confidence_diff:.4f}")
@@ -205,7 +254,13 @@ def debate_room_agent(state: AgentState):
         "llm_reasoning": llm_analysis["reasoning"] if llm_analysis and "reasoning" in llm_analysis else None,
         "mixed_confidence_diff": mixed_confidence_diff,
         "debate_summary": debate_summary,
-        "reasoning": reasoning
+        "reasoning": reasoning,
+        "ai_model_contribution": {
+            "included": ai_model_results is not None,
+            "signal": ai_model_results.get("signal", "neutral") if ai_model_results else None,
+            "confidence": ai_model_results.get("confidence", 0) if ai_model_results else None,
+            "weight": ai_weight
+        } if ai_model_results else None
     }
 
     message = HumanMessage(
@@ -219,7 +274,6 @@ def debate_room_agent(state: AgentState):
         state["metadata"]["agent_reasoning"] = message_content
 
     show_workflow_status("Debate Room", "completed")
-    logger.info("辩论室分析完成")
     return {
         "messages": state["messages"] + [message],
         "data": {

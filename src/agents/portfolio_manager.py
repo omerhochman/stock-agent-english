@@ -57,6 +57,8 @@ def portfolio_management_agent(state: AgentState):
         msg for msg in state["messages"] if msg.name == "risk_management_agent")
     macro_message = next(
         msg for msg in state["messages"] if msg.name == "macro_analyst_agent")
+    ai_model_message = next(
+        (msg for msg in state["messages"] if msg.name == "ai_model_analyst_agent"), None)
 
     system_message = {
         "role": "system",
@@ -70,6 +72,10 @@ def portfolio_management_agent(state: AgentState):
             - These are hard constraints that cannot be overridden by other signals
 
             When weighing the different signals for direction and timing:
+            0. AI Models Analysis (15% weight)
+               - Machine learning predictions based on historical patterns
+               - Reinforcement learning optimal policies
+               - Automatically discovered trading factors
             1. Valuation Analysis (35% weight)
                - Primary driver of fair value assessment
                - Determines if price offers good entry/exit point
@@ -91,7 +97,8 @@ def portfolio_management_agent(state: AgentState):
                - Can influence sizing within risk limits
             
             The decision process should be:
-            1. First check risk management constraints
+            0. First check risk management constraints
+            1. Consider AI model predictions and signals
             2. Then evaluate valuation signal
             3. Then evaluate fundamentals signal
             4. Consider macro environment analysis
@@ -133,13 +140,33 @@ def portfolio_management_agent(state: AgentState):
             Current Position: {portfolio['stock']} shares
             
             {'Multiple assets are being analyzed: ' + ', '.join(tickers) if len(tickers) > 1 else ''}
+            """
+    }
+
+    if ai_model_message:
+        try:
+            ai_model_results = json.loads(ai_model_message.content)
+            
+            # 添加AI模型分析结果
+            user_message["content"] += f"\nAI模型分析信号: {ai_model_message.content}\n"
+            
+            # 如果是多资产分析，特别添加多资产配置建议
+            if ai_model_results.get("multi_asset", False) and "portfolio_allocation" in ai_model_results:
+                allocation = ai_model_results["portfolio_allocation"].get("allocation", {})
+                if allocation:
+                    user_message["content"] += f"\nAI模型建议的资产配置:\n"
+                    for ticker, weight in allocation.items():
+                        user_message["content"] += f"- {ticker}: {weight*100:.2f}%\n"
+        except Exception as e:
+            logger.error(f"解析AI模型分析结果出错: {e}")
+
+    user_message["content"] += """
 
             Only include the action, quantity, reasoning, confidence, and agent_signals in your output as JSON.  Do not include any JSON markdown.
 
             Remember, the action must be either buy, sell, or hold.
             You can only buy if you have available cash.
             You can only sell if you have shares in the portfolio to sell."""
-    }
 
     # 记录LLM请求
     request_data = {
@@ -187,6 +214,7 @@ def portfolio_management_agent(state: AgentState):
         start_date=start_date,
         end_date=end_date,
         data=data,
+        ai_model_message=ai_model_message.content if ai_model_message else None,
     )
 
     # 创建投资组合管理消息
@@ -208,7 +236,7 @@ def portfolio_management_agent(state: AgentState):
     }
 
 
-def optimize_portfolio_decision_advanced(llm_decision, portfolio, current_price, risk_message, ticker, prices_df, start_date, end_date, data=None):
+def optimize_portfolio_decision_advanced(llm_decision, portfolio, current_price, risk_message, ticker, prices_df, start_date, end_date, data=None, ai_model_message=None):
     """
     使用现代投资组合理论和先进的风险管理原则优化投资组合决策
     
@@ -222,6 +250,7 @@ def optimize_portfolio_decision_advanced(llm_decision, portfolio, current_price,
         start_date: 开始日期
         end_date: 结束日期
         data: 完整的数据状态，包含多资产信息
+        ai_model_message: AI模型分析结果的消息内容
         
     Returns:
         dict: 优化后的投资决策
@@ -333,7 +362,16 @@ def optimize_portfolio_decision_advanced(llm_decision, portfolio, current_price,
                 market_data['beta'] = beta
                 logger.info(f"成功计算股票Beta: {beta:.2f}")
     
-    # 5. 应用计算模块中的优化函数增强决策
+    # 5. 解析AI模型分析结果
+    ai_model_data = None
+    if ai_model_message:
+        try:
+            ai_model_data = json.loads(ai_model_message)
+            logger.info(f"成功解析AI模型分析数据: {ai_model_data.get('signal', 'neutral')}")
+        except Exception as e:
+            logger.error(f"解析AI模型分析数据失败: {e}")
+    
+    # 6. 应用计算模块中的优化函数增强决策
     portfolio_optimization_results = {}
     try:
         if stock_returns is not None and len(stock_returns) > 30:
@@ -351,6 +389,17 @@ def optimize_portfolio_decision_advanced(llm_decision, portfolio, current_price,
                 fund_value = {"bullish": 1, "neutral": 0, "bearish": -1}.get(fund_signal.get("signal", "neutral").lower(), 0)
                 signal_value = (tech_value * 0.4 + fund_value * 0.6)  # 基本面权重更高
                 expected_return_multiplier += signal_value * 0.5  # 调整基准预期收益率
+            
+            # 7. 如果有AI模型数据，调整收益率预期
+            if ai_model_data:
+                ai_signal = ai_model_data.get("signal", "neutral")
+                ai_confidence = ai_model_data.get("confidence", 0.5)
+                ai_value = {"bullish": 1, "neutral": 0, "bearish": -1}.get(ai_signal.lower(), 0)
+                
+                # 使用AI模型信号进一步调整预期收益乘数
+                ai_adjustment = ai_value * ai_confidence * 0.3  # AI模型贡献30%的调整
+                expected_return_multiplier += ai_adjustment
+                logger.info(f"AI模型贡献调整: {ai_adjustment:.2f}, 调整后的预期收益乘数: {expected_return_multiplier:.2f}")
             
             # 使用GARCH预测调整波动率预期
             volatility_adjustment = 1.0
@@ -428,6 +477,31 @@ def optimize_portfolio_decision_advanced(llm_decision, portfolio, current_price,
                                     risk_free_rate=risk_free_rate,
                                     objective='min_risk'
                                 )
+                                
+                                # 8. 如果有AI模型的投资组合分配建议，纳入考虑
+                                ai_portfolio_weights = None
+                                if ai_model_data and ai_model_data.get("multi_asset", False):
+                                    portfolio_allocation = ai_model_data.get("portfolio_allocation", {})
+                                    allocation = portfolio_allocation.get("allocation", {})
+                                    
+                                    if allocation:
+                                        ai_portfolio_weights = pd.Series(allocation)
+                                        # 确保权重标准化为1
+                                        if ai_portfolio_weights.sum() > 0:
+                                            ai_portfolio_weights = ai_portfolio_weights / ai_portfolio_weights.sum()
+                                            
+                                            # 创建AI模型建议的投资组合
+                                            ai_return = (expected_returns * ai_portfolio_weights).sum()
+                                            ai_risk = np.sqrt(np.dot(ai_portfolio_weights, np.dot(covariance_matrix, ai_portfolio_weights)))
+                                            ai_sharpe = (ai_return - risk_free_rate) / ai_risk if ai_risk > 0 else 0
+                                            
+                                            # 添加AI模型投资组合到结果中
+                                            portfolio_optimization_results["ai_model"] = {
+                                                "weights": ai_portfolio_weights.to_dict(),
+                                                "expected_return": float(ai_return),
+                                                "expected_volatility": float(ai_risk),
+                                                "sharpe_ratio": float(ai_sharpe)
+                                            }
                                 
                                 # 保存优化结果
                                 portfolio_optimization_results = {
@@ -511,7 +585,7 @@ def optimize_portfolio_decision_advanced(llm_decision, portfolio, current_price,
         logger.error(f"投资组合优化计算失败: {e}")
         portfolio_optimization_results = {"error": str(e)}
         
-    # 6. 应用仓位管理规则 - 改进的凯利准则
+    # 9. 应用仓位管理规则 - 改进的凯利准则
     # 使用投资组合优化结果调整凯利分数
     kelly_fraction = confidence * 2 - 1  # 转换置信度为Kelly分数(-1到1)
     kelly_fraction = max(0, kelly_fraction)  # 确保非负
@@ -531,11 +605,27 @@ def optimize_portfolio_decision_advanced(llm_decision, portfolio, current_price,
         # Beta高于1表示股票比市场更波动，需要减少仓位
         if beta_value > 1.2:
             kelly_fraction = kelly_fraction * (1 / beta_value)  # 按比例减少仓位
+    
+    # 10. 如果有AI模型数据，根据AI模型置信度进一步调整仓位
+    if ai_model_data:
+        ai_confidence = ai_model_data.get("confidence", 0.5)
+        ai_signal = ai_model_data.get("signal", "neutral")
         
+        # 根据AI模型信号和置信度调整仓位
+        if action == "buy" and ai_signal == "bullish":
+            # AI也看多，根据置信度增加仓位
+            kelly_fraction = min(kelly_fraction * (1 + ai_confidence * 0.2), 1.0)
+        elif action == "sell" and ai_signal == "bearish":
+            # AI也看空，根据置信度增加仓位
+            kelly_fraction = min(kelly_fraction * (1 + ai_confidence * 0.2), 1.0)
+        elif (action == "buy" and ai_signal == "bearish") or (action == "sell" and ai_signal == "bullish"):
+            # AI信号与决策相反，降低仓位
+            kelly_fraction = kelly_fraction * (1 - ai_confidence * 0.3)
+    
     # 风险调整
     risk_factor = 1 - (risk_score / 10)  # 风险分数越高，风险系数越低
     
-    # 7. 计算建议仓位
+    # 11. 计算建议仓位
     # Kelly建议的仓位 = 投资组合价值 * Kelly分数 * 风险保守系数
     conservative_factor = 0.5  # 半Kelly，更保守
     suggested_position_value = total_portfolio_value * kelly_fraction * conservative_factor * risk_factor
@@ -562,7 +652,7 @@ def optimize_portfolio_decision_advanced(llm_decision, portfolio, current_price,
     # 转换为股数
     suggested_quantity = int(suggested_position_value / current_price) if current_price > 0 else 0
     
-    # 8. 应用止损和止盈逻辑
+    # 12. 应用止损和止盈逻辑
     stop_loss_level = 0.05  # 5%止损
     take_profit_level = 0.15  # 15%止盈
     
@@ -600,7 +690,7 @@ def optimize_portfolio_decision_advanced(llm_decision, portfolio, current_price,
         else:
             new_quantity = suggested_quantity
     
-    # 9. 应用投资组合约束
+    # 13. 应用投资组合约束
     if action == "buy":
         # 买入时的约束
         max_affordable = int(portfolio['cash'] / current_price) if current_price > 0 else 0
@@ -625,7 +715,7 @@ def optimize_portfolio_decision_advanced(llm_decision, portfolio, current_price,
             new_quantity = portfolio['stock']
             reasoning = f"{reasoning}\n剩余持仓量过小，选择全部卖出以优化仓位。"
             
-    # 10. 平滑交易 - 避免频繁小额交易
+    # 14. 平滑交易 - 避免频繁小额交易
     last_action = "hold"  # 假设上一次操作为持有
     last_price = current_price  # 假设上一次价格等于当前价格
     
@@ -649,6 +739,23 @@ def optimize_portfolio_decision_advanced(llm_decision, portfolio, current_price,
     
     # 格式化市场数据
     formatted_market_data = format_market_data_summary(market_data)
+    
+    # 15. 添加AI模型分析影响到决策推理中
+    if ai_model_data:
+        ai_signal = ai_model_data.get("signal", "neutral")
+        ai_confidence = ai_model_data.get("confidence", 0.5)
+        
+        if ai_signal == action.replace("hold", "neutral").replace("buy", "bullish").replace("sell", "bearish"):
+            reasoning += f"\n\nAI模型分析支持{action}决策，置信度为{ai_confidence:.2f}，增强了决策信心。"
+        else:
+            reasoning += f"\n\nAI模型分析给出{ai_signal}信号，虽与决策方向不同，但已纳入考虑，适当调整了仓位。"
+        
+        # 如果是多资产分析，添加投资组合分配建议
+        if ai_model_data.get("multi_asset", False) and "portfolio_allocation" in ai_model_data:
+            allocation = ai_model_data["portfolio_allocation"].get("allocation", {})
+            if allocation:
+                allocation_text = ", ".join([f"{ticker}: {weight*100:.1f}%" for ticker, weight in allocation.items()])
+                reasoning += f"\n\nAI模型建议的资产配置: {allocation_text}"
 
     # 最终决策整合
     optimized_decision = {
@@ -668,7 +775,13 @@ def optimize_portfolio_decision_advanced(llm_decision, portfolio, current_price,
             "macro_adjustment": macro_adjustment,
             "analytics": portfolio_optimization_results,
             "market_data": formatted_market_data,
-        }
+        },
+        "ai_model_integration": {
+            "used": ai_model_data is not None,
+            "signal": ai_model_data.get("signal", "neutral") if ai_model_data else None,
+            "confidence": ai_model_data.get("confidence", 0) if ai_model_data else None,
+            "impact_on_position": kelly_fraction / (confidence * 2 - 1) if (confidence * 2 - 1) > 0 else 1.0
+        } if ai_model_data else None
     }
 
     return optimized_decision

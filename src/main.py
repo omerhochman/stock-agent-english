@@ -24,6 +24,7 @@ from src.agents.researcher_bear import researcher_bear_agent
 from src.agents.debate_room import debate_room_agent
 from src.agents.macro_analyst import macro_analyst_agent
 from src.agents.portfolio_analyzer import portfolio_analyzer_agent
+from src.agents.ai_model_analyst import ai_model_analyst_agent 
 
 # --- Logging Imports ---
 from src.utils.output_logger import OutputLogger
@@ -141,6 +142,7 @@ workflow = StateGraph(AgentState)
 
 # 添加节点
 workflow.add_node("market_data_agent", market_data_agent)
+workflow.add_node("ai_model_analyst_agent", ai_model_analyst_agent)
 workflow.add_node("technical_analyst_agent", technical_analyst_agent)
 workflow.add_node("fundamentals_agent", fundamentals_agent)
 workflow.add_node("sentiment_agent", sentiment_agent)
@@ -156,29 +158,35 @@ workflow.add_node("portfolio_management_agent", portfolio_management_agent)
 # 定义工作流边缘
 workflow.set_entry_point("market_data_agent")
 
-# 市场数据到各分析师
+# 市场数据到各分析师和AI模型分析
+workflow.add_edge("market_data_agent", "ai_model_analyst_agent")  # 市场数据到AI模型分析
 workflow.add_edge("market_data_agent", "technical_analyst_agent")
 workflow.add_edge("market_data_agent", "fundamentals_agent")
 workflow.add_edge("market_data_agent", "sentiment_agent")
 workflow.add_edge("market_data_agent", "valuation_agent")
-workflow.add_edge("market_data_agent", "portfolio_analyzer_agent")  # 市场数据到投资组合分析
+workflow.add_edge("market_data_agent", "portfolio_analyzer_agent")
 
-# 分析师到研究员
 workflow.add_edge("technical_analyst_agent", "researcher_bull_agent")
 workflow.add_edge("fundamentals_agent", "researcher_bull_agent")
 workflow.add_edge("sentiment_agent", "researcher_bull_agent")
 workflow.add_edge("valuation_agent", "researcher_bull_agent")
-workflow.add_edge("portfolio_analyzer_agent", "researcher_bull_agent")  # 投资组合分析到看多研究员
+workflow.add_edge("portfolio_analyzer_agent", "researcher_bull_agent")
+# AI模型分析到研究员
+workflow.add_edge("ai_model_analyst_agent", "researcher_bull_agent")
 
 workflow.add_edge("technical_analyst_agent", "researcher_bear_agent")
 workflow.add_edge("fundamentals_agent", "researcher_bear_agent")
 workflow.add_edge("sentiment_agent", "researcher_bear_agent")
 workflow.add_edge("valuation_agent", "researcher_bear_agent")
-workflow.add_edge("portfolio_analyzer_agent", "researcher_bear_agent")  # 投资组合分析到看空研究员
+workflow.add_edge("portfolio_analyzer_agent", "researcher_bear_agent")
+# AI模型分析到研究员
+workflow.add_edge("ai_model_analyst_agent", "researcher_bear_agent")
 
 # 研究员到辩论室
 workflow.add_edge("researcher_bull_agent", "debate_room_agent")
 workflow.add_edge("researcher_bear_agent", "debate_room_agent")
+# AI模型分析到辩论室的连接
+workflow.add_edge("ai_model_analyst_agent", "debate_room_agent")
 
 # 辩论室到风险管理
 workflow.add_edge("debate_room_agent", "risk_management_agent")
@@ -188,6 +196,8 @@ workflow.add_edge("risk_management_agent", "macro_analyst_agent")
 
 # 宏观分析到投资组合管理
 workflow.add_edge("macro_analyst_agent", "portfolio_management_agent")
+# AI模型分析直接到投资组合管理
+workflow.add_edge("ai_model_analyst_agent", "portfolio_management_agent")
 workflow.add_edge("portfolio_management_agent", END)
 
 # 编译工作流图
