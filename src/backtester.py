@@ -31,9 +31,10 @@ matplotlib.rcParams['axes.unicode_minus'] = False
 
 
 class Backtester:
-    def __init__(self, agent, ticker, start_date, end_date, initial_capital, num_of_news):
+    def __init__(self, agent, ticker, start_date, end_date, initial_capital, num_of_news, tickers=None):
         self.agent = agent
-        self.ticker = ticker
+        self.ticker = ticker  # 主要交易的股票代码
+        self.tickers = tickers if tickers else None  # 多个股票代码
         self.start_date = start_date
         self.end_date = end_date
         self.initial_capital = initial_capital
@@ -60,7 +61,6 @@ class Backtester:
         self.daily_returns = []
         self.benchmark_returns = []
         self.drawdowns = []
-
 
         # 验证输入参数
         self.validate_inputs()
@@ -124,18 +124,25 @@ class Backtester:
                 self._last_api_call = time.time()
                 self._api_call_count += 1
 
-                # 生成run_id (添加这行)
+                # 生成run_id
                 run_id = str(uuid.uuid4())
+                
+                # 准备调用参数
+                call_params = {
+                    "run_id": run_id,
+                    "ticker": self.ticker,
+                    "start_date": lookback_start,
+                    "end_date": current_date,
+                    "portfolio": portfolio,
+                    "num_of_news": self.num_of_news
+                }
+                
+                # 如果有多个股票代码，添加到调用参数中
+                if self.tickers:
+                    call_params["tickers"] = self.tickers
 
-                # 调用智能体并解析结果 (添加run_id参数)
-                result = self.agent(
-                    run_id=run_id,  # 添加run_id参数
-                    ticker=self.ticker,
-                    start_date=lookback_start,
-                    end_date=current_date,
-                    portfolio=portfolio,
-                    num_of_news=self.num_of_news
-                )
+                # 调用智能体并解析结果
+                result = self.agent(**call_params)
 
                 try:
                     # 尝试解析返回的字符串为 JSON
@@ -677,7 +684,9 @@ if __name__ == "__main__":
     # 设置命令行参数解析
     parser = argparse.ArgumentParser(description='运行回测模拟')
     parser.add_argument('--ticker', type=str, required=True,
-                        help='股票代码 (例如: 600519)')
+                        help='主要股票代码 (例如: 600519)')
+    parser.add_argument('--tickers', type=str,
+                        help='多个股票代码，逗号分隔 (例如: "600519,000858,601398")')
     parser.add_argument('--end-date', type=str,
                         default=datetime.now().strftime('%Y-%m-%d'), help='结束日期，格式：YYYY-MM-DD')
     parser.add_argument('--start-date', type=str, default=(datetime.now() -
@@ -696,7 +705,8 @@ if __name__ == "__main__":
         start_date=args.start_date,
         end_date=args.end_date,
         initial_capital=args.initial_capital,
-        num_of_news=args.num_of_news
+        num_of_news=args.num_of_news,
+        tickers=args.tickers  # 传入多个股票代码
     )
 
     # 运行回测

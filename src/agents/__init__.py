@@ -9,3 +9,4 @@ from src.agents.debate_room import debate_room_agent
 from src.agents.risk_manager import risk_management_agent
 from src.agents.macro_analyst import macro_analyst_agent
 from src.agents.portfolio_manager import portfolio_management_agent
+from src.agents.portfolio_analyzer import portfolio_analyzer_agent

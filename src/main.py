@@ -23,14 +23,13 @@ from src.agents.researcher_bull import researcher_bull_agent
 from src.agents.researcher_bear import researcher_bear_agent
 from src.agents.debate_room import debate_room_agent
 from src.agents.macro_analyst import macro_analyst_agent
+from src.agents.portfolio_analyzer import portfolio_analyzer_agent
 
 # --- Logging Imports ---
 from src.utils.output_logger import OutputLogger
-from src.tools.openrouter_config import get_chat_completion
 from src.utils.llm_interaction_logger import (
-    log_agent_execution,
     set_global_log_storage,
-    get_log_storage
+    get_log_storage,
 )
 from src.utils.api_utils import app as fastapi_app
 from src.utils.json_unicode_handler import monkey_patch_all_agents, patch_json_dumps
@@ -63,7 +62,9 @@ set_global_log_storage(log_storage)
 
 
 # --- Run the Hedge Fund Workflow ---
-def run_hedge_fund(run_id: str, ticker: str, start_date: str, end_date: str, portfolio: dict, show_reasoning: bool = False, num_of_news: int = 5, show_summary: bool = False):
+def run_hedge_fund(run_id: str, ticker: str, start_date: str, end_date: str, portfolio: dict, 
+                   show_reasoning: bool = False, num_of_news: int = 5, show_summary: bool = False,
+                   tickers: str = None):
     print(f"--- Starting Workflow Run ID: {run_id} ---")
 
     # 设置API状态
@@ -73,7 +74,16 @@ def run_hedge_fund(run_id: str, ticker: str, start_date: str, end_date: str, por
         print(f"--- API State updated with Run ID: {run_id} ---")
     except Exception as e:
         print(f"Note: Could not update API state: {str(e)}")
-
+    
+    # 处理tickers参数，如果提供了多个股票代码
+    ticker_list = None
+    if tickers:
+        ticker_list = [t.strip() for t in tickers.split(',')]
+        print(f"--- Processing multiple tickers: {ticker_list} ---")
+        # 确保主要ticker也在列表中
+        if ticker not in ticker_list:
+            ticker_list.insert(0, ticker)
+    
     initial_state = {
         "messages": [
             HumanMessage(
@@ -93,7 +103,11 @@ def run_hedge_fund(run_id: str, ticker: str, start_date: str, end_date: str, por
             "show_summary": show_summary,  # 是否显示汇总报告
         }
     }
-
+    
+    # 如果有多个股票代码，添加到初始状态中
+    if ticker_list:
+        initial_state["data"]["tickers"] = ticker_list
+    
     # 直接执行工作流
     final_state = app.invoke(initial_state)
     print(f"--- Finished Workflow Run ID: {run_id} ---")
@@ -136,6 +150,7 @@ workflow.add_node("researcher_bear_agent", researcher_bear_agent)
 workflow.add_node("debate_room_agent", debate_room_agent)
 workflow.add_node("risk_management_agent", risk_management_agent)
 workflow.add_node("macro_analyst_agent", macro_analyst_agent)
+workflow.add_node("portfolio_analyzer_agent", portfolio_analyzer_agent)
 workflow.add_node("portfolio_management_agent", portfolio_management_agent)
 
 # 定义工作流边缘
@@ -146,17 +161,20 @@ workflow.add_edge("market_data_agent", "technical_analyst_agent")
 workflow.add_edge("market_data_agent", "fundamentals_agent")
 workflow.add_edge("market_data_agent", "sentiment_agent")
 workflow.add_edge("market_data_agent", "valuation_agent")
+workflow.add_edge("market_data_agent", "portfolio_analyzer_agent")  # 市场数据到投资组合分析
 
 # 分析师到研究员
 workflow.add_edge("technical_analyst_agent", "researcher_bull_agent")
 workflow.add_edge("fundamentals_agent", "researcher_bull_agent")
 workflow.add_edge("sentiment_agent", "researcher_bull_agent")
 workflow.add_edge("valuation_agent", "researcher_bull_agent")
+workflow.add_edge("portfolio_analyzer_agent", "researcher_bull_agent")  # 投资组合分析到看多研究员
 
 workflow.add_edge("technical_analyst_agent", "researcher_bear_agent")
 workflow.add_edge("fundamentals_agent", "researcher_bear_agent")
 workflow.add_edge("sentiment_agent", "researcher_bear_agent")
 workflow.add_edge("valuation_agent", "researcher_bear_agent")
+workflow.add_edge("portfolio_analyzer_agent", "researcher_bear_agent")  # 投资组合分析到看空研究员
 
 # 研究员到辩论室
 workflow.add_edge("researcher_bull_agent", "debate_room_agent")
@@ -193,7 +211,9 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(
         description='Run the hedge fund trading system')
     parser.add_argument('--ticker', type=str, required=True,
-                        help='Stock ticker symbol')
+                        help='Primary stock ticker symbol')
+    parser.add_argument('--tickers', type=str,
+                        help='Multiple stock tickers separated by commas (e.g., "600519,000858,601398")')
     parser.add_argument('--start-date', type=str,
                         help='Start date (YYYY-MM-DD). Defaults to 1 year before end date')
     parser.add_argument('--end-date', type=str,
@@ -246,7 +266,8 @@ if __name__ == "__main__":
         portfolio=portfolio,
         show_reasoning=args.show_reasoning,
         num_of_news=args.num_of_news,
-        show_summary=args.summary
+        show_summary=args.summary,
+        tickers=args.tickers  # 传入多个股票代码
     )
     print("\nFinal Result:")
     print(result)

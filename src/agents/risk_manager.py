@@ -1,4 +1,5 @@
 import numpy as np
+import pandas as pd
 from langchain_core.messages import HumanMessage
 
 from src.agents.state import AgentState, show_agent_reasoning, show_workflow_status
@@ -23,7 +24,90 @@ def risk_management_agent(state: AgentState):
     portfolio = state["data"]["portfolio"]
     data = state["data"]
 
+    # 获取资产列表
+    tickers = data.get("tickers", [])
+    if isinstance(tickers, str):
+        tickers = [ticker.strip() for ticker in tickers.split(',')]
+    
+    # 如果没有提供tickers但提供了ticker，则使用单一ticker
+    if not tickers and data.get("ticker"):
+        tickers = [data["ticker"]]
+    
+    # 主要资产的价格数据
     prices_df = prices_to_df(data["prices"])
+    
+    # 多资产投资组合风险分析
+    portfolio_risk_analysis = {}
+    
+    # 如果有多资产数据，计算组合风险
+    all_stock_data = data.get("all_stock_data", {})
+    if len(tickers) > 1 and all_stock_data:
+        # 提取所有股票的收益率
+        returns_dict = {}
+        for ticker in tickers:
+            if ticker in all_stock_data:
+                stock_prices = prices_to_df(all_stock_data[ticker]["prices"])
+                if not stock_prices.empty:
+                    returns_dict[ticker] = stock_prices['close'].pct_change().dropna()
+        
+        # 如果有足够的数据，计算投资组合风险
+        if len(returns_dict) > 1:
+            returns_df = pd.DataFrame(returns_dict)
+            
+            # 计算相关系数矩阵
+            correlation_matrix = returns_df.corr()
+            
+            # 计算等权重投资组合收益率
+            portfolio_return = returns_df.mean(axis=1)  # 等权重投资组合
+            
+            # 使用投资组合收益率计算风险指标
+            daily_vol = portfolio_return.ewm(span=20, adjust=False).std().iloc[-1]
+            volatility = daily_vol * (252 ** 0.5)
+            
+            # 计算VaR和CVaR
+            var_95 = calculate_historical_var(portfolio_return, confidence_level=0.95)
+            cvar_95 = calculate_conditional_var(portfolio_return, confidence_level=0.95)
+            
+            # 计算最大回撤
+            cum_returns = (1 + portfolio_return).cumprod()
+            running_max = cum_returns.cummax()
+            drawdown = (cum_returns / running_max - 1)
+            max_drawdown = drawdown.min()
+            
+            # 计算偏度和峰度
+            skewness = portfolio_return.skew()
+            kurtosis = portfolio_return.kurt()
+            
+            # 保存多资产组合风险分析结果
+            portfolio_risk_analysis = {
+                "tickers": tickers,
+                "volatility": float(volatility),
+                "var_95": float(var_95),
+                "cvar_95": float(cvar_95),
+                "max_drawdown": float(max_drawdown),
+                "skewness": float(skewness),
+                "kurtosis": float(kurtosis),
+                "correlation_matrix": correlation_matrix.to_dict()
+            }
+            
+            # 提供多资产风险分散化建议
+            diversification_tips = []
+            
+            # 基于相关性的建议
+            high_corr_pairs = []
+            for i in range(len(correlation_matrix.columns)):
+                for j in range(i+1, len(correlation_matrix.columns)):
+                    if correlation_matrix.iloc[i, j] > 0.7:  # 高相关性阈值
+                        high_corr_pairs.append(f"{correlation_matrix.columns[i]}-{correlation_matrix.columns[j]}")
+            
+            if high_corr_pairs:
+                diversification_tips.append(f"发现高相关性资产对: {', '.join(high_corr_pairs)}，考虑降低其中一个资产的配置以降低集中风险")
+            
+            avg_corr = correlation_matrix.values[np.triu_indices_from(correlation_matrix.values, k=1)].mean()
+            if avg_corr > 0.6:
+                diversification_tips.append(f"投资组合平均相关性较高({avg_corr:.2f})，可能需要增加其他资产类别以提高分散化效果")
+            
+            portfolio_risk_analysis["diversification_tips"] = diversification_tips
 
     # 获取辩论室评估
     debate_message = next(
@@ -34,7 +118,7 @@ def risk_management_agent(state: AgentState):
     except Exception as e:
         debate_results = ast.literal_eval(debate_message.content)
 
-    # 1. 计算基础风险指标 - 使用更高级的计算方法
+    # 1. 计算基础风险指标
     returns = prices_df['close'].pct_change().dropna()
     
     # 使用EWMA优化波动率计算
@@ -283,6 +367,14 @@ def risk_management_agent(state: AgentState):
                      f"最大回撤={max_drawdown:.2%}, 偏度={skewness:.2f}, "
                      f"辩论信号={debate_signal}, Kelly建议占比={kelly_fraction:.2f}"
     }
+    
+    # 如果有多资产分析结果，添加到输出中
+    if portfolio_risk_analysis:
+        message_content["portfolio_risk_analysis"] = portfolio_risk_analysis
+        
+        # 添加多资产风险提示到reasoning
+        if "diversification_tips" in portfolio_risk_analysis and portfolio_risk_analysis["diversification_tips"]:
+            message_content["reasoning"] += "\n多资产风险分析: " + " ".join(portfolio_risk_analysis["diversification_tips"])
 
     # 创建风险管理消息
     message = HumanMessage(

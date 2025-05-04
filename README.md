@@ -74,6 +74,9 @@ TUSHARE_TOKEN=your_tushare_api_key
 # 基本用法
 python -m src.main --ticker 600054 --show-reasoning
 
+# 多资产
+python src/main.py --ticker 600519 --tickers "600519,000858,601398" --start-date 2023-01-01 --end-date 2023-12-31
+
 # 指定日期范围
 python -m src.main --ticker 600054 --start-date 2023-01-01 --end-date 2023-12-31 --show-reasoning
 

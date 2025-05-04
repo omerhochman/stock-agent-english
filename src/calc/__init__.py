@@ -63,6 +63,12 @@ from src.calc.volatility_models import (
 
 from src.calc.covariance_estimation import estimate_covariance_ewma
 
+from src.calc.correlation_analysis import (
+    analyze_asset_correlations,
+    calculate_optimal_weights_for_correlation,
+    cluster_assets
+)
+
 # 公开API
 __all__ = [
     # 资产定价模型
@@ -93,7 +99,12 @@ __all__ = [
     'calculate_realized_volatility',
     
     # 协方差估计
-    'estimate_covariance_ewma'
+    'estimate_covariance_ewma',
+
+    # 相关性分析
+    'analyze_asset_correlations',
+    'calculate_optimal_weights_for_correlation',
+    'cluster_assets'
 ]
 
 """

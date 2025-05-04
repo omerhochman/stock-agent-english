@@ -22,10 +22,24 @@ def portfolio_management_agent(state: AgentState):
     show_reasoning = state["metadata"]["show_reasoning"]
     portfolio = state["data"]["portfolio"]
     data = state["data"]
-    ticker = data.get("ticker", "")
+    
+    # 获取资产列表
+    tickers = data.get("tickers", [])
+    if isinstance(tickers, str):
+        tickers = [ticker.strip() for ticker in tickers.split(',')]
+    
+    # 如果没有提供tickers但提供了ticker，则使用单一ticker
+    if not tickers and data.get("ticker"):
+        tickers = [data["ticker"]]
+        
+    # 使用主要资产进行分析（保持向后兼容）
+    ticker = tickers[0] if tickers else ""
     prices = data.get("prices", [])
     start_date = data.get("start_date")
     end_date = data.get("end_date")
+    
+    # 如果有多资产分析结果，将其纳入决策
+    portfolio_analysis = data.get("portfolio_analysis", {})
     
     # 获取最新价格
     current_price = prices[-1]['close'] if prices else 0
@@ -110,11 +124,15 @@ def portfolio_management_agent(state: AgentState):
             Valuation Analysis Trading Signal: {valuation_message.content}
             Risk Management Trading Signal: {risk_message.content}
             Macro Analysis Trading Signal: {macro_message.content}
+            
+            {f'Portfolio Analysis: {json.dumps(portfolio_analysis) if portfolio_analysis else "No portfolio analysis available"}'}
 
             Here is the current portfolio:
             Portfolio:
             Cash: {portfolio['cash']:.2f}
             Current Position: {portfolio['stock']} shares
+            
+            {'Multiple assets are being analyzed: ' + ', '.join(tickers) if len(tickers) > 1 else ''}
 
             Only include the action, quantity, reasoning, confidence, and agent_signals in your output as JSON.  Do not include any JSON markdown.
 
@@ -167,7 +185,8 @@ def portfolio_management_agent(state: AgentState):
         ticker=ticker,
         prices_df=prices_to_df(prices),
         start_date=start_date,
-        end_date=end_date
+        end_date=end_date,
+        data=data,
     )
 
     # 创建投资组合管理消息
@@ -189,7 +208,7 @@ def portfolio_management_agent(state: AgentState):
     }
 
 
-def optimize_portfolio_decision_advanced(llm_decision, portfolio, current_price, risk_message, ticker, prices_df, start_date, end_date):
+def optimize_portfolio_decision_advanced(llm_decision, portfolio, current_price, risk_message, ticker, prices_df, start_date, end_date, data=None):
     """
     使用现代投资组合理论和先进的风险管理原则优化投资组合决策
     
@@ -202,6 +221,7 @@ def optimize_portfolio_decision_advanced(llm_decision, portfolio, current_price,
         prices_df: 历史价格数据DataFrame
         start_date: 开始日期
         end_date: 结束日期
+        data: 完整的数据状态，包含多资产信息
         
     Returns:
         dict: 优化后的投资决策
@@ -317,7 +337,7 @@ def optimize_portfolio_decision_advanced(llm_decision, portfolio, current_price,
     portfolio_optimization_results = {}
     try:
         if stock_returns is not None and len(stock_returns) > 30:
-            # 使用EWMA方法估计协方差矩阵(虽然是单个资产，但可为未来扩展打基础)
+            # 使用EWMA方法估计协方差矩阵
             stock_return_mean = stock_returns.mean()
             stock_return_std = stock_returns.std()
             
@@ -356,24 +376,137 @@ def optimize_portfolio_decision_advanced(llm_decision, portfolio, current_price,
             # 使用实际计算的Beta调整优化
             beta_adjusted_return = risk_free_rate + beta * (adjusted_expected_return - risk_free_rate)
             
-            # 创建模拟投资组合进行优化
-            # 注意：由于我们只有一个资产，这是简化的单资产优化
-            weights = np.array([1.0])  # 100%投资于这一个资产
-            asset_returns = np.array([beta_adjusted_return])
-            asset_cov = np.array([[adjusted_volatility**2]])
-            
-            # 保存优化结果
-            portfolio_optimization_results = {
-                "expected_annual_return": float(adjusted_expected_return),
-                "expected_annual_volatility": float(adjusted_volatility),
-                "beta_adjusted_return": float(beta_adjusted_return),
-                "sharpe_ratio": float(sharpe_ratio),
-                "volatility_adjustment": float(volatility_adjustment),
-                "return_multiplier": float(expected_return_multiplier),
-                "beta": float(beta),
-                "market_volatility": float(market_volatility),
-                "risk_free_rate": float(risk_free_rate)
-            }
+            # 创建投资组合进行优化
+            portfolio_optimization_results = {}
+            try:
+                if stock_returns is not None and len(stock_returns) > 30:
+                    # 检查是否有多个资产数据
+                    all_stock_data = data.get("all_stock_data", {})
+                    tickers = data.get("tickers", [ticker])
+                    
+                    if len(tickers) > 1 and all_stock_data:
+                        # 提取所有股票的收益率
+                        returns_dict = {}
+                        for symbol in tickers:
+                            if symbol in all_stock_data:
+                                stock_prices = prices_to_df(all_stock_data[symbol]["prices"])
+                                if not stock_prices.empty:
+                                    returns_dict[symbol] = stock_prices['close'].pct_change().dropna()
+                        
+                        # 如果有足够的数据，计算投资组合优化
+                        if len(returns_dict) > 1:
+                            returns_df = pd.DataFrame(returns_dict)
+                            
+                            # 计算平均收益率和协方差矩阵
+                            mean_returns = returns_df.mean() * 252  # 年化
+                            cov_matrix = returns_df.cov() * 252  # 年化
+                            
+                            # 将Series转换为numpy数组
+                            asset_returns = mean_returns.values
+                            asset_cov = cov_matrix.values
+                            
+                            # 计算最优权重（使用投资组合优化函数）
+                            try:
+                                from src.calc.portfolio_optimization import optimize_portfolio
+                                
+                                # 创建预期收益率Series和协方差矩阵DataFrame
+                                expected_returns = pd.Series(mean_returns, index=tickers)
+                                covariance_matrix = pd.DataFrame(cov_matrix, index=tickers, columns=tickers)
+                                
+                                # 最大夏普比率投资组合
+                                max_sharpe_portfolio = optimize_portfolio(
+                                    expected_returns=expected_returns,
+                                    cov_matrix=covariance_matrix,
+                                    risk_free_rate=risk_free_rate,
+                                    objective='sharpe'
+                                )
+                                
+                                # 最小风险投资组合
+                                min_risk_portfolio = optimize_portfolio(
+                                    expected_returns=expected_returns,
+                                    cov_matrix=covariance_matrix,
+                                    risk_free_rate=risk_free_rate,
+                                    objective='min_risk'
+                                )
+                                
+                                # 保存优化结果
+                                portfolio_optimization_results = {
+                                    "multi_asset": True,
+                                    "tickers": tickers,
+                                    "max_sharpe": {
+                                        "weights": max_sharpe_portfolio['weights'].to_dict(),
+                                        "expected_return": float(max_sharpe_portfolio['return']),
+                                        "expected_volatility": float(max_sharpe_portfolio['risk']),
+                                        "sharpe_ratio": float(max_sharpe_portfolio['sharpe_ratio'])
+                                    },
+                                    "min_risk": {
+                                        "weights": min_risk_portfolio['weights'].to_dict(),
+                                        "expected_return": float(min_risk_portfolio['return']),
+                                        "expected_volatility": float(min_risk_portfolio['risk']),
+                                        "sharpe_ratio": float(min_risk_portfolio['sharpe_ratio'])
+                                    }
+                                }
+                                
+                                # 使用最大夏普比率投资组合的数据
+                                adjusted_expected_return = max_sharpe_portfolio['return']
+                                adjusted_volatility = max_sharpe_portfolio['risk']
+                                sharpe_ratio = max_sharpe_portfolio['sharpe_ratio']
+                                
+                                # 为保持与单资产逻辑的兼容性，保留这些字段
+                                portfolio_optimization_results.update({
+                                    "expected_annual_return": float(adjusted_expected_return),
+                                    "expected_annual_volatility": float(adjusted_volatility),
+                                    "sharpe_ratio": float(sharpe_ratio),
+                                    "volatility_adjustment": float(volatility_adjustment),
+                                    "return_multiplier": float(expected_return_multiplier),
+                                    "beta": float(beta),
+                                    "market_volatility": float(market_volatility),
+                                    "risk_free_rate": float(risk_free_rate)
+                                })
+                                
+                            except Exception as e:
+                                logger.error(f"多资产投资组合优化失败: {e}")
+                        else:
+                            # 单资产优化逻辑
+                            weights = np.array([1.0])  # 100%投资于这一个资产
+                            asset_returns = np.array([beta_adjusted_return])
+                            asset_cov = np.array([[adjusted_volatility**2]])
+                            
+                            # 保存优化结果
+                            portfolio_optimization_results = {
+                                "multi_asset": False,
+                                "expected_annual_return": float(adjusted_expected_return),
+                                "expected_annual_volatility": float(adjusted_volatility),
+                                "beta_adjusted_return": float(beta_adjusted_return),
+                                "sharpe_ratio": float(sharpe_ratio),
+                                "volatility_adjustment": float(volatility_adjustment),
+                                "return_multiplier": float(expected_return_multiplier),
+                                "beta": float(beta),
+                                "market_volatility": float(market_volatility),
+                                "risk_free_rate": float(risk_free_rate)
+                            }
+                    else:
+                        # 单资产优化逻辑
+                        weights = np.array([1.0])  # 100%投资于这一个资产
+                        asset_returns = np.array([beta_adjusted_return])
+                        asset_cov = np.array([[adjusted_volatility**2]])
+                        
+                        # 保存优化结果
+                        portfolio_optimization_results = {
+                            "multi_asset": False,
+                            "expected_annual_return": float(adjusted_expected_return),
+                            "expected_annual_volatility": float(adjusted_volatility),
+                            "beta_adjusted_return": float(beta_adjusted_return),
+                            "sharpe_ratio": float(sharpe_ratio),
+                            "volatility_adjustment": float(volatility_adjustment),
+                            "return_multiplier": float(expected_return_multiplier),
+                            "beta": float(beta),
+                            "market_volatility": float(market_volatility),
+                            "risk_free_rate": float(risk_free_rate)
+                        }
+            except Exception as e:
+                logger.error(f"投资组合优化计算失败: {e}")
+                portfolio_optimization_results = {"error": str(e)}
     except Exception as e:
         logger.error(f"投资组合优化计算失败: {e}")
         portfolio_optimization_results = {"error": str(e)}

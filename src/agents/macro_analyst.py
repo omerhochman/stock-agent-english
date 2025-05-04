@@ -17,8 +17,37 @@ def macro_analyst_agent(state: AgentState):
     show_workflow_status("Macro Analyst")
     show_reasoning = state["metadata"]["show_reasoning"]
     data = state["data"]
-    symbol = data["ticker"]
+    
+    # 获取资产列表
+    tickers = data.get("tickers", [])
+    if isinstance(tickers, str):
+        tickers = [ticker.strip() for ticker in tickers.split(',')]
+    
+    # 如果没有提供tickers但提供了ticker，则使用单一ticker
+    if not tickers and data.get("ticker"):
+        tickers = [data["ticker"]]
+    
+    primary_ticker = tickers[0] if tickers else ""
+    symbol = primary_ticker
     logger.info(f"正在进行宏观分析: {symbol}")
+    
+    # 多资产宏观分析
+    multi_asset_analysis = None
+    if len(tickers) > 1:
+        try:
+            logger.info(f"执行多资产宏观分析: {tickers}")
+            # 收集所有资产的新闻
+            all_assets_news = []
+            for ticker in tickers:
+                asset_news = get_stock_news(ticker, max_news=20)
+                all_assets_news.extend(asset_news)
+            
+            # 对所有新闻进行宏观分析
+            if all_assets_news:
+                multi_asset_analysis = get_macro_news_analysis(all_assets_news)
+                logger.info(f"多资产宏观分析完成: {multi_asset_analysis.get('macro_environment', 'neutral')}")
+        except Exception as e:
+            logger.error(f"多资产宏观分析失败: {e}")
     
     # 获取大量新闻数据（最多100条）
     news_list = get_stock_news(symbol, max_news=100)  # 尝试获取100条新闻
@@ -30,41 +59,65 @@ def macro_analyst_agent(state: AgentState):
     
     logger.info(f"获取到 {len(recent_news)} 条七天内的新闻")
     
-    # 如果没有获取到新闻，返回默认结果
+    # 如果没有获取到新闻，使用多资产分析结果或返回默认结果
     if not recent_news:
-        logger.warning(f"未获取到 {symbol} 的最近新闻，无法进行宏观分析")
-        message_content = {
-            "macro_environment": "neutral",
-            "impact_on_stock": "neutral",
-            "key_factors": [],
-            "reasoning": "未获取到最近新闻，无法进行宏观分析"
-        }
+        logger.warning(f"未获取到 {symbol} 的最近新闻")
+        if multi_asset_analysis:
+            logger.info("使用多资产宏观分析结果")
+            macro_analysis = multi_asset_analysis
+        else:
+            logger.warning("无法进行宏观分析")
+            macro_analysis = {
+                "macro_environment": "neutral",
+                "impact_on_stock": "neutral",
+                "key_factors": [],
+                "reasoning": "未获取到最近新闻，无法进行宏观分析"
+            }
     else:
         # 获取宏观分析结果
         macro_analysis = get_macro_news_analysis(recent_news)
-        message_content = macro_analysis
     
     # 如果需要显示推理过程
     if show_reasoning:
-        show_agent_reasoning(message_content, "Macro Analysis Agent")
+        show_agent_reasoning(macro_analysis, "Macro Analysis Agent")
         # 保存推理信息到metadata供API使用
-        state["metadata"]["agent_reasoning"] = message_content
+        state["metadata"]["agent_reasoning"] = macro_analysis
     
-    message_content = {
-        "signal": macro_analysis.get("impact_on_stock", "neutral"),  # 使用对股票的影响作为信号
-        "confidence": 0.7 if macro_analysis.get("impact_on_stock") == "positive" else (
-                    0.3 if macro_analysis.get("impact_on_stock") == "negative" else 0.5),
-        "macro_environment": macro_analysis.get("macro_environment", "neutral"),
-        "impact_on_stock": macro_analysis.get("impact_on_stock", "neutral"),
-        "key_factors": macro_analysis.get("key_factors", []),
-        "reasoning": macro_analysis.get("reasoning", "未提供宏观分析理由"),
-        "summary": "\n".join([
-            f"宏观环境: {macro_analysis.get('macro_environment', 'neutral')}",
-            f"对股票影响: {macro_analysis.get('impact_on_stock', 'neutral')}",
-            "关键因素:",
-            *[f"- {factor}" for factor in macro_analysis.get("key_factors", [])]
-        ])
-    }
+    # 添加多资产分析信息
+    if multi_asset_analysis and len(tickers) > 1:
+        message_content = {
+            "signal": macro_analysis.get("impact_on_stock", "neutral"),
+            "confidence": 0.7 if macro_analysis.get("impact_on_stock") == "positive" else (
+                        0.3 if macro_analysis.get("impact_on_stock") == "negative" else 0.5),
+            "macro_environment": macro_analysis.get("macro_environment", "neutral"),
+            "impact_on_stock": macro_analysis.get("impact_on_stock", "neutral"),
+            "key_factors": macro_analysis.get("key_factors", []),
+            "reasoning": macro_analysis.get("reasoning", "未提供宏观分析理由"),
+            "multi_asset_analysis": multi_asset_analysis,
+            "tickers_analyzed": tickers,
+            "summary": "\n".join([
+                f"宏观环境: {macro_analysis.get('macro_environment', 'neutral')}",
+                f"对股票影响: {macro_analysis.get('impact_on_stock', 'neutral')}",
+                "关键因素:",
+                *[f"- {factor}" for factor in macro_analysis.get("key_factors", [])]
+            ])
+        }
+    else:
+        message_content = {
+            "signal": macro_analysis.get("impact_on_stock", "neutral"),
+            "confidence": 0.7 if macro_analysis.get("impact_on_stock") == "positive" else (
+                        0.3 if macro_analysis.get("impact_on_stock") == "negative" else 0.5),
+            "macro_environment": macro_analysis.get("macro_environment", "neutral"),
+            "impact_on_stock": macro_analysis.get("impact_on_stock", "neutral"),
+            "key_factors": macro_analysis.get("key_factors", []),
+            "reasoning": macro_analysis.get("reasoning", "未提供宏观分析理由"),
+            "summary": "\n".join([
+                f"宏观环境: {macro_analysis.get('macro_environment', 'neutral')}",
+                f"对股票影响: {macro_analysis.get('impact_on_stock', 'neutral')}",
+                "关键因素:",
+                *[f"- {factor}" for factor in macro_analysis.get("key_factors", [])]
+            ])
+        }
     
     # 创建消息
     message = HumanMessage(
