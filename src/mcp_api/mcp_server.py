@@ -2,6 +2,10 @@ import logging
 from datetime import datetime
 from mcp.server.fastmcp import FastMCP
 
+import sys
+import os
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../..')))
+
 from src.mcp_api.data_source_interface import FinancialDataSource
 from src.mcp_api.baostock_data_source import BaostockDataSource
 from src.mcp_api.mcp_utils import setup_logging
