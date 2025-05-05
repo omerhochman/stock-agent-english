@@ -147,57 +147,66 @@ workflow.add_node("technical_analyst_agent", technical_analyst_agent)
 workflow.add_node("fundamentals_agent", fundamentals_agent)
 workflow.add_node("sentiment_agent", sentiment_agent)
 workflow.add_node("valuation_agent", valuation_agent)
+workflow.add_node("portfolio_analyzer_agent", portfolio_analyzer_agent)
 workflow.add_node("researcher_bull_agent", researcher_bull_agent)
 workflow.add_node("researcher_bear_agent", researcher_bear_agent)
 workflow.add_node("debate_room_agent", debate_room_agent)
 workflow.add_node("risk_management_agent", risk_management_agent)
 workflow.add_node("macro_analyst_agent", macro_analyst_agent)
-workflow.add_node("portfolio_analyzer_agent", portfolio_analyzer_agent)
 workflow.add_node("portfolio_management_agent", portfolio_management_agent)
 
 # 定义工作流边缘
 workflow.set_entry_point("market_data_agent")
 
-# 市场数据到各分析师和AI模型分析
-workflow.add_edge("market_data_agent", "ai_model_analyst_agent")  # 市场数据到AI模型分析
+# 市场数据到各分析师 - 第一层
+workflow.add_edge("market_data_agent", "ai_model_analyst_agent")
 workflow.add_edge("market_data_agent", "technical_analyst_agent")
 workflow.add_edge("market_data_agent", "fundamentals_agent")
 workflow.add_edge("market_data_agent", "sentiment_agent")
 workflow.add_edge("market_data_agent", "valuation_agent")
 workflow.add_edge("market_data_agent", "portfolio_analyzer_agent")
 
-workflow.add_edge("technical_analyst_agent", "researcher_bull_agent")
-workflow.add_edge("fundamentals_agent", "researcher_bull_agent")
-workflow.add_edge("sentiment_agent", "researcher_bull_agent")
-workflow.add_edge("valuation_agent", "researcher_bull_agent")
-workflow.add_edge("portfolio_analyzer_agent", "researcher_bull_agent")
-# AI模型分析到研究员
-workflow.add_edge("ai_model_analyst_agent", "researcher_bull_agent")
+# 确保所有第一层分析完成后再进行研究员分析 - 第二层
+workflow.add_conditional_edges(
+    "ai_model_analyst_agent",
+    lambda x: "researcher_bull_agent",
+)
+workflow.add_conditional_edges(
+    "technical_analyst_agent",
+    lambda x: "researcher_bull_agent" if "researcher_bull_agent" not in [msg.name for msg in x["messages"]] else "researcher_bear_agent",
+)
+workflow.add_conditional_edges(
+    "fundamentals_agent",
+    lambda x: "researcher_bull_agent" if "researcher_bull_agent" not in [msg.name for msg in x["messages"]] else "researcher_bear_agent",
+)
+workflow.add_conditional_edges(
+    "sentiment_agent",
+    lambda x: "researcher_bull_agent" if "researcher_bull_agent" not in [msg.name for msg in x["messages"]] else "researcher_bear_agent",
+)
+workflow.add_conditional_edges(
+    "valuation_agent",
+    lambda x: "researcher_bull_agent" if "researcher_bull_agent" not in [msg.name for msg in x["messages"]] else "researcher_bear_agent",
+)
+workflow.add_conditional_edges(
+    "portfolio_analyzer_agent",
+    lambda x: "researcher_bull_agent" if "researcher_bull_agent" not in [msg.name for msg in x["messages"]] else "researcher_bear_agent",
+)
 
-workflow.add_edge("technical_analyst_agent", "researcher_bear_agent")
-workflow.add_edge("fundamentals_agent", "researcher_bear_agent")
-workflow.add_edge("sentiment_agent", "researcher_bear_agent")
-workflow.add_edge("valuation_agent", "researcher_bear_agent")
-workflow.add_edge("portfolio_analyzer_agent", "researcher_bear_agent")
-# AI模型分析到研究员
-workflow.add_edge("ai_model_analyst_agent", "researcher_bear_agent")
-
-# 研究员到辩论室
-workflow.add_edge("researcher_bull_agent", "debate_room_agent")
+# 研究员到辩论室 - 第三层
+workflow.add_conditional_edges(
+    "researcher_bull_agent",
+    lambda x: "researcher_bear_agent" if "researcher_bear_agent" not in [msg.name for msg in x["messages"]] else "debate_room_agent",
+)
 workflow.add_edge("researcher_bear_agent", "debate_room_agent")
-# AI模型分析到辩论室的连接
-workflow.add_edge("ai_model_analyst_agent", "debate_room_agent")
 
-# 辩论室到风险管理
+# 辩论室到风险管理 - 第四层
 workflow.add_edge("debate_room_agent", "risk_management_agent")
 
-# 风险管理到宏观分析
+# 风险管理到宏观分析 - 第五层
 workflow.add_edge("risk_management_agent", "macro_analyst_agent")
 
-# 宏观分析到投资组合管理
+# 宏观分析到投资组合管理 - 第六层
 workflow.add_edge("macro_analyst_agent", "portfolio_management_agent")
-# AI模型分析直接到投资组合管理
-workflow.add_edge("ai_model_analyst_agent", "portfolio_management_agent")
 workflow.add_edge("portfolio_management_agent", END)
 
 # 编译工作流图
