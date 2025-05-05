@@ -432,6 +432,12 @@ def generate_signals(agent, model_type, prices_df, verbose=True):
             # 信号生成由因子模型内部处理，不需要提前计算特征
             # 因子模型内部会根据需要计算各种特征
             signals = agent.generate_signals(prices_df)
+        elif model_type == 'rl':
+            window_size = 20  # RL模型默认窗口大小
+            if len(prices_df) < window_size + 10:  # 确保至少有窗口大小+10的数据量
+                if verbose:
+                    print(f"警告: 数据量({len(prices_df)}行)不足以使用RL模型。需要至少{window_size + 10}行数据。")
+                return {'signal': 'neutral', 'confidence': 0.5, 'error': '数据量不足'}
         else:
             # 详细的错误捕获
             try:

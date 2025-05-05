@@ -85,7 +85,7 @@ def calculate_beta(ticker, market_index="000300", start_date=None, end_date=None
             logger.info(f"市场日期范围: {market_returns.index.min()} 到 {market_returns.index.max()}")
             logger.info(f"共同日期数量: {len(common_dates)}")
             
-            if len(common_dates) < 30:  # 需要足够的数据点
+            if len(common_dates) < 15:  # 需要足够的数据点
                 logger.warning(f"股票和市场数据重叠时间段不足，只有{len(common_dates)}个共同日期，使用默认Beta值")
                 return 1.0
             

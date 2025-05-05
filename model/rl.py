@@ -266,12 +266,13 @@ class StockTradingEnv(gym.Env):
         max_start_idx = len(self.df) - self.max_steps
         min_start_idx = self.window_size
         
-        if max_start_idx <= min_start_idx + 5:  # 添加一些容差
-            # 使用更小的max_steps
-            adjusted_max_steps = len(self.df) - min_start_idx - 5
-            self.max_steps = max(10, adjusted_max_steps)
+        if min_start_idx >= max_start_idx:
+            print(f"警告: 数据量不足。window_size={self.window_size}, max_steps={self.max_steps}, 数据长度={len(self.df)}")
+            # 调整参数，确保可以选择起始点
+            adjusted_max_steps = len(self.df) - min_start_idx - 5  # 添加一些缓冲
+            self.max_steps = max(10, adjusted_max_steps)  # 至少10步
             max_start_idx = len(self.df) - self.max_steps
-            print(f"注意: 调整max_steps为{self.max_steps}以适应数据量")
+            print(f"已调整 max_steps 为 {self.max_steps}")
         
         # 随机选择起始点
         self.current_step = np.random.randint(min_start_idx, max_start_idx)
@@ -947,7 +948,7 @@ class RLTradingAgent:
         return success
     
     def generate_signals(self, price_data: pd.DataFrame, 
-                        tech_indicators: Dict[str, pd.Series] = None) -> Dict[str, Any]:
+                    tech_indicators: Dict[str, pd.Series] = None) -> Dict[str, Any]:
         """
         生成交易信号
         
@@ -969,6 +970,14 @@ class RLTradingAgent:
             
             # 准备数据
             df = self._prepare_data(price_data, tech_indicators)
+            
+            # 检查数据量是否足够
+            if len(df) < self.window_size + 5:  # 确保有足够的数据
+                return {
+                    'signal': 'neutral', 
+                    'confidence': 0.5, 
+                    'error': f'数据量不足，需要至少{self.window_size + 5}个数据点，但只有{len(df)}个'
+                }
             
             # 创建环境
             env = StockTradingEnv(

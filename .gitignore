@@ -13,3 +13,4 @@ factors/
 src/data/macro_analysis_cache.json
 *.lock
 .venv/
+experiments/

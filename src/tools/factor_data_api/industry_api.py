@@ -6,7 +6,7 @@ import pandas as pd
 import traceback
 from typing import Union, List
 
-from .base import logger, data_api
+from .base import logger
 from .market_data_api import get_index_data
 
 def get_industry_index_returns(industry_codes: Union[str, List[str]],

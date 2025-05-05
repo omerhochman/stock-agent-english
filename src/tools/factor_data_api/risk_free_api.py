@@ -38,10 +38,12 @@ def get_risk_free_rate(start_date: str = None, end_date: str = None,
             
             # 过滤日期范围
             if start_date:
-                start_date = pd.to_datetime(start_date)
+                if isinstance(start_date, str):
+                    start_date = pd.to_datetime(start_date)
                 cache_data = cache_data[cache_data.index >= start_date]
             if end_date:
-                end_date = pd.to_datetime(end_date)
+                if isinstance(end_date, str):
+                    end_date = pd.to_datetime(end_date)
                 cache_data = cache_data[cache_data.index <= end_date]
                 
             if not cache_data.empty:
@@ -51,33 +53,44 @@ def get_risk_free_rate(start_date: str = None, end_date: str = None,
             logger.warning(f"从缓存加载无风险利率数据失败: {e}")
     
     try:
+        # 标准化日期格式
+        if not end_date:
+            end_date = datetime.now().strftime("%Y-%m-%d")
+        elif isinstance(end_date, pd.Timestamp):
+            end_date = end_date.strftime("%Y-%m-%d")
+            
+        if not start_date:
+            # 默认获取一年的数据
+            if isinstance(end_date, str):
+                start_date = (datetime.strptime(end_date, "%Y-%m-%d") - timedelta(days=365)).strftime("%Y-%m-%d")
+            else:
+                start_date = (end_date - timedelta(days=365)).strftime("%Y-%m-%d")
+        elif isinstance(start_date, pd.Timestamp):
+            start_date = start_date.strftime("%Y-%m-%d")
+        
         # 尝试使用AKShare获取数据
         try:
             import akshare as ak
             logger.info("使用AKShare获取国债收益率")
             
-            # 处理日期参数
-            if not end_date:
-                end_date = datetime.now().strftime("%Y-%m-%d")
-            if not start_date:
-                # 默认获取一年的数据
-                start_date = (datetime.strptime(end_date, "%Y-%m-%d") - timedelta(days=365)).strftime("%Y-%m-%d")
-            
-            # 获取国债收益率数据
-            bond_data = ak.bond_china_yield(start_date=start_date, end_date=end_date)
-            
-            # 提取1年期国债收益率
-            if "1年期" in bond_data.columns:
-                rf_data = bond_data[["日期", "1年期"]]
-                rf_data = rf_data.rename(columns={"日期": "date", "1年期": "risk_free_rate"})
+            try:
+                # 尝试使用中美国债收益率接口
+                bond_data = ak.bond_zh_us_rate(start_date=start_date.replace('-', ''))
                 
-                # 转换日期格式和利率格式
-                rf_data["date"] = pd.to_datetime(rf_data["date"])
-                # 将百分比转换为小数
-                rf_data["risk_free_rate"] = rf_data["risk_free_rate"] / 100
+                # 重命名列来匹配预期格式
+                bond_data = bond_data.rename(columns={"日期": "date", "中国国债收益率10年": "risk_free_rate"})
+                bond_data["date"] = pd.to_datetime(bond_data["date"])
+                
+                # 选择需要的列并过滤日期范围
+                bond_data = bond_data[["date", "risk_free_rate"]]
+                bond_data = bond_data[(bond_data['date'] >= pd.to_datetime(start_date)) & 
+                                    (bond_data['date'] <= pd.to_datetime(end_date))]
+                
+                # 将百分比转为小数
+                bond_data["risk_free_rate"] = pd.to_numeric(bond_data["risk_free_rate"], errors="coerce") / 100
                 
                 # 设置索引并排序
-                rf_data = rf_data.set_index("date").sort_index()
+                rf_data = bond_data.set_index("date").sort_index()
                 
                 # 重采样到指定频率
                 if freq == 'W':
@@ -100,8 +113,11 @@ def get_risk_free_rate(start_date: str = None, end_date: str = None,
                     logger.warning(f"保存无风险利率数据到缓存失败: {e}")
                 
                 return rf_data["risk_free_rate"]
-            else:
-                logger.warning("无法从AKShare获取1年期国债收益率，尝试TuShare")
+                
+            except Exception as e1:
+                logger.warning(f"使用AKShare获取国债收益率失败: {e1}")
+                raise Exception("AKShare获取国债收益率数据失败")
+                
         except Exception as e:
             logger.warning(f"使用AKShare获取无风险利率失败: {e}")
             logger.warning("尝试使用TuShare获取数据")
@@ -117,76 +133,29 @@ def get_risk_free_rate(start_date: str = None, end_date: str = None,
             ts.set_token(token)
             pro = ts.pro_api()
             
-            # 注意：TuShare的无风险利率数据可能需要特定权限
-            # 以下是使用TuShare获取LPR(贷款基础利率)的代码
-            if not end_date:
-                end_date = datetime.now().strftime("%Y%m%d")
-            if not start_date:
-                start_date = (datetime.strptime(end_date, "%Y%m%d") if len(end_date) == 8 else datetime.strptime(end_date, "%Y-%m-%d"))
-                start_date = (start_date - timedelta(days=365)).strftime("%Y%m%d")
+            # 标准化日期格式为YYYYMMDD（TuShare格式）
+            if isinstance(start_date, str) and len(start_date) == 10 and '-' in start_date:
+                ts_start_date = start_date.replace('-', '')
             else:
-                # 确保格式为YYYYMMDD
-                if len(start_date) == 10 and '-' in start_date:
-                    start_date = start_date.replace('-', '')
+                ts_start_date = start_date
+                
+            if isinstance(end_date, str) and len(end_date) == 10 and '-' in end_date:
+                ts_end_date = end_date.replace('-', '')
+            else:
+                ts_end_date = end_date
             
-            if len(end_date) == 10 and '-' in end_date:
-                end_date = end_date.replace('-', '')
-                
+            # 使用shibor接口获取Shibor数据
             try:
-                # 获取LPR数据
-                lpr_data = pro.lpr(start_date=start_date, end_date=end_date)
-                
-                if not lpr_data.empty:
-                    # 使用1年期LPR
-                    lpr_data = lpr_data[lpr_data['term'] == '1Y'][['date', 'value']]
-                    lpr_data = lpr_data.rename(columns={'value': 'risk_free_rate'})
-                    
-                    # 转换格式
-                    lpr_data['date'] = pd.to_datetime(lpr_data['date'])
-                    lpr_data['risk_free_rate'] = lpr_data['risk_free_rate'] / 100  # 转换为小数
-                    
-                    # 设置索引并排序
-                    lpr_data = lpr_data.set_index('date').sort_index()
-                    
-                    # 重采样到指定频率
-                    if freq == 'W':
-                        lpr_data = lpr_data.resample('W-FRI').last().fillna(method='ffill')
-                        # 将年化利率转换为周利率
-                        lpr_data = lpr_data / 52
-                    elif freq == 'M':
-                        lpr_data = lpr_data.resample('M').last().fillna(method='ffill')
-                        # 将年化利率转换为月利率
-                        lpr_data = lpr_data / 12
-                    else:  # 日频率
-                        # 将年化利率转换为日利率
-                        lpr_data = lpr_data / 252
-                    
-                    # 保存到缓存
-                    try:
-                        lpr_data.to_csv(cache_file)
-                        logger.info(f"无风险利率数据已保存到缓存: {cache_file}")
-                    except Exception as e:
-                        logger.warning(f"保存无风险利率数据到缓存失败: {e}")
-                    
-                    return lpr_data["risk_free_rate"]
-                else:
-                    logger.warning("TuShare LPR数据为空，尝试获取银行间同业拆借利率")
-            except Exception as e:
-                logger.warning(f"获取TuShare LPR数据失败: {e}")
-                logger.warning("尝试获取银行间同业拆借利率")
-                
-            # 尝试获取银行间同业拆借利率(Shibor)
-            try:
-                shibor_data = pro.shibor(start_date=start_date, end_date=end_date)
+                shibor_data = pro.shibor(start_date=ts_start_date, end_date=ts_end_date)
                 
                 if not shibor_data.empty:
-                    # 使用1Y Shibor
+                    # 使用1年期shibor (1y列)
                     shibor_data = shibor_data[['date', '1y']]
                     shibor_data = shibor_data.rename(columns={'1y': 'risk_free_rate'})
                     
                     # 转换格式
                     shibor_data['date'] = pd.to_datetime(shibor_data['date'])
-                    shibor_data['risk_free_rate'] = shibor_data['risk_free_rate'] / 100  # 转换为小数
+                    shibor_data['risk_free_rate'] = pd.to_numeric(shibor_data['risk_free_rate'], errors='coerce') / 100  # 转换为小数
                     
                     # 设置索引并排序
                     shibor_data = shibor_data.set_index('date').sort_index()
