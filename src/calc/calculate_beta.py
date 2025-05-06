@@ -104,7 +104,7 @@ def calculate_beta(ticker, market_index="000300", start_date=None, end_date=None
                 beta = 1.0
             
             # 确保beta在合理范围内
-            if not (0.2 <= beta <= 3.0):
+            if not (0.0 <= beta <= 3.0):
                 logger.warning(f"计算的Beta值 {beta:.2f} 超出合理范围，调整为限制范围")
                 beta = max(min(beta, 3.0), 0.2)
                 
