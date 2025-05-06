@@ -116,7 +116,7 @@ class FactorMiningModule:
         self.pset.addEphemeralConstant("rand", lambda: random.uniform(-1, 1), float)
     
     def _evaluate_factor(self, individual, X: np.ndarray, y: np.ndarray, 
-                        eval_func: Callable, eval_window: int = 20) -> Tuple[float,]:
+                    eval_func: Callable, eval_window: int = 20) -> Tuple[float,]:
         """评估因子质量"""
         # 将个体转换为函数
         func = self.toolbox.compile(expr=individual)
@@ -138,21 +138,34 @@ class FactorMiningModule:
             # 处理无穷大和NaN
             factor_values = np.nan_to_num(factor_values, nan=0.0, posinf=0.0, neginf=0.0)
             
+            # 检查因子值是否有效
+            if np.all(factor_values == 0.0) or np.all(np.isclose(factor_values, factor_values[0])):
+                # 如果所有值都相同或全为零，给予低分
+                return (-0.5,)
+                
             # 计算评估指标
-            score = eval_func(factor_values, y)
-            
-            # 计算因子复杂度惩罚
-            complexity = len(str(individual))
-            complexity_penalty = np.clip(complexity / 200, 0, 0.5)
-            
-            # 最终分数
-            final_score = score - complexity_penalty
-            
-            return (final_score,)
-            
+            try:
+                score = eval_func(factor_values, y)
+                
+                # 确保分数是一个有限数
+                if not np.isfinite(score):
+                    score = -0.5
+                    
+                # 计算因子复杂度惩罚
+                complexity = len(str(individual))
+                complexity_penalty = np.clip(complexity / 200, 0, 0.5)
+                
+                # 最终分数
+                final_score = max(-1.0, min(1.0, score - complexity_penalty))
+                
+                return (final_score,)
+            except Exception as e:
+                self.logger.error(f"计算因子得分时出错: {str(e)}")
+                return (-0.5,)
+                
         except Exception:
             # 如果出错，返回最低分
-            return (-np.inf,)
+            return (-0.5,)
     
     def _calculate_ic(self, factor_values: np.ndarray, future_returns: np.ndarray, 
                      window: int = 20) -> float:
@@ -237,40 +250,113 @@ class FactorMiningModule:
     
     def _factor_fitness(self, factor_values: np.ndarray, future_returns: np.ndarray) -> float:
         """综合计算因子质量"""
-        # 计算多个指标
-        ic = self._calculate_ic(factor_values, future_returns)
-        return_spread = self._calculate_return_spread(factor_values, future_returns)
-        portfolio_return = self._calculate_portfolio_return(factor_values, future_returns)
-        
-        # 计算因子自相关性（稳定性）
-        factor_series = pd.Series(factor_values)
-        factor_autocorr = factor_series.autocorr(lag=1)
-        if np.isnan(factor_autocorr):
-            factor_autocorr = 0
-        
-        # 计算因子单调性（按分组测试）
-        monotonicity = 0.0
         try:
-            df = pd.DataFrame({'factor': factor_values, 'returns': future_returns})
-            df['quantile'] = pd.qcut(df['factor'], q=5, labels=False, duplicates='drop')
-            group_returns = df.groupby('quantile')['returns'].mean()
-            # 使用秩相关系数判断单调性
-            if len(group_returns) >= 3:
-                monotonicity = stats.spearmanr(group_returns.index, group_returns.values)[0]
-                if np.isnan(monotonicity):
+            # 清除无效值
+            mask = ~(np.isnan(factor_values) | np.isnan(future_returns) | 
+                    np.isinf(factor_values) | np.isinf(future_returns))
+            
+            if np.sum(mask) < 10:  # 如果有效数据点太少
+                return 0.0
+                
+            factor_values_clean = factor_values[mask]
+            future_returns_clean = future_returns[mask]
+            
+            # 计算多个指标
+            try:
+                ic = self._calculate_ic(factor_values_clean, future_returns_clean)
+                if not np.isfinite(ic):
+                    ic = 0.0
+            except:
+                ic = 0.0
+                
+            try:
+                return_spread = self._calculate_return_spread(factor_values_clean, future_returns_clean)
+                if not np.isfinite(return_spread):
+                    return_spread = 0.0
+            except:
+                return_spread = 0.0
+                
+            try:
+                portfolio_return = self._calculate_portfolio_return(factor_values_clean, future_returns_clean)
+                if not np.isfinite(portfolio_return):
+                    portfolio_return = 0.0
+            except:
+                portfolio_return = 0.0
+            
+            # 计算因子自相关性（稳定性）
+            try:
+                factor_series = pd.Series(factor_values_clean)
+                factor_autocorr = factor_series.autocorr(lag=1)
+                if np.isnan(factor_autocorr) or not np.isfinite(factor_autocorr):
+                    factor_autocorr = 0
+            except:
+                factor_autocorr = 0
+            
+            # 计算因子单调性
+            try:
+                monotonicity = self._calculate_monotonicity(factor_values_clean, future_returns_clean)
+                if not np.isfinite(monotonicity):
                     monotonicity = 0.0
-        except:
-            pass
+            except:
+                monotonicity = 0.0
+            
+            # 综合评分（各项指标加权）
+            score = (
+                0.4 * abs(ic) +                 
+                0.3 * abs(return_spread) +      
+                0.2 * abs(portfolio_return) +   
+                0.05 * abs(factor_autocorr) +   
+                0.05 * abs(monotonicity)        
+            )
+            
+            # 确保返回有限值
+            return float(0.0 if not np.isfinite(score) else score)
         
-        # 综合评分（各项指标加权）
-        return (
-            0.4 * abs(ic) +                 
-            0.3 * abs(return_spread) +      
-            0.2 * abs(portfolio_return) +   
-            0.05 * abs(factor_autocorr) +   
-            0.05 * abs(monotonicity)        
-        )
+        except Exception as e:
+            self.logger.error(f"计算因子适应度时出错: {str(e)}")
+            return 0.0
     
+    def _calculate_monotonicity(self, factor_values: np.ndarray, future_returns: np.ndarray, 
+                           n_groups: int = 5) -> float:
+        """计算因子与未来收益之间的单调关系强度"""
+        try:
+            if len(factor_values) < n_groups * 2:
+                return 0.0
+                
+            # 创建数据框
+            df = pd.DataFrame({'factor': factor_values, 'returns': future_returns})
+            
+            # 安全地进行分组
+            try:
+                df['quantile'] = pd.qcut(df['factor'], q=n_groups, labels=False, duplicates='drop')
+            except:
+                # 如果分位数划分失败，尝试减少组数
+                try:
+                    n_groups = max(2, n_groups - 1)
+                    df['quantile'] = pd.qcut(df['factor'], q=n_groups, labels=False, duplicates='drop')
+                except:
+                    # 如果仍然失败，使用等宽分组
+                    df['quantile'] = pd.cut(df['factor'], bins=n_groups, labels=False)
+            
+            # 计算每组平均回报
+            group_returns = df.groupby('quantile')['returns'].mean()
+            
+            if len(group_returns) < 2:
+                return 0.0
+                
+            # 计算排序相关性
+            try:
+                from scipy import stats
+                corr, _ = stats.spearmanr(group_returns.index, group_returns.values)
+                return 0.0 if np.isnan(corr) else corr
+            except:
+                # 如果无法计算相关性，计算简单的趋势
+                trend = (group_returns.iloc[-1] - group_returns.iloc[0]) / (len(group_returns) - 1)
+                return np.clip(trend, -1.0, 1.0)
+        
+        except Exception:
+            return 0.0
+
     def evolve_factors(self, price_data: pd.DataFrame, n_factors: int = 5, 
                       population_size: int = 100, n_generations: int = 50,
                       future_return_periods: int = 5, min_fitness: float = 0.05):
@@ -497,9 +583,111 @@ class FactorMiningModule:
             
             # 计算因子值
             factor_values = {}
+
+            # 导入需要的函数，确保在局部作用域可用
+            # 安全保护的特殊函数
+            def protected_div(left, right):
+                """安全除法，防止除以0错误"""
+                if isinstance(right, np.ndarray):
+                    return np.where(np.abs(right) >= 1e-10, left / right, 1.0)
+                else:
+                    return left / right if abs(right) >= 1e-10 else 1.0
+
+            def protected_sqrt(x):
+                """安全平方根，处理负数"""
+                if isinstance(x, np.ndarray):
+                    return np.where(x > 0, np.sqrt(x), 0.0)
+                else:
+                    return np.sqrt(x) if x > 0 else 0.0
+
+            def protected_log(x):
+                """安全对数，处理负数和0"""
+                if isinstance(x, np.ndarray):
+                    return np.where(x > 0, np.log(x), 0.0)
+                else:
+                    return np.log(x) if x > 0 else 0.0
+
+            def protected_inv(x):
+                """安全倒数，处理0"""
+                if isinstance(x, np.ndarray):
+                    return np.where(np.abs(x) >= 1e-10, 1.0 / x, 0.0)
+                else:
+                    return 1.0 / x if abs(x) >= 1e-10 else 0.0
+            
+            # 时间序列函数
+            def rolling_mean(x, window=10):
+                """滚动平均"""
+                return pd.Series(x).rolling(window=window).mean().fillna(0).values
+
+            def rolling_std(x, window=10):
+                """滚动标准差"""
+                return pd.Series(x).rolling(window=window).std().fillna(0).values
+
+            def ts_delta(x, period=1):
+                """时间序列差分"""
+                return pd.Series(x).diff(period).fillna(0).values
+
+            def ts_delay(x, period=1):
+                """时间序列滞后"""
+                return pd.Series(x).shift(period).fillna(0).values
+
+            def ts_return(x, period=1):
+                """时间序列收益率"""
+                return pd.Series(x).pct_change(period).fillna(0).values
+
+            def ts_rank(x, window=10):
+                """时间序列排名"""
+                return pd.Series(x).rolling(window).apply(lambda x: pd.Series(x).rank(pct=True).iloc[-1]).fillna(0).values
             
             # 创建函数命名空间
-            local_namespace = self._create_function_namespace()
+            local_namespace = {
+                # 基本运算符
+                'add': operator.add, 'sub': operator.sub, 'mul': operator.mul, 'div': protected_div, 'neg': operator.neg,
+                
+                # 数学函数
+                'abs': abs, 'sqrt': protected_sqrt, 'log': protected_log, 'inv': protected_inv,
+                
+                # 专用安全函数 - 直接定义在命名空间中
+                'protected_div': protected_div,
+                'protected_sqrt': protected_sqrt,
+                'protected_log': protected_log,
+                'protected_inv': protected_inv,
+                
+                # 时间序列函数
+                'rolling_mean': rolling_mean, 'rolling_std': rolling_std,
+                'ts_delta': ts_delta, 'ts_delay': ts_delay, 
+                'ts_return': ts_return, 'ts_rank': ts_rank,
+                
+                # 带参数的时间序列函数
+                'rolling_mean_5': lambda x: rolling_mean(x, window=5),
+                'rolling_mean_10': lambda x: rolling_mean(x, window=10),
+                'rolling_mean_20': lambda x: rolling_mean(x, window=20),
+                'rolling_std_5': lambda x: rolling_std(x, window=5),
+                'rolling_std_10': lambda x: rolling_std(x, window=10),
+                'ts_delta_1': lambda x: ts_delta(x, period=1),
+                'ts_delta_5': lambda x: ts_delta(x, period=5),
+                'ts_delay_1': lambda x: ts_delay(x, period=1),
+                'ts_delay_5': lambda x: ts_delay(x, period=5),
+                'ts_return_1': lambda x: ts_return(x, period=1),
+                'ts_return_5': lambda x: ts_return(x, period=5),
+                'ts_rank_10': lambda x: ts_rank(x, window=10),
+                
+                # NumPy函数
+                'mean': np.mean, 'std': np.std, 'min': np.min, 'max': np.max, 'sum': np.sum
+            }
+            
+            # 计算缺失的特征（可能被因子表达式引用）
+            if 'open' in enhanced_df.columns and 'close' in enhanced_df.columns:
+                valid_close = enhanced_df['close'] != 0
+                enhanced_df['open_close'] = np.zeros(len(enhanced_df))
+                if any(valid_close):
+                    enhanced_df.loc[valid_close, 'open_close'] = enhanced_df.loc[valid_close, 'open'] / enhanced_df.loc[valid_close, 'close'] - 1
+            
+            if 'high' in enhanced_df.columns and 'low' in enhanced_df.columns:
+                valid_low = enhanced_df['low'] != 0
+                enhanced_df['high_low'] = np.zeros(len(enhanced_df))
+                if any(valid_low):
+                    enhanced_df.loc[valid_low, 'high_low'] = enhanced_df.loc[valid_low, 'high'] / enhanced_df.loc[valid_low, 'low'] - 1
             
             # 将数据特征添加到命名空间
             for col in enhanced_df.columns:

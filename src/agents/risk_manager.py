@@ -223,7 +223,7 @@ def risk_management_agent(state: AgentState):
     
     # 应用改进的凯利公式
     kelly_fraction = win_rate - ((1 - win_rate) / win_loss_ratio)
-    kelly_fraction = max(0, kelly_fraction)  # 确保非负
+    kelly_fraction = max(0.05, kelly_fraction)
     
     # 保守系数和风险调整
     conservative_factor = 0.5  # 只用一半凯利建议
@@ -231,9 +231,11 @@ def risk_management_agent(state: AgentState):
     
     # 最终头寸大小
     max_position_size = total_portfolio_value * kelly_fraction * conservative_factor * risk_adjustment
+
+    max_position_size = max(max_position_size, total_portfolio_value * 0.02)  # 设置最小仓位
     
     # 安全检查 - 头寸不能太高
-    max_position_size = min(max_position_size, total_portfolio_value * 0.25)
+    max_position_size = min(max_position_size, total_portfolio_value * 0.4)
 
     # 5. 压力测试 (更全面的情景)
     stress_test_scenarios = {
@@ -282,18 +284,52 @@ def risk_management_agent(state: AgentState):
     # 7. 生成交易行动
     debate_signal = debate_results.get("signal", "neutral")
 
+    # 获取宏观环境信息
+    macro_message = next(
+        (msg for msg in state["messages"] if msg.name == "macro_analyst_agent"), None)
+    
+    macro_environment_positive = False
+    if macro_message:
+        try:
+            macro_data = json.loads(macro_message.content)
+            # 检查宏观分析是否积极
+            macro_impact = macro_data.get("impact_on_stock", "neutral")
+            macro_environment = macro_data.get("macro_environment", "neutral")
+            
+            # 如果宏观环境和对股票的影响都是积极的，降低风险评分
+            if macro_impact == "positive" and macro_environment == "positive":
+                macro_environment_positive = True
+                # 降低风险评分，但确保不小于0
+                risk_score = max(risk_score - 2, 0)
+                logger.info(f"基于积极的宏观环境降低风险评分至 {risk_score}")
+        except Exception as e:
+            logger.warning(f"解析宏观分析数据失败: {e}")
+            
+    # 增加对市场近期表现的评估
+    recent_period = min(20, len(returns))
+    if recent_period > 5:  # 确保有足够的数据
+        recent_returns = returns[-recent_period:]
+        recent_positive_days = sum(1 for r in recent_returns if r > 0)
+        recent_positive_ratio = recent_positive_days / len(recent_returns)
+        
+        # 如果近期大部分交易日收益为正，降低风险评分
+        if recent_positive_ratio > 0.65:  # 超过65%的天数为正收益
+            risk_score = max(risk_score - 1, 0)  # 再降低1分
+            logger.info(f"基于近期积极市场表现降低风险评分至 {risk_score}")
+
+    logger.info(f"风险分数risk_score为：{risk_score}")
     # 基于风险分数和辩论信号的决策规则
-    if risk_score >= 9:
+    if risk_score >= 10:  
         trading_action = "hold"  # 非常高风险，持有观望
-    elif risk_score >= 7:
+    elif risk_score >= 8:  
         if debate_signal == "bearish":
             trading_action = "sell"  # 高风险 + 看空 = 卖出
         else:
             trading_action = "reduce"  # 高风险但非看空 = 减仓
     else:
-        if debate_signal == "bullish" and debate_confidence > 0.5:
-            trading_action = "buy"  # 低风险 + 强看多 = 买入
-        elif debate_signal == "bearish" and debate_confidence > 0.5:
+        if debate_signal == "bullish" and debate_confidence > 0.4: 
+            trading_action = "buy"  # 低风险 + 看多 = 买入
+        elif debate_signal == "bearish" and debate_confidence > 0.6:
             trading_action = "sell"  # 低风险 + 强看空 = 卖出
         else:
             trading_action = "hold"  # 其他情况 = 持有

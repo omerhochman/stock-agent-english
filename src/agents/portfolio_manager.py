@@ -397,7 +397,7 @@ def optimize_portfolio_decision_advanced(llm_decision, portfolio, current_price,
                 ai_value = {"bullish": 1, "neutral": 0, "bearish": -1}.get(ai_signal.lower(), 0)
                 
                 # 使用AI模型信号进一步调整预期收益乘数
-                ai_adjustment = ai_value * ai_confidence * 0.3  # AI模型贡献30%的调整
+                ai_adjustment = ai_value * ai_confidence * 0.2  # AI模型贡献20%的调整
                 expected_return_multiplier += ai_adjustment
                 logger.info(f"AI模型贡献调整: {ai_adjustment:.2f}, 调整后的预期收益乘数: {expected_return_multiplier:.2f}")
             

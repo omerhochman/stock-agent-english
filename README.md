@@ -2,7 +2,7 @@ Forked From：https://github.com/24mlight/A_Share_investment_Agent.git
 
 # A 股投资 Agent 系统
 
-![System Architecture V2](assets/img/structure_v2.png)
+![System Architecture V2](assets/img/structure.svg)
 
 ## 系统组成
 

@@ -427,10 +427,12 @@ def generate_signals(agent, model_type, prices_df, verbose=True):
         # 添加缺失的技术指标
         prices_df = add_technical_indicators(prices_df.copy())
         
+        # 初始化信号为默认值，确保所有路径都有值
+        signals = {'signal': 'neutral', 'confidence': 0.5}
+        
         # 对于因子模型，需要特殊处理
         if model_type == 'factor':
             # 信号生成由因子模型内部处理，不需要提前计算特征
-            # 因子模型内部会根据需要计算各种特征
             signals = agent.generate_signals(prices_df)
         elif model_type == 'rl':
             window_size = 20  # RL模型默认窗口大小
@@ -438,6 +440,7 @@ def generate_signals(agent, model_type, prices_df, verbose=True):
                 if verbose:
                     print(f"警告: 数据量({len(prices_df)}行)不足以使用RL模型。需要至少{window_size + 10}行数据。")
                 return {'signal': 'neutral', 'confidence': 0.5, 'error': '数据量不足'}
+            signals = agent.generate_signals(prices_df)
         else:
             # 详细的错误捕获
             try:
@@ -446,7 +449,7 @@ def generate_signals(agent, model_type, prices_df, verbose=True):
                 import traceback
                 print(f"生成信号时出现错误: {e}")
                 traceback.print_exc()
-                # 尝试使用简单的字典返回
+                # 使用简单的字典返回
                 signals = {'signal': 'neutral', 'confidence': 0.5, 'error': str(e)}
         
         if verbose:

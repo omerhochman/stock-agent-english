@@ -208,9 +208,9 @@ def debate_room_agent(state: AgentState):
         # 计算混合置信度差异
         confidence_diff = bull_confidence - bear_confidence
 
-        # 将LLM权重调整为25%，AI模型权重为20%，研究员占55%
+        # 将LLM权重调整为25%，AI模型权重为15%，研究员占剩下的
         llm_weight = 0.25
-        ai_weight = 0.20
+        ai_weight = 0.15
         researcher_weight = 1 - llm_weight - ai_weight
         
         # 修改混合置信度计算

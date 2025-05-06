@@ -65,7 +65,7 @@ set_global_log_storage(log_storage)
 # --- Run the Hedge Fund Workflow ---
 def run_hedge_fund(run_id: str, ticker: str, start_date: str, end_date: str, portfolio: dict, 
                    show_reasoning: bool = False, num_of_news: int = 5, show_summary: bool = False,
-                   tickers: str = None):
+                   tickers = None):
     print(f"--- Starting Workflow Run ID: {run_id} ---")
 
     # 设置API状态
@@ -76,14 +76,26 @@ def run_hedge_fund(run_id: str, ticker: str, start_date: str, end_date: str, por
     except Exception as e:
         print(f"Note: Could not update API state: {str(e)}")
     
-    # 处理tickers参数，如果提供了多个股票代码
     ticker_list = None
     if tickers:
-        ticker_list = [t.strip() for t in tickers.split(',')]
-        print(f"--- Processing multiple tickers: {ticker_list} ---")
-        # 确保主要ticker也在列表中
-        if ticker not in ticker_list:
-            ticker_list.insert(0, ticker)
+        if isinstance(tickers, str):
+            # 如果是字符串，则按逗号分割
+            ticker_list = [t.strip() for t in tickers.split(',')]
+        elif isinstance(tickers, list):
+            # 如果已经是列表，直接使用
+            ticker_list = tickers
+        else:
+            # 其他类型，尝试转换为字符串
+            try:
+                ticker_list = [str(tickers)]
+            except:
+                ticker_list = None
+                
+        if ticker_list:
+            print(f"--- Processing multiple tickers: {ticker_list} ---")
+            # 确保主要ticker也在列表中
+            if ticker not in ticker_list:
+                ticker_list.insert(0, ticker)
     
     initial_state = {
         "messages": [
