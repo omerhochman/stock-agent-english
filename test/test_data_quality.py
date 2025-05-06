@@ -1,7 +1,6 @@
 # 数据处理示例
 from src.tools.api import get_price_history, get_financial_metrics
 import matplotlib.pyplot as plt
-import pandas as pd
 
 # 获取高质量价格数据
 ticker = "600519"

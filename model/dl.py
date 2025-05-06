@@ -15,6 +15,8 @@ from typing import Dict, Tuple, List, Optional, Any
 # 设置日志
 logger = logging.getLogger('deep_learning')
 
+FUTURE = 20 # 预测的未来天数
+
 # 设置随机种子以确保结果可重现
 torch.manual_seed(42)
 np.random.seed(42)
@@ -109,7 +111,7 @@ class DeepLearningModule:
                          target_col: str = 'close',
                          feature_cols: Optional[List[str]] = None,
                          seq_length: int = 10,
-                         forecast_days: int = 5,
+                         forecast_days: int = 20,
                          hidden_dim: int = 64,
                          num_layers: int = 2,
                          epochs: int = 50,
@@ -165,7 +167,7 @@ class DeepLearningModule:
             
             # 初始化模型
             input_dim = len(feature_cols)
-            self.lstm_model = StockLSTM(input_dim, hidden_dim, num_layers, forecast_days)
+            self.lstm_model = StockLSTM(input_dim, hidden_dim, num_layers, FUTURE)
             self.lstm_model.to(self.device)
             
             # 定义优化器和损失函数
@@ -379,8 +381,8 @@ class DeepLearningModule:
             # 加载LSTM模型
             if os.path.exists(lstm_path) and os.path.exists(price_scaler_path):
                 # 需要先定义模型结构
-                self.lstm_model = StockLSTM(input_dim=1, hidden_dim=64, num_layers=2, output_dim=5)
-                self.lstm_model.load_state_dict(torch.load(lstm_path, map_location=self.device))
+                self.lstm_model = StockLSTM(input_dim=1, hidden_dim=64, num_layers=2, output_dim=FUTURE) # output_dim = forecast_days
+                self.lstm_model.load_state_dict(torch.load(lstm_path, map_location=self.device, weights_only=False))
                 self.lstm_model.to(self.device)
                 self.lstm_model.eval()
                 self.price_scaler = joblib.load(price_scaler_path)
@@ -491,7 +493,7 @@ class MLAgent:
                 target_col='close',
                 feature_cols=['close'],  # 简化起见只使用收盘价
                 seq_length=10,
-                forecast_days=5
+                forecast_days=FUTURE,  # 预测天数
             )
             
             # 准备分类器训练数据
@@ -651,7 +653,7 @@ class MLAgent:
             
             avg_return = np.mean(expected_returns)
             reasoning_parts.append(
-                f"LSTM模型预测未来5天价格走势: {', '.join([f'{p:.2f}' for p in future_prices])}, "
+                f"LSTM模型预测未来{FUTURE}天价格走势: {', '.join([f'{p:.2f}' for p in future_prices])}, "
                 f"预期平均收益率: {avg_return:.2%}"
             )
         
@@ -697,6 +699,8 @@ def preprocess_stock_data(price_df: pd.DataFrame, technical_indicators: Optional
     
     # 复制数据，避免修改原始数据
     df = price_df.copy()
+
+    df.set_index('date', inplace=True)
     
     # 计算收益率
     df['returns'] = df['close'].pct_change()

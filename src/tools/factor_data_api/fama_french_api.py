@@ -86,7 +86,7 @@ def calculate_fama_french_factors_tushare(start_date: str, end_date: str, freq: 
         portfolio_dates = pd.date_range(
             start=pd.to_datetime(start_date, format="%Y%m%d"), 
             end=pd.to_datetime(end_date, format="%Y%m%d"), 
-            freq='Q'
+            freq='QE'  # 季度末
         ).strftime('%Y%m%d').tolist()
         
         # 3. 初始化因子数据框
@@ -233,7 +233,7 @@ def calculate_fama_french_factors_tushare(start_date: str, end_date: str, freq: 
         final_factors = final_factors.loc[common_index]
         
         # 使用前向填充处理缺失值
-        final_factors = final_factors.fillna(method='ffill')
+        final_factors = final_factors.ffill()
         
         # 计算市场风险溢价(Mkt-RF)
         final_factors['MKT_RF'] = final_factors['MKT'] - final_factors['RF']

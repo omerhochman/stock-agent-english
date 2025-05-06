@@ -1,6 +1,8 @@
 import os
+import sys
 import logging
 from typing import Optional
+from datetime import datetime
 
 
 # 预定义的图标
@@ -19,30 +21,20 @@ def setup_logger(name: str, log_dir: Optional[str] = None) -> logging.Logger:
     Returns:
         配置好的logger实例
     """
-    # 设置 root logger 的级别为 DEBUG
-    logging.getLogger().setLevel(logging.DEBUG)
-
-    # 降低第三方库的日志级别，减少噪音
-    logging.getLogger('urllib3').setLevel(logging.WARNING)
-    logging.getLogger('openai').setLevel(logging.WARNING)
-    logging.getLogger('httpx').setLevel(logging.WARNING)
-    logging.getLogger('httpcore').setLevel(logging.WARNING)
-    logging.getLogger('asyncio').setLevel(logging.WARNING)
-    logging.getLogger('uvicorn').setLevel(logging.WARNING)
-    logging.getLogger('matplotlib').setLevel(logging.WARNING)
-    logging.getLogger('PIL').setLevel(logging.WARNING)
-
     # 获取或创建 logger
     logger = logging.getLogger(name)
+    
+    # 如果已经有处理器，先清除所有处理器，确保不会重复添加
+    if logger.handlers:
+        logger.handlers.clear()
+    
+    # 设置日志级别
     logger.setLevel(logging.DEBUG)  # logger本身记录DEBUG级别及以上
     logger.propagate = False  # 防止日志消息传播到父级logger
 
-    # 如果已经有处理器，不再添加
-    if logger.handlers:
-        return logger
-
     # 创建控制台处理器
-    console_handler = logging.StreamHandler()
+    # 这样可以确保日志输出到原始的标准输出，而不是被重定向后的输出
+    console_handler = logging.StreamHandler(sys.__stdout__)
     console_handler.setLevel(logging.INFO)  # 控制台只显示INFO及以上级别
 
     # 自定义过滤器，过滤掉HTTP请求和其他噪音日志
@@ -77,17 +69,29 @@ def setup_logger(name: str, log_dir: Optional[str] = None) -> logging.Logger:
         log_dir = os.path.join(os.path.dirname(os.path.dirname(
             os.path.dirname(os.path.abspath(__file__)))), 'logs')
     os.makedirs(log_dir, exist_ok=True)
-    log_file = os.path.join(log_dir, f"{name}.log")
-    file_handler = logging.FileHandler(log_file, encoding='utf-8')
-    file_handler.setLevel(logging.DEBUG)  # 文件记录DEBUG级别及以上的日志
-    file_handler.setFormatter(formatter)
+    
+    # 使用时间戳来创建唯一的日志文件名，避免文件冲突
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    log_file = os.path.join(log_dir, f"{name}_{timestamp}.log")
+    
+    # 尝试创建文件处理器，如果失败则记录错误但不中断程序
+    try:
+        file_handler = logging.FileHandler(log_file, encoding='utf-8')
+        file_handler.setLevel(logging.DEBUG)  # 文件记录DEBUG级别及以上的日志
+        file_handler.setFormatter(formatter)
+        logger.addHandler(file_handler)
+    except (IOError, PermissionError) as e:
+        # 直接打印到原始stdout，确保错误信息可见
+        sys.__stdout__.write(f"警告: 无法创建日志文件 {log_file}: {str(e)}\n")
+        sys.__stdout__.flush()
 
-    # 添加处理器到日志记录器
+    # 添加控制台处理器
     logger.addHandler(console_handler)
-    logger.addHandler(file_handler)
+    
+    # 记录一条消息，表明日志器已初始化
+    logger.info(f"日志器 '{name}' 已初始化，输出到 {log_file}")
 
     return logger
-
 
 def setup_global_logging(log_dir: Optional[str] = None):
     """设置全局日志配置，降低所有已知噪音源的日志级别

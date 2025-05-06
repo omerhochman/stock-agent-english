@@ -45,8 +45,8 @@ def estimate_capm(returns: pd.Series,
     results = model.fit()
     
     # 提取参数
-    alpha = results.params[0]
-    beta = results.params[1]
+    alpha = results.params.iloc[0]
+    beta = results.params.iloc[1]
     
     # 计算预测值和残差
     df['predicted'] = alpha + beta * df['excess_market']
@@ -66,8 +66,8 @@ def estimate_capm(returns: pd.Series,
         'alpha': alpha,
         'beta': beta,
         'r_squared': r_squared,
-        'p_value_alpha': results.pvalues[0],
-        'p_value_beta': results.pvalues[1],
+        'p_value_alpha': results.pvalues.iloc[0], 
+        'p_value_beta': results.pvalues.iloc[1], 
         'information_ratio': information_ratio,
         'treynor_ratio': treynor_ratio,
         'residual_std': np.std(df['residuals']),
@@ -121,10 +121,10 @@ def estimate_fama_french(returns: pd.Series,
     results = model.fit()
     
     # 提取参数
-    alpha = results.params[0]
-    beta_market = results.params[1]
-    beta_smb = results.params[2]
-    beta_hml = results.params[3]
+    alpha = results.params.iloc[0]
+    beta_market = results.params.iloc[1]
+    beta_smb = results.params.iloc[2]
+    beta_hml = results.params.iloc[3]
     
     # 计算预测值和残差
     df['predicted'] = (alpha + 
@@ -140,10 +140,10 @@ def estimate_fama_french(returns: pd.Series,
         'beta_smb': beta_smb,
         'beta_hml': beta_hml,
         'r_squared': results.rsquared,
-        'p_value_alpha': results.pvalues[0],
-        'p_value_market': results.pvalues[1],
-        'p_value_smb': results.pvalues[2],
-        'p_value_hml': results.pvalues[3],
+        'p_value_alpha': results.pvalues.iloc[0],  
+        'p_value_market': results.pvalues.iloc[1],
+        'p_value_smb': results.pvalues.iloc[2],  
+        'p_value_hml': results.pvalues.iloc[3],
         'residual_std': np.std(df['residuals']),
         'annualized_alpha': alpha * 252,  # 年化alpha
         'observations': len(df)

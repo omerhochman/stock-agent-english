@@ -1,6 +1,5 @@
 # 多股票分析示例
 from src.tools.api import get_price_history, get_financial_metrics
-import pandas as pd
 import matplotlib.pyplot as plt
 
 # 股票列表

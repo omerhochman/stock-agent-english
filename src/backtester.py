@@ -14,6 +14,8 @@ import os
 import uuid  # 添加uuid模块用于生成run_id
 
 from src.tools.factor_data_api import get_risk_free_rate
+from src.utils.logging_config import setup_logger
+from src.utils.trading_display import print_trading_output
 
 # 根据操作系统配置中文字体
 if sys.platform.startswith('win'):
@@ -43,7 +45,7 @@ class Backtester:
         self.num_of_news = num_of_news
         # 设置回测日志
         self.setup_backtest_logging()
-        self.logger = self.setup_logging()
+        self.logger = setup_logger('Backtester')
 
         # 初始化 API 调用管理
         self._api_call_count = 0
@@ -64,18 +66,6 @@ class Backtester:
 
         # 验证输入参数
         self.validate_inputs()
-
-    def setup_logging(self):
-        """设置日志记录器"""
-        logger = logging.getLogger('backtester')
-        logger.setLevel(logging.INFO)
-        if not logger.handlers:
-            handler = logging.StreamHandler()
-            formatter = logging.Formatter(
-                '%(asctime)s - %(levelname)s - %(message)s')
-            handler.setFormatter(formatter)
-            logger.addHandler(handler)
-        return logger
 
     def validate_inputs(self):
         """验证输入参数的有效性"""
@@ -289,12 +279,19 @@ class Backtester:
 
         for current_date in dates:
             lookback_start = (current_date - timedelta(days=30)
-                              ).strftime("%Y-%m-%d")
+                            ).strftime("%Y-%m-%d")
             current_date_str = current_date.strftime("%Y-%m-%d")
 
             # 获取智能体决策
             output = self.get_agent_decision(
                 current_date_str, lookback_start, self.portfolio)
+
+            # 美观显示决策结果
+            # 首先清除屏幕
+            os.system('cls' if os.name == 'nt' else 'clear')
+            
+            # 使用外部的显示函数
+            print_trading_output(output)
 
             # 记录每个智能体的信号和分析结果
             self.backtest_logger.info(f"\n交易日期: {current_date_str}")

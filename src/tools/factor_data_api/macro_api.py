@@ -163,7 +163,7 @@ def _generate_mock_macro_data(indicator_type: str, start_date: str, end_date: st
     # 根据指标类型生成不同频率的日期范围
     if indicator_type == "gdp":
         # GDP数据是季度数据
-        date_range = pd.date_range(start=start_date, end=end_date, freq='Q')
+        date_range = pd.date_range(start=start_date, end=end_date, freq='QE')
     elif indicator_type in ["cpi", "m2"]:
         # CPI和M2数据是月度数据
         date_range = pd.date_range(start=start_date, end=end_date, freq='M')
