@@ -16,20 +16,19 @@ from typing import Dict, Tuple, List, Optional, Any
 logger = setup_logger('deep_learning')
 
 # 默认预测的未来天数 (可被函数参数覆盖)
-DEFAULT_FORECAST_DAYS = 20 
+DEFAULT_FORECAST_DAYS = 10 
 
 # 设置随机种子以确保结果可重现
 torch.manual_seed(42)
 np.random.seed(42)
 
 
-class StockLSTM(nn.Module):
-    """股票价格预测的LSTM模型"""
+class LSTMModel(nn.Module):
+    """通用LSTM模型，用于加载保存的模型"""
     
     def __init__(self, input_dim: int, hidden_dim: int, num_layers: int, output_dim: int, dropout: float = 0.2):
         """
-        初始化LSTM模型
-        
+        初始化模型
         Args:
             input_dim: 输入特征数量
             hidden_dim: LSTM隐藏层维度
@@ -37,7 +36,7 @@ class StockLSTM(nn.Module):
             output_dim: 输出维度 (通常为预测天数)
             dropout: Dropout概率
         """
-        super(StockLSTM, self).__init__()
+        super(LSTMModel, self).__init__()
         
         self.hidden_dim = hidden_dim
         self.num_layers = num_layers
@@ -60,12 +59,15 @@ class StockLSTM(nn.Module):
         h0 = torch.zeros(self.num_layers, x.size(0), self.hidden_dim).to(x.device)
         c0 = torch.zeros(self.num_layers, x.size(0), self.hidden_dim).to(x.device)
         
-        # LSTM前向传播：输出所有的隐藏状态和最后的隐藏状态
+        # LSTM前向传播
         lstm_out, _ = self.lstm(x, (h0, c0))
         
         # 使用最后一个时间步的隐藏状态
         out = self.fc(lstm_out[:, -1, :])
         return out
+
+# 为了向后兼容，保留原类名别名
+StockLSTM = LSTMModel
 
 
 class DeepLearningModule:
@@ -112,9 +114,9 @@ class DeepLearningModule:
                          target_col: str = 'close',
                          feature_cols: Optional[List[str]] = None,
                          seq_length: int = 10,
-                         forecast_days: int = 20,
-                         hidden_dim: int = 64,
-                         num_layers: int = 2,
+                         forecast_days: int = 10,
+                         hidden_dim: int = 128,
+                         num_layers: int = 3,
                          epochs: int = 50,
                          batch_size: int = 16,
                          learning_rate: float = 0.001):
@@ -126,9 +128,9 @@ class DeepLearningModule:
             target_col: 目标列名(通常是收盘价)
             feature_cols: 特征列名列表(为None时使用target_col)
             seq_length: 输入序列长度
-            forecast_days: 预测天数
-            hidden_dim: LSTM隐藏层维度
-            num_layers: LSTM层数
+            forecast_days: 预测天数 (默认为10)
+            hidden_dim: LSTM隐藏层维度 (默认为128)
+            num_layers: LSTM层数 (默认为3)
             epochs: 训练轮数
             batch_size: 批量大小
             learning_rate: 学习率
@@ -177,7 +179,7 @@ class DeepLearningModule:
             # 初始化模型
             input_dim = len(feature_cols)
             logger.info(f"初始化LSTM模型，输入维度: {input_dim}, 隐藏层维度: {hidden_dim}, 层数: {num_layers}")
-            self.lstm_model = StockLSTM(input_dim, hidden_dim, num_layers, forecast_days)
+            self.lstm_model = LSTMModel(input_dim, hidden_dim, num_layers, forecast_days)
             self.lstm_model.to(self.device)
             
             # 定义优化器和损失函数
@@ -484,12 +486,64 @@ class DeepLearningModule:
                 logger.info(f"从price_scaler检测到特征维度: {input_dim}")
                 
                 # 需要先定义模型结构，使用正确的输入维度
-                self.lstm_model = StockLSTM(input_dim=input_dim, hidden_dim=64, num_layers=2, output_dim=DEFAULT_FORECAST_DAYS)
-                self.lstm_model.load_state_dict(torch.load(lstm_path, map_location=self.device))
+                self.lstm_model = LSTMModel(input_dim=input_dim, hidden_dim=128, num_layers=3, output_dim=10)
+                
+                # 添加尝试加载模型的代码
+                try:
+                    state_dict = torch.load(lstm_path, map_location=self.device)
+                    logger.info(f"开始尝试加载模型参数，检测到以下参数: {list(state_dict.keys())}")
+                    
+                    # 手动创建具有正确结构的新模型
+                    # 首先确定模型的关键参数
+                    # 检查第一层参数的形状来确定真实的隐藏层大小
+                    if 'lstm.weight_ih_l0' in state_dict:
+                        # LSTM参数的形状是 [4*hidden_size, input_dim]
+                        lstm_param_shape = state_dict['lstm.weight_ih_l0'].shape
+                        actual_hidden_size = lstm_param_shape[0] // 4
+                        actual_input_dim = lstm_param_shape[1]
+                        logger.info(f"从模型参数推断: 隐藏层大小={actual_hidden_size}, 输入维度={actual_input_dim}")
+                        
+                        # 检查输出层大小
+                        if 'fc.weight' in state_dict:
+                            fc_param_shape = state_dict['fc.weight'].shape
+                            actual_output_dim = fc_param_shape[0]
+                            logger.info(f"从模型参数推断: 输出维度={actual_output_dim}")
+                        else:
+                            actual_output_dim = 10  # 默认值
+                        
+                        # 检查层数
+                        actual_num_layers = 1
+                        while f'lstm.weight_ih_l{actual_num_layers}' in state_dict:
+                            actual_num_layers += 1
+                        logger.info(f"从模型参数推断: LSTM层数={actual_num_layers}")
+                        
+                        # 使用正确的参数重新创建模型
+                        logger.info(f"使用推断的参数重新创建模型: input_dim={actual_input_dim}, hidden_dim={actual_hidden_size}, num_layers={actual_num_layers}, output_dim={actual_output_dim}")
+                        self.lstm_model = LSTMModel(
+                            input_dim=actual_input_dim,
+                            hidden_dim=actual_hidden_size,
+                            num_layers=actual_num_layers,
+                            output_dim=actual_output_dim
+                        )
+                        
+                        # 尝试加载现在应该匹配的状态字典
+                        self.lstm_model.load_state_dict(state_dict)
+                        logger.info("✓ LSTM模型加载成功，使用从参数推断的模型结构")
+                    else:
+                        # 如果找不到关键参数，则使用默认值重试
+                        logger.warning("无法从参数推断模型结构，使用默认参数")
+                        self.lstm_model = LSTMModel(input_dim=input_dim, hidden_dim=128, num_layers=3, output_dim=10)
+                        self.lstm_model.load_state_dict(state_dict)
+                        logger.info("使用默认参数加载模型成功")
+                except Exception as e:
+                    logger.error(f"加载模型最终失败: {str(e)}")
+                    logger.warning("将使用默认模型初始化，但不会加载预训练权重")
+                    self.lstm_model = LSTMModel(input_dim=input_dim, hidden_dim=128, num_layers=3, output_dim=10)
+                
                 self.lstm_model.to(self.device)
                 self.lstm_model.eval()
                 
-                logger.info("LSTM模型加载成功")
+                logger.info("LSTM模型加载处理完成")
             else:
                 logger.warning("LSTM模型或标准化器文件不存在")
             
@@ -589,8 +643,8 @@ class MLAgent:
         self.logger = setup_logger('ml_agent')
     
     def train_models(self, price_data: pd.DataFrame, technical_indicators: Dict[str, pd.Series] = None,
-                  seq_length: int = 10, feature_cols: List[str] = None, hidden_dim: int = 64,
-                  num_layers: int = 2, forecast_days: int = 20, epochs: int = 50,
+                  seq_length: int = 10, feature_cols: List[str] = None, hidden_dim: int = 128,
+                  num_layers: int = 3, forecast_days: int = 10, epochs: int = 50,
                   batch_size: int = 16, learning_rate: float = 0.001):
         """
         训练所有模型
@@ -600,9 +654,9 @@ class MLAgent:
             technical_indicators: 技术指标
             seq_length: 序列长度
             feature_cols: 特征列名列表
-            hidden_dim: LSTM隐藏层维度
-            num_layers: LSTM层数
-            forecast_days: 预测天数
+            hidden_dim: LSTM隐藏层维度 (默认为128)
+            num_layers: LSTM层数 (默认为3)
+            forecast_days: 预测天数 (默认为10)
             epochs: 训练轮数
             batch_size: 批量大小
             learning_rate: 学习率

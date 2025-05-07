@@ -1,23 +1,31 @@
-Forked From：https://github.com/24mlight/A_Share_investment_Agent.git
-
 # A 股投资 Agent 系统
+
+Forked From：https://github.com/24mlight/A_Share_investment_Agent.git
 
 ![System Architecture V2](assets/img/structure.svg)
 
+## 系统概述
+
+这是一个基于智能体（Agent）的A股投资决策系统，通过多个专业智能体协同工作，实现数据收集、分析、决策和风险管理的全流程自动化。系统采用模块化设计，每个智能体负责特定的分析任务，最终由Portfolio Manager综合各方分析结果做出交易决策。
+
 ## 系统组成
 
-系统由以下几个协同工作的 agent 组成：
+系统由以下几个协同工作的智能体组成：
 
 1. **Market Data Analyst** - 负责收集和预处理市场数据
-2. **Valuation Agent** - 计算股票内在价值并生成交易信号
-3. **Sentiment Agent** - 分析市场情绪并生成交易信号
-4. **Fundamentals Agent** - 分析基本面数据并生成交易信号
-5. **Technical Analyst** - 分析技术指标并生成交易信号
-6. **Researcher Bull** - 从多头角度分析综合研究结果
-7. **Researcher Bear** - 从空头角度分析综合研究结果
-8. **Debate Room** - 综合多空观点并形成平衡分析
-9. **Risk Manager** - 计算风险指标并设置仓位限制
-10. **Portfolio Manager** - 制定最终交易决策并生成订单
+2. **Technical Analyst** - 分析技术指标并生成交易信号
+3. **Fundamentals Analyst** - 分析基本面数据并生成交易信号
+4. **Sentiment Analyst** - 分析市场情绪并生成交易信号
+5. **Valuation Analyst** - 计算股票内在价值并生成交易信号
+6. **AI Model Analyst** - 运行AI模型预测并生成交易信号
+7. **Macro Analyst** - 分析宏观经济环境并生成交易信号
+8. **Researcher Bull** - 从多头角度分析综合研究结果
+9. **Researcher Bear** - 从空头角度分析综合研究结果
+10. **Debate Room** - 综合多空观点并形成平衡分析
+11. **Risk Manager** - 计算风险指标并设置仓位限制
+12. **Portfolio Manager** - 制定最终交易决策并生成订单
+
+详细的智能体说明请查看 [src/agents/README.md](src/agents/README.md)。
 
 ## 环境配置
 
@@ -100,6 +108,8 @@ python -m src.backtester --ticker 600054 --start-date 2022-01-01 --end-date 2022
 python -m src.backtester --ticker 600054 --initial-capital 500000
 ```
 
+**注意**：当前回测系统存在一个已知问题 - 在某些情况下系统可能会过度倾向于持有(hold)策略，导致长时间不交易。这可能与风险管理参数过于保守、多个分析师信号互相抵消或分析师置信度偏低有关。如果遇到此问题，可尝试调整风险参数或修改Portfolio Manager的决策逻辑。
+
 模型训练与评估：
 
 ```bash
@@ -129,6 +139,7 @@ python -m src.tools.test_news_crawler
 ### 参数说明
 
 - `--ticker`: 股票代码（必需）
+- `--tickers`: 多个股票代码，逗号分隔（可选，用于多资产分析）
 - `--show-reasoning`: 显示分析推理过程（可选，默认为 false）
 - `--summary`: 显示汇总报告（可选，默认为 false）
 - `--initial-capital`: 初始现金金额（可选，默认为 100,000）
@@ -154,65 +165,437 @@ python -m src.tools.test_news_crawler
 **示例输出:**
 
 ```
-正在获取 301157 的历史行情数据...
-开始日期：2024-12-11
-结束日期：2024-12-11
-成功获取历史行情数据，共 242 条记录
+--- Finished Workflow Run ID: c94a353c-8d28-486e-b5e7-9e7f92a1b7c4 ---
+2025-05-07 19:56:56 - structured_terminal - INFO -
+════════════════════════════════════════════════════════════════════════════════
+                               股票代码 600054 投资分析报告
+════════════════════════════════════════════════════════════════════════════════
+                         分析区间: 2023-01-01 至 2025-05-06
 
-警告：以下指标存在NaN值：
-- momentum_1m: 20条
-- momentum_3m: 60条
-- momentum_6m: 120条
-...（这些警告是正常的，是由于某些技术指标需要更长的历史数据才能计算）
+╔═══════════════════════════════════ 📈 技术分析分析 ═══════════════════════════════════╗
+║ 信号: 📈 bullish
+║ 置信度: 34%
+║ ├─ signal: bullish
+║ ├─ confidence: 0.3369
+║ ├─ market_regime: mean_reverting
+║ ├─ regime_confidence: 0.5000
+║ ├─ strategy_weights:
+║   ├─ trend: 0.2000
+║   ├─ mean_reversion: 0.4500
+║   ├─ momentum: 0.1500
+║   ├─ volatility: 0.1500
+║   └─ stat_arb: 0.0500
+║ └─ strategy_signals:
+║   ├─ trend_following:
+║     ├─ signal: neutral
+║     ├─ confidence: 0.5000
+║     └─ metrics:
+║       ├─ adx: 17.4486
+║       └─ trend_strength: 0.1745
+║   ├─ mean_reversion:
+║     ├─ signal: neutral
+║     ├─ confidence: 0.2400
+║     └─ metrics:
+║       ├─ z_score: -0.6314
+║       ├─ price_vs_bb: 0.2563
+║       ├─ rsi_14: 39.8467
+║       ├─ rsi_28: 48.0707
+║       ├─ avg_deviation: -0.0200
+║       ├─ k_percent: 21.0145
+║       ├─ d_percent: 17.7575
+║       └─ signal_score: 0
+║   ├─ momentum:
+║     ├─ signal: neutral
+║     ├─ confidence: 0.2000
+║     └─ metrics:
+║       ├─ momentum_1m: -0.0260
+║       ├─ momentum_3m: 0.0782
+║       ├─ momentum_6m: 0.0280
+║       ├─ relative_strength: 0.0983
+║       ├─ volume_trend: 0.8827
+║       └─ divergence: -0.1343
+║   ├─ volatility:
+║     ├─ signal: bullish
+║     ├─ confidence: 0.7000
+║     └─ metrics:
+║       ├─ historical_volatility: 0.4362
+║       ├─ volatility_regime: 1.5622
+║       ├─ volatility_z_score: 0.5622
+║       ├─ atr_ratio: 0.0304
+║       ├─ garch_vol_trend: -0.2795
+║       ├─ garch_forecast_quality: 0.8000
+║       └─ garch_results:
+║         ├─ model_type: GARCH(1,1)
+║         ├─ parameters:
+║           ├─ omega: 0.0000
+║           ├─ alpha: 0.1484
+║           ├─ beta: 0.7570
+║           └─ persistence: 0.9054
+║         ├─ log_likelihood: 1424.2592
+║         ├─ forecast:
+║           ├─ 0.01934439715669238
+║           ├─ 0.01947384175695497
+║           ├─ 0.019590300231429235
+║           ├─ 0.01969514513510902
+║           ├─ 0.01978959022705738
+║           ├─ 0.019874711562961323
+║           ├─ 0.019951465249916377
+║           ├─ 0.020020702495460313
+║           ├─ 0.020083182443127238
+║           └─ 0.02013958318202366
+║         └─ forecast_annualized:
+║           ├─ 0.307082784834438
+║           ├─ 0.3091376541595679
+║           ├─ 0.31098637512871713
+║           ├─ 0.31265073637693247
+║           ├─ 0.3141500057320084
+║           ├─ 0.315501265048413
+║           ├─ 0.3167196920557553
+║           ├─ 0.31781879925478945
+║           ├─ 0.31881063767551954
+║           └─ 0.3197059716488009
+║   └─ statistical_arbitrage:
+║     ├─ signal: neutral
+║     ├─ confidence: 0.5000
+║     └─ metrics:
+║       ├─ hurst_exponent: 0.00000
+║       ├─ skewness: -0.8531
+║       └─ kurtosis: 4.0486
+╚══════════════════════════════════════════════════════════════════════════════╝
 
-正在获取 301157 的财务指标数据...
-获取实时行情...
-成功获取实时行情数据
+╔══════════════════════════════════ 📝 基本面分析分析 ══════════════════════════════════╗
+║ 信号: 📈 bullish
+║ 置信度: 50%
+║ ├─ signal: bullish
+║ ├─ confidence: 50%
+║ └─ reasoning:
+║   ├─ profitability_signal:
+║     ├─ signal: neutral
+║     └─ details: ROE: 12.00%, Net Margin: 15.00%, Op Margin: 18.00%
+║   ├─ growth_signal:
+║     ├─ signal: bearish
+║     └─ details: Revenue Growth: 10.00%, Earnings Growth: 8.00%
+║   ├─ financial_health_signal:
+║     ├─ signal: bullish
+║     └─ details: Current Ratio: 1.50, D/E: 0.40
+║   └─ price_ratios_signal:
+║     ├─ signal: bullish
+║     └─ details: P/E: 57.18, P/B: 1.80, P/S: 3.00
+╚══════════════════════════════════════════════════════════════════════════════╝
 
-获取新浪财务指标...
-成功获取新浪财务指标数据，共 3 条记录
-最新数据日期：2024-09-30 00:00:00
+╔═══════════════════════════════════ 🔍 情感分析分析 ═══════════════════════════════════╗
+║ 信号: 📈 bullish
+║ 置信度: 90%
+║ ├─ signal: bullish
+║ ├─ confidence: 90%
+║ └─ reasoning: Based on 5 recent news articles, sentiment score: 0.90
+╚══════════════════════════════════════════════════════════════════════════════╝
 
-获取利润表数据...
-成功获取利润表数据
+╔═══════════════════════════════════ 💰 估值分析分析 ═══════════════════════════════════╗
+║ 信号: 📈 bullish
+║ 置信度: 62%
+║ ├─ signal: bullish
+║ ├─ confidence: 0.6250
+║ ├─ valuation_gap: 9.5668
+║ ├─ all_valuations:
+║   ├─ Agent 1:
+║       ├─ method: DCF
+║       ├─ value: $156.95B
+║       └─ weight: 0.3500
+║   ├─ Agent 2:
+║       ├─ method: Owner Earnings
+║       ├─ value: $97.82B
+║       └─ weight: 0.3500
+║   ├─ Agent 3:
+║       ├─ method: Relative Valuation
+║       ├─ value: 18.3600
+║       └─ weight: 0.1500
+║   └─ Agent 4:
+║       ├─ method: Residual Income
+║       ├─ value: 0
+║       └─ weight: 0.1500
+║ ├─ reasoning:
+║   ├─ dcf_analysis:
+║     ├─ signal: bullish
+║     ├─ details: 内在价值: $156,954,655,682.63, 市值: $8,438,920,121.00, 差异: 1759.9%
+║     └─ model_details:
+║       ├─ stages: 多阶段DCF
+║       ├─ wacc: 5.0%
+║       ├─ beta: 0.78
+║       └─ terminal_growth: 3.0%
+║   ├─ owner_earnings_analysis:
+║     ├─ signal: bullish
+║     ├─ details: 所有者收益价值: $97,823,398,513.58, 市值: $8,438,920,121.00, 差异: 1059.2%
+║     └─ model_details:
+║       ├─ required_return: 5.0%
+║       ├─ margin_of_safety: 25%
+║       └─ growth_rate: 8.0%
+║   ├─ relative_valuation:
+║     ├─ signal: bearish
+║     ├─ details: 相对估值: $18.36, 市值: $8,438,920,121.00, 差异: -100.0%
+║     └─ model_details:
+║       ├─ pe_ratio: 57.18 (行业平均调整: 15.30)
+║       ├─ pb_ratio: 1.80 (行业平均: 1.50)
+║       └─ growth_premium: 0.3
+║   ├─ residual_income_valuation:
+║     ├─ signal: bearish
+║     ├─ details: 剩余收益价值: $0.00, 市值: $8,438,920,121.00, 差异: -100.0%
+║     └─ model_details:
+║       ├─ book_value: $0.00
+║       ├─ roe: 12.0%
+║       └─ excess_return: 7.0%
+║   └─ weighted_valuation:
+║     ├─ signal: bullish
+║     ├─ details: 加权估值: $89,172,318,971.42, 市值: $8,438,920,121.00, 差异: 956.7%
+║     ├─ weights:
+║       ├─ DCF: 35%
+║       ├─ Owner Earnings: 35%
+║       ├─ Relative Valuation: 15%
+║       └─ Residual Income: 15%
+║     └─ consistency: 0.50
+║ └─ capm_data:
+║   ├─ beta: 0.7848
+║   ├─ required_return: 0.0500
+║   ├─ risk_free_rate: 0.0001
+║   ├─ market_return: 0.0068
+║   └─ market_volatility: 0.1798
+╚══════════════════════════════════════════════════════════════════════════════╝
 
-构建指标数据...
-成功构建指标数据
+╔═══════════════════════════════════ 🐂 多方研究分析 ═══════════════════════════════════╗
+║ 置信度: 35%
+║ ├─ perspective: bullish
+║ ├─ confidence: 0.3524
+║ ├─ thesis_points:
+║   ├─ Technical indicators show bullish momentum with 0.3368983957219251 confidence
+║   ├─ Strong fundamentals with 50% confidence
+║   ├─ Positive market sentiment with 90% confidence
+║   └─ Stock appears undervalued with 0.625 confidence
+║ └─ reasoning: Bullish thesis based on comprehensive analysis of technical, fundamental, sentiment, and valuation factors
+╚══════════════════════════════════════════════════════════════════════════════╝
+
+╔═══════════════════════════════════ 🐻 空方研究分析 ═══════════════════════════════════╗
+║ 置信度: 30%
+║ ├─ perspective: bearish
+║ ├─ confidence: 0.3000
+║ ├─ thesis_points:
+║   ├─ Technical rally may be temporary, suggesting potential reversal
+║   ├─ Current fundamental strength may not be sustainable
+║   ├─ Market sentiment may be overly optimistic, indicating potential risks
+║   └─ Current valuation may not fully reflect downside risks
+║ └─ reasoning: Bearish thesis based on comprehensive analysis of technical, fundamental, sentiment, and valuation factors
+╚══════════════════════════════════════════════════════════════════════════════╝
+
+╔══════════════════════════════════ 🗣️ 辩论室分析分析 ══════════════════════════════════╗
+║ 信号: 📉 bearish
+║ 置信度: 30%
+║ ├─ signal: bearish
+║ ├─ confidence: 0.3000
+║ ├─ bull_confidence: 0.3524
+║ ├─ bear_confidence: 0.3000
+║ ├─ confidence_diff: 0.0524
+║ ├─ llm_score: -0.6000
+║ ��─ llm_analysis: The bullish perspective highlights several key factors such as technical indicators showing bullish momentum, strong fundamentals, positive market sentiment, and an undervalued stock. However, these points have varying levels of confidence, some of which are relatively low (e.g., technical indicators at ~0.34 confidence). Conversely, the bearish view, supported by the AI model analysis, suggests that the technical rally might be short-lived, fundamentals may not be sustainable, market sentiment ...
+║ ├─ llm_reasoning: The bearish arguments are supported by a high level of confidence from AI models, indicating a stronger likelihood of a downturn. Additionally, potential over-optimism in market sentiment and risks of unsustainable fundamentals further support a cautious approach. The bullish arguments, while notable, have lower confidence levels, reducing their persuasiveness.
+║ ├─ mixed_confidence_diff: -0.2536
+║ ├─ debate_summary:
+║   ├─ Bullish Arguments:
+║   ├─ + Technical indicators show bullish momentum with 0.3368983957219251 confidence
+║   ├─ + Strong fundamentals with 50% confidence
+║   ├─ + Positive market sentiment with 90% confidence
+║   ├─ + Stock appears undervalued with 0.625 confidence
+║   ├─
+Bearish Arguments:
+║   ├─ - Technical rally may be temporary, suggesting potential reversal
+║   ├─ - Current fundamental strength may not be sustainable
+║   ├─ - Market sentiment may be overly optimistic, indicating potential risks
+║   └─ - Current valuation may not fully reflect downside risks
+║ ├─ reasoning: Bearish arguments more convincing
+║ └─ ai_model_contribution:
+║   ├─ included: ✅
+║   ├─ signal: bearish
+║   ├─ confidence: 0.9000
+║   └─ weight: 0.1500
+╚══════════════════════════════════════════════════════════════════════════════╝
+
+╔══════════════════════════════════ ⚠️ 风险管理分析 ══════════════════════════════════╗
+║ ├─ max_position_size: 2000.0000
+║ ├─ risk_score: 4
+║ ├─ trading_action: hold
+║ ├─ risk_metrics:
+║   ├─ volatility: 0.3464
+║   ├─ value_at_risk_95: 0.0275
+║   ├─ conditional_var_95: 0.0455
+║   ├─ max_drawdown: -0.3268
+║   ├─ skewness: 0.0188
+║   ├─ kurtosis: 3.3005
+║   ├─ sortino_ratio: 0.1112
+║   ├─ market_risk_score: 4
+║   ├─ stress_test_results:
+║     └─ no_position: ✅
+║   └─ macro_environment_assessment:
+║     ├─ global_risks: ❌
+║     ├─ liquidity_concerns: ❌
+║     └─ volatility_regime: high
+║ ├─ position_sizing:
+║   ├─ kelly_fraction: 0.0500
+║   ├─ win_rate: 0.4024
+║   ├─ win_loss_ratio: 1.0476
+║   ├─ risk_adjustment: 0.7000
+║   └─ total_portfolio_value: 100000.0000
+║ ├─ debate_analysis:
+║   ├─ bull_confidence: 0.3524
+║   ├─ bear_confidence: 0.3000
+║   ├─ debate_confidence: 0.3000
+║   └─ debate_signal: bearish
+║ ├─ volatility_model:
+║   ├─ model_type: GARCH(1,1)
+║   ├─ parameters:
+║     ├─ omega: 0.0000
+║     ├─ alpha: 0.1484
+║     ├─ beta: 0.7570
+║     └─ persistence: 0.9054
+║   ├─ log_likelihood: 1424.2592
+║   ├─ forecast:
+║     ├─ 0.01934439715669238
+║     ├─ 0.01947384175695497
+║     ├─ 0.019590300231429235
+║     ├─ 0.01969514513510902
+║     ├─ 0.01978959022705738
+║     ├─ 0.019874711562961323
+║     ├─ 0.019951465249916377
+║     ├─ 0.020020702495460313
+║     ├─ 0.020083182443127238
+║     └─ 0.02013958318202366
+║   └─ forecast_annualized:
+║     ├─ 0.307082784834438
+║     ├─ 0.3091376541595679
+║     ├─ 0.31098637512871713
+║     ├─ 0.31265073637693247
+║     ├─ 0.3141500057320084
+║     ├─ 0.315501265048413
+║     ├─ 0.3167196920557553
+║     ├─ 0.31781879925478945
+║     ├─ 0.31881063767551954
+║     └─ 0.3197059716488009
+║ └─ reasoning: 风险评分 4/10: 市场风险=4, 波动率=34.64%, VaR=2.75%, CVaR=4.55%, 最大回撤=-32.68%, 偏度=0.02, 辩论信号=bearish, Kelly建议占比=0.05
+╚══════════════════════════════════════════════════════════════════════════════╝
+
+╔═══════════════════════════════════ 🌍 宏观分析分析 ═══════════════════════════════════╗
+║ 宏观环境: 📈 positive
+║ 对股票影响: 📈 positive
+║ ● 关键因素:
+║   • 消费市场复苏
+║   • 财政政策支持
+║   • 市场情绪改善
+║   • 国际旅游限制放宽
+║   • 区域经济发展
+║ ● 分析摘要:
+║   当前宏观经济环境对A股市场特别是文旅产业构成积极影响。首先，报道中显示黄山旅游及其他旅游公司的业绩增速显著，多次提到 旅游客流量创历史新高，显示国内旅游市场复苏。这反映出消费者内需的强劲复苏，积极影响整...
+║ ├─ signal: positive
+║ ├─ confidence: 0.7000
+║ ├─ macro_environment: positive
+║ ├─ impact_on_stock: positive
+║ ├─ key_factors:
+║   ├─ 消费市场复苏
+║   ├─ 财政政策支持
+║   ├─ 市场情绪改善
+║   ├─ 国际旅游限制放宽
+║   └─ 区域经济发展
+║ ├─ reasoning: 当前宏观经济环境对A股市场特别是文旅产业构成积极影响。首先，报道中显示黄山旅游及其他旅游公司的业绩增速显 著，多次提到旅游客流量创历史新高，显示国内旅游市场复苏。这反映出消费者内需的强劲复苏，积极影响整个文旅行业。其次，财政政策方面可能存在对旅游及相关行业的支持，如减税、投资补助等，以推动文旅行业增长，直接有利于企业业绩提升。第三，市场情绪方面，因旅游活动及消费复苏，投资者信心增强，股市流动性增加，风险偏好上升，从而推高相关股票价格。此外，国际旅游限制的放宽可能扩大市场空间，使得行业受益，因此黄山旅游等公司盈利能力增强。最后，区域经济的发展如长三角地区的强势增长，为黄山旅游提供了进一步扩展的机遇。因此，综合来看，现有宏观经济环境及各重要因素对黄山旅游以及重仓股如黄山旅游的股价都是利好的。
+║ └─ summary: 宏观环境: positive
+对股票影响: positive
+关键因素:
+- 消费市场复苏
+- 财政政策支持
+- 市场情绪改善
+- 国际旅游限制放宽
+- 区域经济发展
+╚══════════════════════════════════════════════════════════════════════════════╝
+
+╔══════════════════════════════════ 📂 投资组合管理分析 ══════════════════════════════════╗
+║ 交易行动: ⏸️ HOLD
+║ 交易数量: 171
+║ 决策信心: 80%
+║ ● 各分析师意见:
+║ ● 决策理由:
+║   The decision to hold is primarily dictated by the risk management constraint
+║   s which recommend holding. Despite positive signals from valuation, fundamen
+║   tal, technical, macro, and sentiment analyses, AI models overwhelmingly indi
+║   cate a bearish outlook with high confidence. This, combined with a risk mana
+║   gement action of hold, means no position is initiated. The high bullish sent
+║   iment suggests potential future opportunities, but current AI signals provid
+║   e caution.
+
+AI模型分析给出bearish信号，虽与决策方向不同，但已纳入考虑，适当调整了仓位。
+║ ├─ action: hold
+║ ├─ quantity: 171
+║ ├─ confidence: 0.8000
+║ ├─ agent_signals:
+║   ├─ Agent 1:
+║       ├─ agent_name: AI Models
+║       ├─ signal: bearish
+║       └─ confidence: 0.9000
+║   ├─ Agent 2:
+║       ├─ agent_name: Valuation Analysis
+║       ├─ signal: bullish
+║       └─ confidence: 0.6250
+║   ├─ Agent 3:
+║       ├─ agent_name: Fundamental Analysis
+║       ├─ signal: bullish
+║       └─ confidence: 0.5000
+║   ├─ Agent 4:
+║       ├─ agent_name: Technical Analysis
+║       ├─ signal: bullish
+║       └─ confidence: 0.3369
+║   ├─ Agent 5:
+║       ├─ agent_name: Macro Analysis
+║       ├─ signal: positive
+║       └─ confidence: 0.7000
+║   └─ Agent 6:
+║       ├─ agent_name: Sentiment Analysis
+║       ├─ signal: bullish
+║       └─ confidence: 0.9000
+║ ├─ reasoning: The decision to hold is primarily dictated by the risk management constraints which recommend holding. Despite positive signals from valuation, fundamental, technical, macro, and sentiment analyses, AI models overwhelmingly indicate a bearish outlook with high confidence. This, combined with a risk management action of hold, means no position is initiated. The high bullish sentiment suggests potential future opportunities, but current AI signals provide caution.
+
+AI模型分析给出bearish信号，虽与决策方向不同，但已纳入考...
+║ ├─ portfolio_optimization:
+║   ├─ risk_score: 4
+║   ├─ kelly_fraction: 0.6000
+║   ├─ risk_factor: 0.6000
+║   ├─ max_position_size: 2000.0000
+║   ├─ suggested_position_value: 2000.0000
+║   ├─ total_portfolio_value: 100000.0000
+║   ├─ position_profit_pct: 0
+║   ├─ macro_adjustment: 1.0000
+║   ├─ analytics:
+║     ├─ multi_asset: ❌
+║     ├─ expected_annual_return: 0.0201
+║     ├─ expected_annual_volatility: 0.3143
+║     ├─ beta_adjusted_return: 0.0201
+║     ├─ sharpe_ratio: 0.0636
+║     ├─ volatility_adjustment: 1.0198
+║     ├─ return_multiplier: 0.8200
+║     ├─ beta: 1.0000
+║     ├─ market_volatility: 0.1798
+║     └─ risk_free_rate: 0.0001
+║   └─ market_data:
+║     ├─ market_returns_mean: 0.0000
+║     ├─ market_returns_std: 0.0113
+║     ├─ stock_returns_mean: 0.0001
+║     ├─ stock_returns_std: 0.0202
+║     ├─ market_volatility: 0.1798
+║     └─ stock_volatility: 0.3205
+║ └─ ai_model_integration:
+║   ├─ used: ✅
+║   ├─ signal: bearish
+║   ├─ confidence: 0.9000
+║   └─ impact_on_position: 1.0000
+╚══════════════════════════════════════════════════════════════════════════════╝
+
+════════════════════════════════════════════════════════════════════════════════
 
 Final Result:
-{
-  "action": "buy",
-  "quantity": 12500,
-  "confidence": 0.42,
-  "agent_signals": [
-    {
-      "agent": "Technical Analysis",
-      "signal": "bullish",
-      "confidence": 0.6
-    },
-    {
-      "agent": "Fundamental Analysis",
-      "signal": "neutral",
-      "confidence": 0.5
-    },
-    {
-      "agent": "Sentiment Analysis",
-      "signal": "neutral",
-      "confidence": 0.8
-    },
-    {
-      "agent": "Valuation Analysis",
-      "signal": "bearish",
-      "confidence": 0.99
-    },
-    {
-      "agent": "Risk Management",
-      "signal": "buy",
-      "confidence": 1.0
-    }
-  ],
-  "reasoning": "Risk Management allows a buy action with a maximum quantity of 12500..."
-}
+{"action": "hold", "quantity": 171, "confidence": 0.8, "agent_signals": [{"agent_name": "AI Models", "signal": "bearish", "confidence": 0.9}, {"agent_name": "Valuation Analysis", "signal": "bullish", "confidence": 0.625}, {"agent_name": "Fundamental Analysis", "signal": "bullish", "confidence": 0.5}, {"agent_name": "Technical Analysis", "signal": "bullish", "confidence": 0.3368983957219251}, {"agent_name": "Macro Analysis", "signal": "positive", "confidence": 0.7}, {"agent_name": "Sentiment Analysis", "signal": "bullish", "confidence": 0.9}], "reasoning": "The decision to hold is primarily dictated by the risk management constraints which recommend holding. Despite positive signals from valuation, fundamental, technical, macro, and sentiment analyses, AI models overwhelmingly indicate a bearish outlook with high confidence. This, combined with a risk management action of hold, means no position is initiated. The high bullish sentiment suggests potential future opportunities, but current AI signals provide caution.\n\nAI模型分析给出bearish信号，虽与决策方向不同，但已纳入考虑，适当调整了仓位。", "portfolio_optimization": {"risk_score": 4, "kelly_fraction": 0.6000000000000001, "risk_factor": 0.6, "max_position_size": 2000.0, "suggested_position_value": 2000.0, "total_portfolio_value": 100000.0, "position_profit_pct": 0, "macro_adjustment": 1.0, "analytics": {"multi_asset": false, "expected_annual_return": 0.020056438875632077, "expected_annual_volatility": 0.31425639219149415, "beta_adjusted_return": 0.020056438875632077, "sharpe_ratio": 0.06357019014466853, "volatility_adjustment": 1.0197810629914392, "return_multiplier": 0.82, "beta": 1.0, "market_volatility": 0.17975368423841376, "risk_free_rate": 7.910026984126984e-05}, "market_data": {"market_returns_mean": 2.7084239960171616e-05, "market_returns_std": 0.01132341775577318, "stock_returns_mean": 9.705980872837823e-05, "stock_returns_std": 0.02018788364201582, "market_volatility": 0.17975368423841376, "stock_volatility": 0.3204727176808965}}, "ai_model_integration": {"used": true, "signal": "bearish", "confidence": 0.9, "impact_on_position": 1.0}}
 ```
 
 ### 日志文件说明
@@ -235,7 +618,7 @@ Final Result:
 ## 项目结构
 
 ```
-A_Share_investment_Agent/
+stock-agent/
 ├── src/                         # Agent 核心逻辑和工具
 │   ├── agents/                  # Agent 定义和工作流
 │   │   ├── __init__.py
@@ -249,7 +632,10 @@ A_Share_investment_Agent/
 │   │   ├── sentiment.py
 │   │   ├── state.py
 │   │   ├── technicals.py
-│   │   └── valuation.py
+│   │   ├── valuation.py
+│   │   ├── ai_model_analyst.py
+│   │   ├── macro_analyst.py
+│   │   └── README.md           # 智能体详细文档
 │   ├── data/                   # 数据存储目录 (本地缓存等)
 │   │   ├── img/                # 项目图片
 │   │   ├── sentiment_cache.json
@@ -259,7 +645,7 @@ A_Share_investment_Agent/
 │   │   ├── api.py
 │   │   ├── data_analyzer.py
 │   │   ├── news_crawler.py
-│   │   └── openrouter_config.py
+│   │   └── factor_data_api.py
 │   ├── utils/                  # 通用工具函数 (日志, LLM客户端, 序列化)
 │   │   ├── __init__.py
 │   │   ├── api_utils.py        # Agent 共享的API工具
@@ -270,269 +656,29 @@ A_Share_investment_Agent/
 │   │   └── serialization.py
 │   ├── backtester.py          # 回测系统
 │   └── main.py                # Agent 工作流定义和命令行入口
-├── logs/                      # 日志文件目录 (主要由 OutputLogger 生成)
+├── model/                     # 机器学习和深度学习模型
+│   ├── train/                 # 模型训练脚本
+│   └── predict/               # 模型预测脚本
+├── logs/                      # 日志文件目录
+├── factors/                   # 因子定义和计算
 ├── .env                       # 环境变量配置
-├── .env.example              # 环境变量示例
-└── README.md                 # 项目文档
+├── .env.example               # 环境变量示例
+└── README.md                  # 项目文档
 ```
 
-## 项目详细说明
-
-### 架构设计
+## 架构设计
 
 本项目是一个基于多个 agent 的 AI 投资系统，采用模块化设计，每个 agent 都有其专门的职责。系统的架构如下：
 
 ```
-Market Data Analyst → [Technical/Fundamentals/Sentiment/Valuation Analyst] → [Bull/Bear Researchers] → Debate Room → Risk Manager → Portfolio Manager → Trading Decision
+Market Data → [Technical/Fundamentals/Sentiment/Valuation/AI Model/Macro] → [Bull/Bear Researchers] → Debate Room → Risk Manager → Portfolio Manager → Trading Decision
 ```
 
-#### Agent 角色和职责
+## 数据流和处理
 
-1. **Market Data Analyst**
+### 数据类型
 
-   - 作为系统的入口点
-   - 负责收集和预处理所有必要的市场数据
-   - 通过 akshare API 获取 A 股市场数据
-   - 数据来源：东方财富、新浪财经等
-
-2. **Technical Analyst**
-
-   - 分析价格趋势、成交量、动量等技术指标
-   - 生成基于技术分析的交易信号
-   - 关注短期市场走势和交易机会
-
-3. **Fundamentals Analyst**
-
-   - 分析公司财务指标和经营状况
-   - 评估公司的长期发展潜力
-   - 生成基于基本面的交易信号
-
-4. **Sentiment Analyst**
-
-   - 分析市场新闻和舆论数据
-   - 评估市场情绪和投资者行为
-   - 生成基于情绪的交易信号
-
-5. **Valuation Analyst**
-
-   - 进行公司估值分析
-   - 评估股票的内在价值
-   - 生成基于估值的交易信号
-
-6. **Researcher Bull**
-
-   - 从多头角度综合分析各类数据
-   - 提出支持买入的论点和证据
-   - 生成多头投资策略建议
-
-7. **Researcher Bear**
-
-   - 从空头角度综合分析各类数据
-   - 提出支持卖出的论点和证据
-   - 生成空头投资策略建议
-
-8. **Debate Room**
-
-   - 组织多头和空头研究员的辩论
-   - 评估双方论点的强度和可信度
-   - 生成平衡的综合分析结论
-
-9. **Risk Manager**
-
-   - 整合所有 agent 的交易信号
-   - 评估潜在风险
-   - 设定交易限制和风险控制参数
-   - 生成风险管理信号
-
-10. **Portfolio Manager**
-    - 作为最终决策者
-    - 综合考虑所有信号和风险因素
-    - 做出最终的交易决策（买入/卖出/持有）
-    - 确保决策符合风险管理要求
-
-### 数据流和处理
-
-#### 数据类型
-
-1. **市场数据（Market Data）**
-
-   ```python
-   {
-       "market_cap": float,        # 总市值
-       "volume": float,            # 成交量
-       "average_volume": float,    # 平均成交量
-       "fifty_two_week_high": float,  # 52周最高价
-       "fifty_two_week_low": float    # 52周最低价
-   }
-   ```
-
-2. **财务指标数据（Financial Metrics）**
-
-   ```python
-   {
-       # 市场数据
-       "market_cap": float,          # 总市值
-       "float_market_cap": float,    # 流通市值
-
-       # 盈利数据
-       "revenue": float,             # 营业总收入
-       "net_income": float,          # 净利润
-       "return_on_equity": float,    # 净资产收益率
-       "net_margin": float,          # 销售净利率
-       "operating_margin": float,    # 营业利润率
-
-       # 增长指标
-       "revenue_growth": float,      # 主营业务收入增长率
-       "earnings_growth": float,     # 净利润增长率
-       "book_value_growth": float,   # 净资产增长率
-
-       # 财务健康指标
-       "current_ratio": float,       # 流动比率
-       "debt_to_equity": float,      # 资产负债率
-       "free_cash_flow_per_share": float,  # 每股经营性现金流
-       "earnings_per_share": float,  # 每股收益
-
-       # 估值比率
-       "pe_ratio": float,           # 市盈率（动态）
-       "price_to_book": float,      # 市净率
-       "price_to_sales": float      # 市销率
-   }
-   ```
-
-3. **财务报表数据（Financial Statements）**
-
-   ```python
-   {
-       "net_income": float,          # 净利润
-       "operating_revenue": float,    # 营业总收入
-       "operating_profit": float,     # 营业利润
-       "working_capital": float,      # 营运资金
-       "depreciation_and_amortization": float,  # 折旧和摊销
-       "capital_expenditure": float,  # 资本支出
-       "free_cash_flow": float       # 自由现金流
-   }
-   ```
-
-4. **交易信号（Trading Signals）**
-
-   ```python
-   {
-       "action": str,               # "buy", "sell", "hold"
-       "quantity": int,             # 交易数量
-       "confidence": float,         # 置信度 (0-1)
-       "agent_signals": [           # 各个 agent 的信号
-           {
-               "agent": str,        # agent 名称
-               "signal": str,       # "bullish", "bearish", "neutral"
-               "confidence": float  # 置信度 (0-1)
-           }
-       ],
-       "reasoning": str            # 决策理由
-   }
-   ```
-
-#### 数据流转过程
-
-1. **数据采集阶段**
-
-   - Market Data Agent 通过 akshare API 获取实时市场数据：
-     - 股票实时行情（`stock_zh_a_spot_em`）
-     - 历史行情数据（`stock_zh_a_hist`）
-     - 财务指标数据（`stock_financial_analysis_indicator`）
-     - 财务报表数据（`stock_financial_report_sina`）
-   - 新闻数据通过新浪财经 API 获取
-   - 所有数据经过标准化处理和格式化
-
-2. **分析阶段**
-
-   - Technical Analyst：
-
-     - 计算技术指标（动量、趋势、波动率等）
-     - 分析价格模式和交易信号
-     - 生成技术分析评分和建议
-
-   - Fundamentals Analyst：
-
-     - 分析财务报表数据
-     - 评估公司基本面状况
-     - 生成基本面分析评分
-
-   - Sentiment Analyst：
-
-     - 分析最新的市场新闻
-     - 使用 AI 模型评估新闻情感
-     - 生成市场情绪评分
-
-   - Valuation Analyst：
-     - 计算估值指标
-     - 进行 DCF 估值分析
-     - 评估股票的内在价值
-
-3. **研究员综合阶段**
-
-   - Bull Researcher：
-
-     - 强调积极因素和增长潜力
-     - 找出支持价格上涨的理由
-     - 生成多头论点
-
-   - Bear Researcher：
-
-     - 强调风险因素和估值问题
-     - 找出可能导致价格下跌的风险
-     - 生成空头论点
-
-   - Debate Room：
-     - 组织多空头研究员的辩论
-     - 对比评估双方论点
-     - 形成平衡的综合结论
-
-4. **风险评估阶段**
-
-   Risk Manager 综合考虑多个维度：
-
-   - 市场风险评估（波动率、Beta 等）
-   - 头寸规模限制计算
-   - 止损止盈水平设定
-   - 投资组合风险控制
-
-5. **决策阶段**
-
-   Portfolio Manager 基于以下因素做出决策：
-
-   - 各 Agent 的信号强度和置信度
-   - 当前市场状况和风险水平
-   - 投资组合状态和现金水平
-   - 交易成本和流动性考虑
-
-6. **数据存储和缓存**
-
-   - 情绪分析结果缓存在 `data/sentiment_cache.json`
-   - 新闻数据保存在 `data/stock_news/` 目录
-   - 日志文件按类型存储在 `logs/` 目录
-   - API 调用记录实时写入日志
-
-### 代理协作机制
-
-1. **信息共享**
-
-   - 所有代理共享同一个状态对象（AgentState）
-   - 通过消息传递机制进行通信
-   - 每个代理都可以访问必要的历史数据
-
-2. **决策权重**
-   Portfolio Manager 在做决策时考虑不同信号的权重：
-
-   - 估值分析：35%
-   - 基本面分析：30%
-   - 技术分析：25%
-   - 情绪分析：10%
-
-3. **风险控制**
-   - 强制性风险限制
-   - 最大持仓限制
-   - 交易规模限制
-   - 止损和止盈设置
+系统处理的主要数据类型包括市场数据、财务指标数据、财务报表数据和交易信号。每种数据类型都有标准化的结构和处理流程。
 
 ### 系统特点
 
@@ -560,45 +706,15 @@ Market Data Analyst → [Technical/Fundamentals/Sentiment/Valuation Analyst] →
    - 实时风险评估
    - 自动止损机制
 
-5. **智能决策**
-   - 基于多维度分析
-   - 考虑多个市场因素
-   - 动态调整策略
+5. **多资产分析**
+   - 支持分析多个股票
+   - 提供投资组合优化建议
+   - 计算相关性和风险指标
 
-### 情感分析功能
+## 未来发展方向
 
-情感分析代理（Sentiment Agent）是系统中的关键组件之一，负责分析市场新闻和舆论对股票的潜在影响。
-
-#### 功能特点
-
-1. **新闻数据采集**
-
-   - 自动抓取最新的股票相关新闻
-   - 支持多个新闻源
-   - 实时更新新闻数据
-
-2. **情感分析处理**
-
-   - 使用先进的 AI 模型分析新闻情感
-   - 情感分数范围：-1（极其消极）到 1（极其积极）
-   - 考虑新闻的重要性和时效性
-
-3. **交易信号生成**
-   - 基于情感分析结果生成交易信号
-   - 包含信号类型（看涨/看跌）
-   - 提供置信度评估
-   - 附带详细的分析理由
-
-#### 情感分数说明
-
-- **1.0**: 极其积极（重大利好消息、超预期业绩、行业政策支持）
-- **0.5 到 0.9**: 积极（业绩增长、新项目落地、获得订单）
-- **0.1 到 0.4**: 轻微积极（小额合同签订、日常经营正常）
-- **0.0**: 中性（日常公告、人事变动、无重大影响的新闻）
-- **-0.1 到 -0.4**: 轻微消极（小额诉讼、非核心业务亏损）
-- **-0.5 到 -0.9**: 消极（业绩下滑、重要客户流失、行业政策收紧）
-- **-1.0**: 极其消极（重大违规、核心业务严重亏损、被监管处罚）
-
-## 结果展示
-
-![image](assets/img/image.png)
+1. 优化回测系统，解决过度持有(hold)的问题
+2. 增加更多机器学习模型和因子
+3. 添加更丰富的技术指标和分析方法
+4. 加强宏观经济分析能力
+5. 增强多资产配置和投资组合优化功能

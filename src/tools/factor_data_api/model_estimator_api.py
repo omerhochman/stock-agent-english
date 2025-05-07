@@ -186,7 +186,7 @@ def estimate_beta_for_stocks(symbols: List[str],
         
         try:
             model = sm.OLS(y, X).fit()
-            betas[symbol] = model.params[1]  # 贝塔系数
+            betas[symbol] = model.params.iloc[1]  # 贝塔系数
             r_squareds[symbol] = model.rsquared  # R平方
         except Exception as e:
             logger.warning(f"计算股票 {symbol} 的贝塔系数时出错: {e}")
@@ -265,7 +265,7 @@ def calculate_rolling_beta(stock_symbol: str,
         
         try:
             model = sm.OLS(y, X).fit()
-            rolling_betas.loc[stock_returns.index[i]] = model.params[1]  # 贝塔系数
+            rolling_betas.loc[stock_returns.index[i]] = model.params.iloc[1]  # 贝塔系数
         except Exception as e:
             logger.debug(f"计算 {stock_returns.index[i]} 的贝塔系数时出错: {e}")
             rolling_betas.loc[stock_returns.index[i]] = np.nan
