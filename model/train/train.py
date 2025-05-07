@@ -13,10 +13,27 @@ from datetime import datetime, timedelta
 project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), "../.."))
 sys.path.insert(0, project_root)
 
+import matplotlib
+
 from model.dl import MLAgent, preprocess_stock_data
 from model.rl import RLTradingAgent, RLTrader, StockTradingEnv
 from model.deap_factors import FactorAgent, FactorMiningModule
 from src.tools.api import get_price_history
+from model.split_evaluate import split_and_evaluate
+
+# 根据操作系统配置中文字体
+if sys.platform.startswith('win'):
+    # Windows系统
+    matplotlib.rc('font', family='Microsoft YaHei')
+elif sys.platform.startswith('linux'):
+    # Linux系统
+    matplotlib.rc('font', family='WenQuanYi Micro Hei')
+else:
+    # macOS系统
+    matplotlib.rc('font', family='PingFang SC')
+
+# 用来正常显示负号
+matplotlib.rcParams['axes.unicode_minus'] = False
 
 
 def process_data(ticker, start_date, end_date, verbose=True):
@@ -121,13 +138,13 @@ def train_dl_model(prices_df, params=None, save_dir='models', verbose=True):
         
         # 设置默认参数 (不直接传递给train_models，而是分别设置)
         default_params = {
-            'seq_length': 10,
-            'forecast_days': 5,
-            'hidden_dim': 64,
-            'num_layers': 2,
-            'epochs': 50,
-            'batch_size': 16,
-            'learning_rate': 0.001
+            'seq_length': 15,  # 增加序列长度以捕获更多历史信息
+            'forecast_days': 10,  # 更有意义的预测期
+            'hidden_dim': 128,  # 增加隐藏层维度，提高模型容量
+            'num_layers': 3,  # 增加层数
+            'epochs': 100,  # 增加训练轮数
+            'batch_size': 32,  # 适当调整批量大小
+            'learning_rate': 0.0005  # 降低学习率以提高稳定性
         }
         
         # 合并用户提供的参数
@@ -141,15 +158,58 @@ def train_dl_model(prices_df, params=None, save_dir='models', verbose=True):
             for key, value in default_params.items():
                 print(f"  {key}: {value}")
         
-        # 初始化并训练模型 - 修正：正确调用train_models()方法
+        # 初始化并训练模型
         ml_agent = MLAgent(model_dir=save_dir)
-        ml_agent.train_models(processed_data)  # 不传递参数，使用默认设置
+        
+        # 检测数据量是否足够
+        if len(processed_data) < 50:
+            print(f"警告: 数据量较少({len(processed_data)}行)，模型训练可能不充分")
+        
+        # 准备特征列
+        # 确保所有必要的特征都在处理后的数据中
+        feature_cols = ['close', 'ma5', 'ma10', 'ma20', 'rsi', 'macd']
+        missing_features = [col for col in feature_cols if col not in processed_data.columns]
+        if missing_features:
+            print(f"警告: 以下特征在数据中缺失: {missing_features}")
+            print("将使用可用的特征列")
+            feature_cols = [col for col in feature_cols if col in processed_data.columns]
+            if not feature_cols:
+                feature_cols = ['close']
+                print("只使用close列作为特征")
+        
+        if verbose:
+            print(f"使用以下特征列: {feature_cols}")
+        
+        # 自定义参数
+        custom_params = {
+            'seq_length': default_params['seq_length'],
+            'forecast_days': default_params['forecast_days'],
+            'hidden_dim': default_params['hidden_dim'],
+            'num_layers': default_params['num_layers'],
+            'epochs': default_params['epochs'],
+            'batch_size': default_params['batch_size'],
+            'learning_rate': default_params['learning_rate'],
+            'feature_cols': feature_cols  # 使用预先验证的特征列
+        }
+        
+        # 确保自定义参数传递给MLAgent
+        ml_agent.train_models(processed_data, 
+                             seq_length=custom_params['seq_length'],
+                             feature_cols=custom_params['feature_cols'],
+                             hidden_dim=custom_params['hidden_dim'],
+                             num_layers=custom_params['num_layers'],
+                             forecast_days=custom_params['forecast_days'],
+                             epochs=custom_params['epochs'],
+                             batch_size=custom_params['batch_size'],
+                             learning_rate=custom_params['learning_rate'])
         
         # 生成交易信号
         signals = ml_agent.generate_signals(processed_data)
         
         if verbose:
             print(f"训练完成。生成的交易信号: {signals.get('signal', 'unknown')}, 置信度: {signals.get('confidence', 0)}")
+            if 'reasoning' in signals:
+                print(f"信号解析: {signals['reasoning']}")
         
         return ml_agent, signals
     
@@ -484,21 +544,33 @@ def parse_arguments():
     
     # 模型选择和操作
     parser.add_argument('--model', type=str, choices=['dl', 'rl', 'factor', 'all'],
-                        default='dl',
+                        default='all',
                         help='模型类型: dl (深度学习), rl (强化学习), factor (遗传编程因子), all (所有)')
-    parser.add_argument('--action', type=str, choices=['train', 'test', 'both'],
+    parser.add_argument('--action', type=str, choices=['train', 'test', 'both', 'evaluate'],
                         default='both',
-                        help='操作类型: train (仅训练), test (仅测试), both (训练并测试)')
+                        help='操作类型: train (仅训练), test (仅测试), both (训练并测试), evaluate (划分数据并评估)')
     
     # 模型参数
     parser.add_argument('--params', type=str, default=None,
                         help='模型参数，JSON格式字符串，例如: \'{"hidden_dim": 128, "epochs": 100}\'')
+    
+    # 数据划分参数
+    parser.add_argument('--train-ratio', type=float, default=0.7,
+                        help='训练集比例，默认0.7')
+    parser.add_argument('--val-ratio', type=float, default=0.2,
+                        help='验证集比例，默认0.2')
+    parser.add_argument('--test-ratio', type=float, default=0.1,
+                        help='测试集比例，默认0.1')
+    parser.add_argument('--shuffle', action='store_true',
+                        help='是否打乱数据')
     
     # 其他选项
     parser.add_argument('--model-dir', type=str, default='models',
                         help='模型保存目录，默认为 "models"')
     parser.add_argument('--factor-dir', type=str, default='factors',
                         help='因子模型保存目录，默认为 "factors"')
+    parser.add_argument('--eval-dir', type=str, default='models/evaluation',
+                        help='评估结果保存目录，默认为 "models/evaluation"')
     parser.add_argument('--verbose', action='store_true', default=True,
                         help='显示详细输出')
     
@@ -528,7 +600,76 @@ def main():
         print("错误: 无法获取股票数据或数据为空")
         return
     
-    # 执行模型训练和测试
+    # 数据划分评估模式
+    if args.action == 'evaluate':
+        if args.verbose:
+            print(f"\n{'='*50}")
+            print(f"开始数据划分和模型评估 - 股票代码: {args.ticker}")
+            print(f"数据划分比例 - 训练集: {args.train_ratio*100:.1f}%, 验证集: {args.val_ratio*100:.1f}%, 测试集: {args.test_ratio*100:.1f}%")
+            print(f"{'='*50}")
+        
+        # 执行模型训练和评估
+        models_to_evaluate = ['dl', 'rl', 'factor'] if args.model == 'all' else [args.model]
+        
+        evaluation_results = {}
+        for model_type in models_to_evaluate:
+            if args.verbose:
+                print(f"\n{'='*50}")
+                print(f"开始评估 {model_type} 模型")
+                print(f"{'='*50}")
+            
+            save_dir = args.factor_dir if model_type == 'factor' else args.model_dir
+            
+            # 调用split_evaluate模块进行训练和评估
+            agent, model_results = split_and_evaluate(
+                ticker=args.ticker,
+                price_data=prices_df,
+                model_type=model_type,
+                train_ratio=args.train_ratio,
+                val_ratio=args.val_ratio,
+                test_ratio=args.test_ratio,
+                shuffle=args.shuffle,
+                params=params,
+                save_dir=save_dir,
+                eval_dir=args.eval_dir,
+                verbose=args.verbose
+            )
+            
+            evaluation_results[model_type] = model_results
+            
+            if args.verbose:
+                print(f"\n{'='*50}")
+                print(f"{model_type} 模型评估完成")
+                print(f"{'='*50}")
+        
+        # 打印综合评估结果
+        if args.verbose and len(evaluation_results) > 0:
+            print("\n")
+            print("="*50)
+            print("评估结果摘要:")
+            print("="*50)
+            
+            for model_type, results in evaluation_results.items():
+                print(f"\n{model_type} 模型:")
+                if 'results' in results:
+                    model_results = results['results']
+                    for sub_model, metrics in model_results.items():
+                        print(f"  {sub_model}:")
+                        if 'metrics' in metrics:
+                            for metric_name, metric_value in metrics['metrics'].items():
+                                if isinstance(metric_value, (int, float)):
+                                    print(f"    {metric_name}: {metric_value:.4f}")
+                                else:
+                                    print(f"    {metric_name}: {metric_value}")
+                
+                print(f"  训练集大小: {results.get('train_size', 'N/A')}")
+                print(f"  测试集大小: {results.get('test_size', 'N/A')}")
+            
+            print(f"\n评估结果详情已保存到 {args.eval_dir} 目录")
+        
+        return
+
+    # 执行模型训练和测试（原始模式）
     models_to_train = ['dl', 'rl', 'factor'] if args.model == 'all' else [args.model]
     results = {}
     

@@ -6,12 +6,12 @@ from torch.distributions import Categorical
 import gym
 from gym import spaces
 import os
-import logging
+from src.utils.logging_config import setup_logger
 from typing import Dict, Tuple, Any
 import random
 
 # 设置日志
-logger = logging.getLogger('reinforcement_learning')
+logger = setup_logger('reinforcement_learning')
 
 # 设置随机种子以确保结果可重现
 torch.manual_seed(42)
@@ -564,7 +564,7 @@ class RLTrader:
         self.agent = None
         self.trained = False
         
-        self.logger = logging.getLogger('rl_trader')
+        self.logger = setup_logger('rl_trader')
     
     def train(self, df, initial_balance=100000, transaction_fee_percent=0.001,
           n_episodes=1000, batch_size=64, reward_scaling=100.0, max_steps=252,
@@ -875,7 +875,7 @@ class RLTradingAgent:
         """
         self.rl_trader = RLTrader(model_dir=model_dir)
         self.window_size = 20  # 观察窗口大小
-        self.logger = logging.getLogger('rl_trading_agent')
+        self.logger = setup_logger('rl_trading_agent')
         self.is_trained = False
     
     def train(self, price_data: pd.DataFrame, tech_indicators: Dict[str, pd.Series] = None):

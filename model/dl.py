@@ -9,13 +9,14 @@ from sklearn.ensemble import RandomForestClassifier
 from sklearn.model_selection import train_test_split
 import joblib
 import os
-import logging
+from src.utils.logging_config import setup_logger
 from typing import Dict, Tuple, List, Optional, Any
 
 # 设置日志
-logger = logging.getLogger('deep_learning')
+logger = setup_logger('deep_learning')
 
-FUTURE = 20 # 预测的未来天数
+# 默认预测的未来天数 (可被函数参数覆盖)
+DEFAULT_FORECAST_DAYS = 20 
 
 # 设置随机种子以确保结果可重现
 torch.manual_seed(42)
@@ -142,6 +143,14 @@ class DeepLearningModule:
             if feature_cols is None:
                 feature_cols = [target_col]
             
+            # 记录使用的特征列
+            logger.info(f"LSTM训练使用特征列: {feature_cols}")
+            
+            # 确保所有特征都在DataFrame中
+            missing_features = [col for col in feature_cols if col not in price_data.columns]
+            if missing_features:
+                raise ValueError(f"以下特征列在数据中不存在: {missing_features}")
+            
             # 提取特征数据
             data = price_data[feature_cols].values
             
@@ -167,7 +176,8 @@ class DeepLearningModule:
             
             # 初始化模型
             input_dim = len(feature_cols)
-            self.lstm_model = StockLSTM(input_dim, hidden_dim, num_layers, FUTURE)
+            logger.info(f"初始化LSTM模型，输入维度: {input_dim}, 隐藏层维度: {hidden_dim}, 层数: {num_layers}")
+            self.lstm_model = StockLSTM(input_dim, hidden_dim, num_layers, forecast_days)
             self.lstm_model.to(self.device)
             
             # 定义优化器和损失函数
@@ -234,9 +244,50 @@ class DeepLearningModule:
             raise ValueError("LSTM模型未训练，请先调用train_lstm_model方法")
         
         try:
-            # 如果feature_cols为None，只使用target_col
+            # 如果feature_cols为None，获取price_scaler的特征数量
             if feature_cols is None:
-                feature_cols = [target_col]
+                # 确定price_scaler中的特征数量
+                n_features = self.price_scaler.n_features_in_
+                logger.info(f"从price_scaler检测到特征数量: {n_features}")
+                
+                # 根据特征数量确定要使用的特征列
+                if n_features == 1:
+                    feature_cols = [target_col]
+                elif n_features == 6:
+                    feature_cols = ['close', 'ma5', 'ma10', 'ma20', 'rsi', 'macd']
+                else:
+                    # 如果不确定使用哪些特征，尝试从DataFrame中选择足够的特征
+                    all_numeric_cols = price_data.select_dtypes(include=np.number).columns.tolist()
+                    feature_cols = all_numeric_cols[:n_features]
+                    logger.info(f"自动选择特征列: {feature_cols}")
+            
+            # 确保所有特征都存在
+            missing_features = [col for col in feature_cols if col not in price_data.columns]
+            if missing_features:
+                logger.warning(f"以下特征在数据中缺失: {missing_features}")
+                # 尝试生成缺失的特征
+                for col in missing_features:
+                    if col == 'ma5':
+                        price_data['ma5'] = price_data['close'].rolling(window=5).mean()
+                    elif col == 'ma10':
+                        price_data['ma10'] = price_data['close'].rolling(window=10).mean()
+                    elif col == 'ma20':
+                        price_data['ma20'] = price_data['close'].rolling(window=20).mean()
+                    elif col == 'rsi':
+                        delta = price_data['close'].diff()
+                        gain = (delta.where(delta > 0, 0)).fillna(0)
+                        loss = (-delta.where(delta < 0, 0)).fillna(0)
+                        avg_gain = gain.rolling(window=14).mean()
+                        avg_loss = loss.rolling(window=14).mean()
+                        rs = avg_gain / avg_loss
+                        price_data['rsi'] = 100 - (100 / (1 + rs))
+                    elif col == 'macd':
+                        ema12 = price_data['close'].ewm(span=12, adjust=False).mean()
+                        ema26 = price_data['close'].ewm(span=26, adjust=False).mean()
+                        price_data['macd'] = ema12 - ema26
+            
+            # 填充NaN值
+            price_data = price_data.ffill().bfill()
             
             # 提取最新的序列数据
             data = price_data[feature_cols].values[-seq_length:]
@@ -267,7 +318,7 @@ class DeepLearningModule:
             raise
     
     def train_stock_classifier(self, features: pd.DataFrame, labels: pd.Series,
-                              n_estimators: int = 100, random_state: int = 42):
+                              n_estimators: int = 200, random_state: int = 42):
         """
         训练股票分类器，用于选股
         
@@ -283,13 +334,32 @@ class DeepLearningModule:
         try:
             logger.info("开始训练随机森林分类器...")
             
+            # 检查类别分布
+            class_distribution = labels.value_counts(normalize=True)
+            logger.info(f"原始类别分布: {class_distribution.to_dict()}")
+            
+            # 确定是否需要平衡类别
+            class_weight = None
+            if len(class_distribution) > 1:
+                ratio_0 = class_distribution.get(0, 0)
+                ratio_1 = class_distribution.get(1, 0)
+                
+                if ratio_0 > 0.65 or ratio_1 > 0.65:
+                    logger.info("检测到类别严重不平衡，将应用平衡权重")
+                    # 自定义类别权重，确保模型不会总是预测多数类
+                    class_weight = {
+                        0: 1.0 / (ratio_0 if ratio_0 > 0 else 0.5),
+                        1: 1.0 / (ratio_1 if ratio_1 > 0 else 0.5)
+                    }
+                    logger.info(f"应用的类别权重: {class_weight}")
+            
             # 数据标准化
             self.feature_scaler = StandardScaler()
             features_scaled = self.feature_scaler.fit_transform(features)
             
             # 划分训练集和验证集
             X_train, X_val, y_train, y_val = train_test_split(
-                features_scaled, labels, test_size=0.2, random_state=random_state
+                features_scaled, labels, test_size=0.2, random_state=random_state, stratify=labels
             )
             
             # 训练随机森林分类器
@@ -297,13 +367,21 @@ class DeepLearningModule:
                 n_estimators=n_estimators, 
                 random_state=random_state, 
                 n_jobs=-1,
-                class_weight='balanced'  # 处理类别不平衡问题
+                max_depth=6,  # 限制树的深度，减少过拟合
+                min_samples_leaf=5,  # 确保叶节点有足够的样本
+                class_weight=class_weight,
+                max_features='sqrt'  # 使用特征子集，增加多样性
             )
             self.rf_model.fit(X_train, y_train)
             
             # 验证
             train_accuracy = self.rf_model.score(X_train, y_train)
             val_accuracy = self.rf_model.score(X_val, y_val)
+            
+            # 验证集上的类别预测比例
+            y_val_pred = self.rf_model.predict(X_val)
+            val_pred_distribution = pd.Series(y_val_pred).value_counts(normalize=True)
+            logger.info(f"验证集预测类别分布: {val_pred_distribution.to_dict()}")
             
             logger.info(f"分类器训练完成，训练准确率: {train_accuracy:.4f}, 验证准确率: {val_accuracy:.4f}")
             
@@ -345,11 +423,30 @@ class DeepLearningModule:
             predictions = self.rf_model.predict(features_scaled)
             probabilities = self.rf_model.predict_proba(features_scaled)
             
+            # 获取原始概率
+            raw_probability_up = probabilities[0][1]  # 上涨概率
+            raw_probability_down = probabilities[0][0]  # 下跌概率
+            
+            # 调整极端概率，防止过于自信的预测
+            calibrated_prob_up = min(max(raw_probability_up, 0.05), 0.95)
+            calibrated_prob_down = min(max(raw_probability_down, 0.05), 0.95)
+            
+            # 重新归一化概率
+            total = calibrated_prob_up + calibrated_prob_down
+            calibrated_prob_up = calibrated_prob_up / total
+            calibrated_prob_down = calibrated_prob_down / total
+            
+            # 记录原始和校准后的概率
+            logger.info(f"原始预测概率 - 上涨: {raw_probability_up:.4f}, 下跌: {raw_probability_down:.4f}")
+            logger.info(f"校准后概率 - 上涨: {calibrated_prob_up:.4f}, 下跌: {calibrated_prob_down:.4f}")
+            
             # 返回预测结果
             return {
                 "prediction": predictions[0],  # 1表示上涨，0表示下跌
-                "probability": probabilities[0][1],  # 上涨概率
-                "expected_return": (probabilities[0][1] - 0.5) * 2  # 转换为-1到1的范围
+                "probability": calibrated_prob_up if predictions[0] == 1 else calibrated_prob_down,
+                "up_probability": calibrated_prob_up,
+                "down_probability": calibrated_prob_down,
+                "expected_return": (calibrated_prob_up - 0.5) * 2  # 转换为-1到1的范围
             }
             
         except Exception as e:
@@ -380,12 +477,18 @@ class DeepLearningModule:
             
             # 加载LSTM模型
             if os.path.exists(lstm_path) and os.path.exists(price_scaler_path):
-                # 需要先定义模型结构
-                self.lstm_model = StockLSTM(input_dim=1, hidden_dim=64, num_layers=2, output_dim=FUTURE) # output_dim = forecast_days
-                self.lstm_model.load_state_dict(torch.load(lstm_path, map_location=self.device, weights_only=False))
+                # 先加载标准化器以获取特征维度
+                self.price_scaler = joblib.load(price_scaler_path)
+                input_dim = getattr(self.price_scaler, 'n_features_in_', 1)
+                
+                logger.info(f"从price_scaler检测到特征维度: {input_dim}")
+                
+                # 需要先定义模型结构，使用正确的输入维度
+                self.lstm_model = StockLSTM(input_dim=input_dim, hidden_dim=64, num_layers=2, output_dim=DEFAULT_FORECAST_DAYS)
+                self.lstm_model.load_state_dict(torch.load(lstm_path, map_location=self.device))
                 self.lstm_model.to(self.device)
                 self.lstm_model.eval()
-                self.price_scaler = joblib.load(price_scaler_path)
+                
                 logger.info("LSTM模型加载成功")
             else:
                 logger.warning("LSTM模型或标准化器文件不存在")
@@ -448,7 +551,7 @@ class DeepLearningModule:
         return features
     
     def generate_training_labels(self, price_data: pd.DataFrame, forward_days: int = 5,
-                                return_threshold: float = 0.03) -> pd.Series:
+                                return_threshold: float = 0.01) -> pd.Series:
         """
         生成训练标签
         
@@ -458,13 +561,20 @@ class DeepLearningModule:
             return_threshold: 收益率阈值
             
         Returns:
-            标签Series (1表示上涨超过阈值，0表示其他情况)
+            标签Series (1表示上涨超过阈值，0表示下跌低于阈值的负值)
         """
         # 计算未来收益率
         future_returns = price_data['close'].shift(-forward_days) / price_data['close'] - 1
         
-        # 生成标签 (1表示上涨超过阈值，0表示其他情况)
+        # 生成标签 (1表示上涨超过阈值，0表示下跌低于负的阈值)
+        # 使用对称的阈值，使得上涨和下跌的机会更均衡
         labels = (future_returns > return_threshold).astype(int)
+        
+        # 统计标签分布并输出日志
+        label_counts = labels.value_counts()
+        up_ratio = label_counts.get(1, 0) / len(labels) if len(labels) > 0 else 0
+        down_ratio = label_counts.get(0, 0) / len(labels) if len(labels) > 0 else 0
+        logger.info(f"标签分布 - 上涨: {up_ratio:.2%}, 下跌: {down_ratio:.2%}")
         
         return labels
 
@@ -476,36 +586,90 @@ class MLAgent:
         """初始化ML Agent"""
         self.dl_module = DeepLearningModule(model_dir)
         self.is_trained = False
-        self.logger = logging.getLogger('ml_agent')
+        self.logger = setup_logger('ml_agent')
     
-    def train_models(self, price_data: pd.DataFrame, technical_indicators: Dict[str, pd.Series] = None):
+    def train_models(self, price_data: pd.DataFrame, technical_indicators: Dict[str, pd.Series] = None,
+                  seq_length: int = 10, feature_cols: List[str] = None, hidden_dim: int = 64,
+                  num_layers: int = 2, forecast_days: int = 20, epochs: int = 50,
+                  batch_size: int = 16, learning_rate: float = 0.001):
         """
         训练所有模型
         
         Args:
             price_data: 价格数据
             technical_indicators: 技术指标
+            seq_length: 序列长度
+            feature_cols: 特征列名列表
+            hidden_dim: LSTM隐藏层维度
+            num_layers: LSTM层数
+            forecast_days: 预测天数
+            epochs: 训练轮数
+            batch_size: 批量大小
+            learning_rate: 学习率
         """
         try:
-            # 准备LSTM训练数据
+            # 如果feature_cols为None，使用默认值
+            if feature_cols is None:
+                feature_cols = ['close', 'ma5', 'ma10', 'ma20', 'rsi', 'macd']
+                self.logger.info(f"未指定特征列，使用默认特征: {feature_cols}")
+            
+            # 确保特征列在数据中存在，否则添加它们
+            missing_features = [col for col in feature_cols if col not in price_data.columns]
+            if missing_features:
+                self.logger.warning(f"数据中缺少以下特征，将自动添加: {missing_features}")
+                for col in missing_features:
+                    if col == 'ma5':
+                        price_data['ma5'] = price_data['close'].rolling(window=5).mean()
+                    elif col == 'ma10':
+                        price_data['ma10'] = price_data['close'].rolling(window=10).mean()
+                    elif col == 'ma20':
+                        price_data['ma20'] = price_data['close'].rolling(window=20).mean()
+                    elif col == 'rsi':
+                        delta = price_data['close'].diff()
+                        gain = (delta.where(delta > 0, 0)).fillna(0)
+                        loss = (-delta.where(delta < 0, 0)).fillna(0)
+                        avg_gain = gain.rolling(window=14).mean()
+                        avg_loss = loss.rolling(window=14).mean()
+                        rs = avg_gain / avg_loss
+                        price_data['rsi'] = 100 - (100 / (1 + rs))
+                    elif col == 'macd':
+                        ema12 = price_data['close'].ewm(span=12, adjust=False).mean()
+                        ema26 = price_data['close'].ewm(span=26, adjust=False).mean()
+                        price_data['macd'] = ema12 - ema26
+            
+            # 填充NaN值
+            price_data = price_data.ffill().bfill()
+            
+            self.logger.info(f"开始训练模型，使用参数: seq_length={seq_length}, hidden_dim={hidden_dim}, "
+                           f"num_layers={num_layers}, epochs={epochs}, forecast_days={forecast_days}")
+            self.logger.info(f"使用特征列: {feature_cols}")
+            
+            # 准备LSTM训练数据，使用传入的参数
             self.dl_module.train_lstm_model(
                 price_data=price_data,
                 target_col='close',
-                feature_cols=['close'],  # 简化起见只使用收盘价
-                seq_length=10,
-                forecast_days=FUTURE,  # 预测天数
+                feature_cols=feature_cols,
+                seq_length=seq_length,
+                forecast_days=forecast_days,
+                hidden_dim=hidden_dim,
+                num_layers=num_layers,
+                epochs=epochs,
+                batch_size=batch_size,
+                learning_rate=learning_rate
             )
             
             # 准备分类器训练数据
             features = self.dl_module.prepare_features(price_data, technical_indicators)
-            labels = self.dl_module.generate_training_labels(price_data)
+            labels = self.dl_module.generate_training_labels(price_data, forward_days=forecast_days)
             
             # 确保特征和标签具有相同的索引
             common_idx = features.index.intersection(labels.index)
             if len(common_idx) > 0:
+                self.logger.info(f"训练随机森林分类器，使用{len(common_idx)}个样本")
                 self.dl_module.train_stock_classifier(
                     features=features.loc[common_idx],
-                    labels=labels.loc[common_idx]
+                    labels=labels.loc[common_idx],
+                    n_estimators=200
                 )
                 self.is_trained = True
             else:
@@ -513,6 +677,8 @@ class MLAgent:
             
         except Exception as e:
             self.logger.error(f"训练模型时出错: {str(e)}")
+            import traceback
+            traceback.print_exc()
     
     def load_models(self):
         """加载已训练的模型"""
@@ -544,9 +710,26 @@ class MLAgent:
             # 使用LSTM预测未来价格
             lstm_predictions = None
             if self.dl_module.lstm_model is not None:
+                # 确定预测天数
+                forecast_days = self.dl_module.lstm_model.fc.out_features
+                self.logger.info(f"使用LSTM模型预测未来{forecast_days}天价格")
+                
+                # 获取price_scaler的特征数量以确定正确的feature_cols
+                n_features = self.dl_module.price_scaler.n_features_in_
+                if n_features == 1:
+                    lstm_feature_cols = ['close']
+                elif n_features == 6:
+                    lstm_feature_cols = ['close', 'ma5', 'ma10', 'ma20', 'rsi', 'macd']
+                else:
+                    # 尝试根据数据选择合适的特征
+                    all_numeric_cols = price_data.select_dtypes(include=np.number).columns.tolist()
+                    lstm_feature_cols = all_numeric_cols[:n_features]
+                
+                self.logger.info(f"LSTM预测将使用以下特征: {lstm_feature_cols}")
+                
                 lstm_predictions = self.dl_module.predict_lstm(
                     price_data=price_data,
-                    feature_cols=['close'],
+                    feature_cols=lstm_feature_cols,
                     seq_length=10,
                     target_col='close'
                 )
@@ -558,17 +741,29 @@ class MLAgent:
                 
                 signals['lstm_predictions'] = {
                     'future_prices': future_prices.tolist(),
-                    'expected_returns': expected_returns
+                    'expected_returns': expected_returns,
+                    'forecast_days': forecast_days
                 }
                 
-                # 基于LSTM预测生成信号
+                # 计算预测增长率的统计信息
                 avg_return = np.mean(expected_returns)
-                if avg_return > 0.03:  # 正向信号阈值
+                median_return = np.median(expected_returns)
+                positive_count = sum(1 for r in expected_returns if r > 0)
+                negative_count = sum(1 for r in expected_returns if r < 0)
+                
+                self.logger.info(f"LSTM预测 - 平均收益率: {avg_return:.4f}, 中位数收益率: {median_return:.4f}")
+                self.logger.info(f"LSTM预测 - 正收益天数: {positive_count}, 负收益天数: {negative_count}")
+                
+                # 基于LSTM预测生成信号，调整阈值和置信度计算
+                positive_ratio = positive_count / len(expected_returns) if len(expected_returns) > 0 else 0.5
+                
+                # 使用更平衡的预测逻辑
+                if avg_return > 0.02 and positive_ratio > 0.6:  # 正向信号阈值
                     signals['lstm_signal'] = 'bullish'
-                    signals['lstm_confidence'] = min(avg_return * 10, 0.9)  # 将收益率映射到置信度
-                elif avg_return < -0.02:  # 负向信号阈值
+                    signals['lstm_confidence'] = min(0.5 + positive_ratio * 0.4, 0.9)  # 更温和的置信度
+                elif avg_return < -0.02 and positive_ratio < 0.4:  # 负向信号阈值
                     signals['lstm_signal'] = 'bearish'
-                    signals['lstm_confidence'] = min(abs(avg_return) * 10, 0.9)
+                    signals['lstm_confidence'] = min(0.5 + (1 - positive_ratio) * 0.4, 0.9)
                 else:
                     signals['lstm_signal'] = 'neutral'
                     signals['lstm_confidence'] = 0.5
@@ -585,34 +780,44 @@ class MLAgent:
                     
                     signals['rf_prediction'] = rf_prediction
                     
-                    # 基于随机森林预测生成信号
+                    # 获取上涨和下跌概率
+                    up_probability = rf_prediction.get('up_probability', 0.5)
+                    down_probability = rf_prediction.get('down_probability', 0.5)
+                    
+                    # 基于随机森林预测生成信号，应用更保守的阈值
                     if rf_prediction['prediction'] == 1:
                         signals['rf_signal'] = 'bullish'
-                        signals['rf_confidence'] = rf_prediction['probability']
+                        signals['rf_confidence'] = rf_prediction.get('probability', up_probability)
                     else:
                         signals['rf_signal'] = 'bearish'
-                        signals['rf_confidence'] = 1 - rf_prediction['probability']
+                        signals['rf_confidence'] = rf_prediction.get('probability', down_probability)
+                    
+                    # 记录预测结果
+                    self.logger.info(f"RF预测 - 信号: {signals['rf_signal']}, 置信度: {signals['rf_confidence']:.4f}")
             
             # 结合两个模型生成最终信号
             if 'lstm_signal' in signals and 'rf_signal' in signals:
-                # 简单加权平均
-                lstm_weight = 0.6  # LSTM权重较高
-                rf_weight = 0.4  # 随机森林权重较低
+                # 简单加权平均，但调整权重以减少偏差
+                lstm_weight = 0.5  # LSTM和随机森林权重相等
+                rf_weight = 0.5
                 
                 lstm_score = {'bullish': 1, 'neutral': 0, 'bearish': -1}[signals['lstm_signal']] * signals['lstm_confidence']
                 rf_score = {'bullish': 1, 'neutral': 0, 'bearish': -1}[signals['rf_signal']] * signals['rf_confidence']
                 
                 combined_score = lstm_weight * lstm_score + rf_weight * rf_score
                 
-                if combined_score > 0.2:
+                # 使用更保守的阈值
+                if combined_score > 0.3:
                     signals['signal'] = 'bullish'
-                    signals['confidence'] = min(abs(combined_score), 0.9)
-                elif combined_score < -0.2:
+                    signals['confidence'] = min(abs(combined_score), 0.85)
+                elif combined_score < -0.3:
                     signals['signal'] = 'bearish'
-                    signals['confidence'] = min(abs(combined_score), 0.9)
+                    signals['confidence'] = min(abs(combined_score), 0.85)
                 else:
                     signals['signal'] = 'neutral'
                     signals['confidence'] = 0.5
+                
+                self.logger.info(f"最终信号 - {signals['signal']}, 置信度: {signals['confidence']:.4f}, 组合得分: {combined_score:.4f}")
             elif 'lstm_signal' in signals:
                 signals['signal'] = signals['lstm_signal']
                 signals['confidence'] = signals['lstm_confidence']
@@ -650,29 +855,58 @@ class MLAgent:
         if 'lstm_predictions' in signals:
             future_prices = signals['lstm_predictions']['future_prices']
             expected_returns = signals['lstm_predictions']['expected_returns']
+            forecast_days = signals['lstm_predictions'].get('forecast_days', DEFAULT_FORECAST_DAYS)
             
             avg_return = np.mean(expected_returns)
+            positive_count = sum(1 for r in expected_returns if r > 0)
+            negative_count = sum(1 for r in expected_returns if r < 0)
+            
+            positive_ratio = positive_count / len(expected_returns) if len(expected_returns) > 0 else 0
+            
+            short_term_return = expected_returns[0] if expected_returns else 0
+            medium_term_avg = np.mean(expected_returns[1:min(5, len(expected_returns))]) if len(expected_returns) > 1 else avg_return
+            long_term_avg = np.mean(expected_returns[min(5, len(expected_returns)):]) if len(expected_returns) > 5 else avg_return
+            
             reasoning_parts.append(
-                f"LSTM模型预测未来{FUTURE}天价格走势: {', '.join([f'{p:.2f}' for p in future_prices])}, "
-                f"预期平均收益率: {avg_return:.2%}"
+                f"LSTM模型预测未来{forecast_days}天: 短期收益率({short_term_return:.2%}), 中期收益率({medium_term_avg:.2%}), 长期收益率({long_term_avg:.2%}). "
+                f"预期正收益天数占比: {positive_ratio:.2%}"
             )
         
         # 随机森林模型理由
         if 'rf_prediction' in signals:
-            prob = signals['rf_prediction']['probability']
-            if signals['rf_prediction']['prediction'] == 1:
-                reasoning_parts.append(f"随机森林模型预测上涨概率: {prob:.2%}")
+            pred = signals['rf_prediction']['prediction']
+            up_prob = signals['rf_prediction'].get('up_probability', 0.5)
+            down_prob = signals['rf_prediction'].get('down_probability', 0.5)
+            
+            if pred == 1:
+                reasoning_parts.append(f"随机森林模型预测上涨概率: {up_prob:.2%}, 下跌概率: {down_prob:.2%}")
             else:
-                reasoning_parts.append(f"随机森林模型预测下跌概率: {(1-prob):.2%}")
+                reasoning_parts.append(f"随机森林模型预测下跌概率: {down_prob:.2%}, 上涨概率: {up_prob:.2%}")
+        
+        # 技术指标评估
+        if 'lstm_signal' in signals:
+            reasoning_parts.append(f"LSTM技术分析结果: {signals['lstm_signal']}, 置信度: {signals['lstm_confidence']:.2%}")
+        
+        if 'rf_signal' in signals:
+            reasoning_parts.append(f"随机森林技术分析结果: {signals['rf_signal']}, 置信度: {signals['rf_confidence']:.2%}")
         
         # 组合策略理由
         if 'signal' in signals:
             if signals['signal'] == 'bullish':
-                reasoning_parts.append(f"综合分析产生看多信号，置信度: {signals['confidence']:.2%}")
+                reasoning_parts.append(
+                    f"综合分析产生看多信号，置信度: {signals['confidence']:.2%}. "
+                    f"请注意，即使在看多信号下，市场仍存在风险，建议设置止损。"
+                )
             elif signals['signal'] == 'bearish':
-                reasoning_parts.append(f"综合分析产生看空信号，置信度: {signals['confidence']:.2%}")
+                reasoning_parts.append(
+                    f"综合分析产生看空信号，置信度: {signals['confidence']:.2%}. "
+                    f"请注意，即使在看空信号下，市场仍有可能反弹，建议适时止盈。"
+                )
             else:
-                reasoning_parts.append(f"综合分析产生中性信号，置信度: {signals['confidence']:.2%}")
+                reasoning_parts.append(
+                    f"综合分析产生中性信号，置信度: {signals['confidence']:.2%}. "
+                    f"市场方向不明确，建议谨慎操作或持币观望。"
+                )
         
         return "; ".join(reasoning_parts)
 

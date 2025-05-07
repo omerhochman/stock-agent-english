@@ -100,6 +100,22 @@ python -m src.backtester --ticker 600054 --start-date 2022-01-01 --end-date 2022
 python -m src.backtester --ticker 600054 --initial-capital 500000
 ```
 
+模型训练与评估：
+
+```bash
+# 训练深度学习模型
+python -m model.train.train --ticker 600054 --model dl
+
+# 训练所有模型
+python -m model.train.train --ticker 600054 --model all
+
+# 模型评估（划分训练、验证、测试集）
+python -m model.train.train --ticker 600054 --model dl --action evaluate
+
+# 自定义数据划分比例
+python -m model.train.train --ticker 600054 --model dl --action evaluate --train-ratio 0.8 --val-ratio 0.1 --test-ratio 0.1
+```
+
 数据处理工具：
 
 ```bash

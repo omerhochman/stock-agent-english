@@ -248,6 +248,8 @@ print(f"  因子模型: {factor_signals['signal']} ({factor_signals['confidence'
 from model.dl import MLAgent, DeepLearningModule, preprocess_stock_data
 from model.rl import RLTradingAgent, RLTrader, StockTradingEnv
 from model.deap_factors import FactorAgent, FactorMiningModule
+from . import evaluate
+from . import split_evaluate
 
 # 公开API
 __all__ = [
@@ -263,5 +265,7 @@ __all__ = [
     
     # 遗传编程模块
     'FactorAgent',
-    'FactorMiningModule'
+    'FactorMiningModule',
+    'evaluate',
+    'split_evaluate'
 ]

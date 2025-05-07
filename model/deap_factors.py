@@ -5,7 +5,7 @@ import re
 import operator
 from deap import algorithms, base, creator, tools, gp
 import os
-import logging
+from src.utils.logging_config import setup_logger
 from typing import Dict, List, Any, Tuple, Callable
 import json
 from functools import partial
@@ -14,7 +14,7 @@ from scipy import stats
 
 # 设置警告级别和随机种子
 warnings.filterwarnings("ignore", category=RuntimeWarning)
-logger = logging.getLogger('factor_mining')
+logger = setup_logger('factor_mining')
 random.seed(42)
 np.random.seed(42)
 
@@ -71,7 +71,7 @@ class FactorMiningModule:
         self.best_factors = []
         self.pset = None
         self.toolbox = None
-        self.logger = logging.getLogger('factor_mining')
+        self.logger = setup_logger('factor_mining')
     
     def _setup_primitives(self, input_names: List[str]):
         """设置遗传编程的原语集"""
@@ -863,7 +863,7 @@ class FactorAgent:
     def __init__(self, model_dir: str = 'factors'):
         """初始化因子Agent"""
         self.factor_module = FactorMiningModule(model_dir=model_dir)
-        self.logger = logging.getLogger('factor_agent')
+        self.logger = setup_logger('factor_agent')
         self.factors_generated = False
     
     def generate_factors(self, price_data, n_factors=5, **kwargs):
