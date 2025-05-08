@@ -1,8 +1,9 @@
 import pandas as pd
-import logging
 from typing import Dict, Any, List
 
-logger = logging.getLogger(__name__)
+from src.utils.logging_config import setup_logger
+
+logger = setup_logger('akshare_adapter')
 
 def get_akshare_price_data(akshare_code: str, start_date: str, end_date: str, adjust: str) -> pd.DataFrame:
     """从AKShare获取价格数据"""

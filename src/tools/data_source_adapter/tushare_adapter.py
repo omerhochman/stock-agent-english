@@ -1,10 +1,11 @@
 import os
 import pandas as pd
-import logging
 from typing import Dict, Any, List
 from datetime import datetime, timedelta
 
-logger = logging.getLogger(__name__)
+from src.utils.logging_config import setup_logger
+
+logger = setup_logger('tushare_adapter')
 
 # 获取TuShare API密钥
 TUSHARE_TOKEN = os.environ.get('TUSHARE_TOKEN', '')

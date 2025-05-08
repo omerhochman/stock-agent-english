@@ -1,5 +1,4 @@
 import pandas as pd
-import logging
 import traceback
 from datetime import datetime, timedelta
 from typing import Dict, Any, List
@@ -7,10 +6,9 @@ from .retry_decorator import retry
 from .cache import get_cached_data
 from .akshare_adapter import get_akshare_price_data, get_akshare_financial_metrics, get_akshare_financial_statements, get_akshare_market_data
 from .tushare_adapter import get_tushare_price_data, get_tushare_financial_metrics, get_tushare_financial_statements, get_tushare_market_data
+from src.utils.logging_config import setup_logger
 
-# 配置日志
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
+logger = setup_logger('data_source_adapter')
 
 class DataSourceAdapter:
     """数据源适配器，支持从AKShare和TuShare获取数据"""
@@ -59,7 +57,7 @@ class DataSourceAdapter:
         Returns:
             包含价格数据的DataFrame
         """
-        logging.info(f"Getting price history for {symbol} from {start_date} to {end_date}")
+        logger.info(f"Getting price history for {symbol} from {start_date} to {end_date}")
         
         # 处理日期参数
         start_date, end_date = self._process_dates(start_date, end_date)
@@ -87,7 +85,7 @@ class DataSourceAdapter:
                 df = pd.DataFrame(df_dict)
                 if not df.empty and 'date' in df.columns:
                     df['date'] = pd.to_datetime(df['date'])
-                logging.info(f"Successfully retrieved {len(df)} records from cache")
+                logger.info(f"Successfully retrieved {len(df)} records from cache")
             else:
                 df = pd.DataFrame()
                 
@@ -126,9 +124,9 @@ class DataSourceAdapter:
             if not df.empty:
                 return df
         except Exception as e:
-            logging.warning(f"AKShare data fetch failed: {str(e)}")
-            logging.debug(f"AKShare error details: {traceback.format_exc()}")
-            logging.info("Falling back to TuShare...")
+            logger.warning(f"AKShare data fetch failed: {str(e)}")
+            logger.debug(f"AKShare error details: {traceback.format_exc()}")
+            logger.info("Falling back to TuShare...")
         
         # 如果AKShare失败或不可用，尝试使用TuShare
         try:
@@ -136,14 +134,14 @@ class DataSourceAdapter:
             if not df.empty:
                 return df
             else:
-                logging.warning("TuShare returned empty DataFrame")
+                logger.warning("TuShare returned empty DataFrame")
         except Exception as e:
-            logging.error(f"TuShare data fetch failed: {str(e)}")
-            logging.debug(f"TuShare error details: {traceback.format_exc()}")
+            logger.error(f"TuShare data fetch failed: {str(e)}")
+            logger.debug(f"TuShare error details: {traceback.format_exc()}")
         
         # 如果两种数据源都失败，返回空DataFrame
         if df.empty:
-            logging.warning("Both AKShare and TuShare data fetch failed, returning empty DataFrame")
+            logger.warning("Both AKShare and TuShare data fetch failed, returning empty DataFrame")
         
         return df
     
@@ -158,7 +156,7 @@ class DataSourceAdapter:
         Returns:
             包含财务指标的字典
         """
-        logging.info(f"Getting financial metrics for {symbol}")
+        logger.info(f"Getting financial metrics for {symbol}")
         
         # 转换股票代码
         akshare_code, tushare_code, exchange_prefix = self.convert_stock_code(symbol)
@@ -185,15 +183,15 @@ class DataSourceAdapter:
             if metrics != [{}]:
                 return metrics
         except Exception as e:
-            logging.warning(f"AKShare financial metrics fetch failed: {str(e)}")
-            logging.info("Falling back to TuShare...")
+            logger.warning(f"AKShare financial metrics fetch failed: {str(e)}")
+            logger.info("Falling back to TuShare...")
         
         # 如果AKShare失败或不可用，尝试使用TuShare
         try:
             metrics = get_tushare_financial_metrics(tushare_code)
             return metrics
         except Exception as e:
-            logging.error(f"TuShare financial metrics fetch failed: {str(e)}")
+            logger.error(f"TuShare financial metrics fetch failed: {str(e)}")
         
         return metrics  # 返回默认的空指标列表
     
@@ -208,7 +206,7 @@ class DataSourceAdapter:
         Returns:
             包含财务报表数据的字典列表
         """
-        logging.info(f"Getting financial statements for {symbol}")
+        logger.info(f"Getting financial statements for {symbol}")
         
         # 转换股票代码
         akshare_code, tushare_code, exchange_prefix = self.convert_stock_code(symbol)
@@ -254,15 +252,15 @@ class DataSourceAdapter:
             if statements != default_items:
                 return statements
         except Exception as e:
-            logging.warning(f"AKShare financial statements fetch failed: {str(e)}")
-            logging.info("Falling back to TuShare...")
+            logger.warning(f"AKShare financial statements fetch failed: {str(e)}")
+            logger.info("Falling back to TuShare...")
         
         # 如果AKShare失败或不可用，尝试使用TuShare
         try:
             statements = get_tushare_financial_statements(tushare_code)
             return statements
         except Exception as e:
-            logging.error(f"TuShare financial statements fetch failed: {str(e)}")
+            logger.error(f"TuShare financial statements fetch failed: {str(e)}")
         
         return default_items
     
@@ -277,7 +275,7 @@ class DataSourceAdapter:
         Returns:
             包含市场数据的字典
         """
-        logging.info(f"Getting market data for {symbol}")
+        logger.info(f"Getting market data for {symbol}")
         
         # 转换股票代码
         akshare_code, tushare_code, exchange_prefix = self.convert_stock_code(symbol)
@@ -310,14 +308,14 @@ class DataSourceAdapter:
             if market_data != default_data:
                 return market_data
         except Exception as e:
-            logging.warning(f"AKShare market data fetch failed: {str(e)}")
-            logging.info("Falling back to TuShare...")
+            logger.warning(f"AKShare market data fetch failed: {str(e)}")
+            logger.info("Falling back to TuShare...")
         
         # 如果AKShare失败或不可用，尝试使用TuShare
         try:
             market_data = get_tushare_market_data(tushare_code)
             return market_data
         except Exception as e:
-            logging.error(f"TuShare market data fetch failed: {str(e)}")
+            logger.error(f"TuShare market data fetch failed: {str(e)}")
         
         return default_data

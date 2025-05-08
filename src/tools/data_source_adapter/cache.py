@@ -1,12 +1,13 @@
 import os
 import json
 import time
-import logging
 import traceback
 import pandas as pd
 from typing import Any, Callable
 
-logger = logging.getLogger(__name__)
+from src.utils.logging_config import setup_logger
+
+logger = setup_logger('cache')
 
 # 数据缓存目录设置
 CACHE_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))), 'data', 'cache')

@@ -5,11 +5,12 @@ Agent Collector Module - 收集和存储Agent分析结果
 """
 
 import json
-import logging
-from typing import Dict, Any, List, Optional
+from typing import Dict, Any
+
+from src.utils.logging_config import setup_logger
 
 # 日志设置
-logger = logging.getLogger(__name__)
+logger = setup_logger('agent_collector')
 
 # 用于存储所有Agent的最终状态
 _collected_states = {}

@@ -318,6 +318,8 @@ def risk_management_agent(state: AgentState):
             logger.info(f"基于近期积极市场表现降低风险评分至 {risk_score}")
 
     logger.info(f"风险分数risk_score为：{risk_score}")
+    logger.info(f"辩论信号debate_signal为：{debate_signal}")
+    logger.info(f"辩论置信度debate_confidence为：{debate_confidence}")
     # 基于风险分数和辩论信号的决策规则
     if risk_score >= 10:  
         trading_action = "hold"  # 非常高风险，持有观望

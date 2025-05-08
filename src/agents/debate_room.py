@@ -2,12 +2,12 @@ from langchain_core.messages import HumanMessage
 from src.agents.state import AgentState, show_agent_reasoning, show_workflow_status
 from src.tools.openrouter_config import get_chat_completion
 from src.utils.api_utils import agent_endpoint, log_llm_interaction
+from src.utils.logging_config import setup_logger
 import json
 import ast
-import logging
 
 # 获取日志记录器
-logger = logging.getLogger('debate_room')
+logger = setup_logger('debate_room')
 
 
 @agent_endpoint("debate_room", "辩论室，分析多空双方观点，得出平衡的投资结论")

@@ -13,10 +13,10 @@ def calculate_beta(ticker, market_index="000300", start_date=None, end_date=None
     """
     from src.tools.api import get_price_history, prices_to_df
     from src.tools.factor_data_api import get_market_returns, get_index_data
+    from src.utils.logging_config import setup_logger
     import pandas as pd
-    import logging
     
-    logger = logging.getLogger('calculate_beta')
+    logger = setup_logger('calculate_beta')
     
     try:
         # 1. 获取股票价格数据

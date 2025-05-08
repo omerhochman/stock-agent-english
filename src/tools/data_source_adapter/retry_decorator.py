@@ -1,8 +1,9 @@
 import functools
 import time
-import logging
 
-logger = logging.getLogger(__name__)
+from src.utils.logging_config import setup_logger
+
+logger = setup_logger('retry')
 
 def retry(max_tries=3, delay_seconds=2, backoff=2, exceptions=(Exception,)):
     """

@@ -1,10 +1,11 @@
-import logging
 import json
 from typing import Dict, Any, Optional
 from datetime import datetime
 
+from src.utils.logging_config import setup_logger
+
 # 日志设置
-logger = logging.getLogger(__name__)
+logger = setup_logger(__name__)
 
 # ANSI颜色代码
 COLORS = {
