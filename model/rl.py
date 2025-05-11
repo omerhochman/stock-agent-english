@@ -277,12 +277,12 @@ class StockTradingEnv(gym.Env):
         min_start_idx = self.window_size
         
         if min_start_idx >= max_start_idx:
-            print(f"警告: 数据量不足。window_size={self.window_size}, max_steps={self.max_steps}, 数据长度={len(self.df)}")
+            logger.info(f"警告: 数据量不足。window_size={self.window_size}, max_steps={self.max_steps}, 数据长度={len(self.df)}")
             # 调整参数，确保可以选择起始点
             adjusted_max_steps = len(self.df) - min_start_idx - 5  # 添加一些缓冲
             self.max_steps = max(10, adjusted_max_steps)  # 至少10步
             max_start_idx = len(self.df) - self.max_steps
-            print(f"已调整 max_steps 为 {self.max_steps}")
+            logger.info(f"已调整 max_steps 为 {self.max_steps}")
         
         # 随机选择起始点
         self.current_step = np.random.randint(min_start_idx, max_start_idx)
@@ -305,13 +305,13 @@ class StockTradingEnv(gym.Env):
         if mode == 'human':
             current_price = self.df['close'].iloc[self.current_step]
             portfolio_value = self.balance + self.current_position * current_price
-            print(f"Step: {self.current_step}")
-            print(f"Price: {current_price:.2f}")
-            print(f"Balance: {self.balance:.2f}")
-            print(f"Shares: {self.current_position}")
-            print(f"Portfolio Value: {portfolio_value:.2f}")
-            print(f"Total Reward: {self.total_reward:.4f}")
-            print("-------------------")
+            logger.info(f"Step: {self.current_step}")
+            logger.info(f"Price: {current_price:.2f}")
+            logger.info(f"Balance: {self.balance:.2f}")
+            logger.info(f"Shares: {self.current_position}")
+            logger.info(f"Portfolio Value: {portfolio_value:.2f}")
+            logger.info(f"Total Reward: {self.total_reward:.4f}")
+            logger.info("-------------------")
 
 
 class ActorCritic(nn.Module):
@@ -843,7 +843,7 @@ class RLTrader:
                 action_probs = action_probs.squeeze().cpu().numpy()
                 
                 # 打印调试信息
-                print(f"动作概率: {action_probs}")
+                logger.info(f"动作概率: {action_probs}")
                 
                 # 选择动作
                 action = np.argmax(action_probs)
@@ -853,7 +853,7 @@ class RLTrader:
                 
                 # 确保动作在有效范围内
                 if action not in signal_map:
-                    print(f"警告: 无效的动作索引 {action}")
+                    logger.info(f"警告: 无效的动作索引 {action}")
                     action = 0  # 默认为neutral
                 
                 # 计算置信度
@@ -873,9 +873,9 @@ class RLTrader:
                     'action_probabilities': action_prob_dict
                 }
             except Exception as e:
-                print(f"生成交易信号时出错: {e}")
+                logger.info(f"生成交易信号时出错: {e}")
                 import traceback
-                traceback.print_exc()
+                traceback.logger.info_exc()
                 return {'signal': 'neutral', 'confidence': 0.5}
 
 
@@ -1006,7 +1006,7 @@ class RLTradingAgent:
             # 获取状态
             state = env.reset()
 
-            print(f"\n用于信号生成的状态shape: {state.shape}\n")
+            logger.info(f"\n用于信号生成的状态shape: {state.shape}\n")
             
             # 生成信号
             signal_info = self.rl_trader.generate_trading_signal(state)
@@ -1031,7 +1031,7 @@ class RLTradingAgent:
         except Exception as e:
             self.logger.error(f"生成交易信号时出错: {e}")
             import traceback
-            traceback.print_exc()
+            traceback.logger.info_exc()
             signals['signal'] = 'neutral'
             signals['confidence'] = 0.5
             signals['error'] = str(e)

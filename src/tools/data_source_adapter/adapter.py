@@ -267,13 +267,13 @@ class DataSourceAdapter:
     @retry(max_tries=3, delay_seconds=2)
     def get_market_data(self, symbol: str) -> Dict[str, Any]:
         """
-        获取市场数据，优先使用AKShare，失败时切换到TuShare
+        获取市场数据，现在包含行业指标
         
         Args:
             symbol: 股票代码
             
         Returns:
-            包含市场数据的字典
+            包含市场数据和行业指标的字典
         """
         logger.info(f"Getting market data for {symbol}")
         
@@ -281,16 +281,28 @@ class DataSourceAdapter:
         akshare_code, tushare_code, exchange_prefix = self.convert_stock_code(symbol)
         
         # 缓存键
-        cache_key = f"market_data_{symbol}"
+        cache_key = f"market_data_with_industry_{symbol}"
         
         # 市场数据更新频率高，使用较短的缓存时间
         market_data = get_cached_data(
             cache_key,
-            lambda: self._fetch_market_data(akshare_code, tushare_code),
+            lambda: self._fetch_market_data_with_industry(akshare_code, tushare_code),
             ttl_days=0.5  # 12小时
         )
         
         return market_data
+    
+    def _fetch_market_data_with_industry(self, akshare_code: str, tushare_code: str) -> Dict[str, Any]:
+        """内部方法：获取包含行业数据的市场信息"""
+        # 获取基础市场数据
+        market_data = self._fetch_market_data(akshare_code, tushare_code)
+        
+        # 添加行业指标
+        industry_data = self._fetch_industry_metrics(akshare_code)
+        
+        # 合并数据
+        combined_data = {**market_data, **industry_data}
+        return combined_data
     
     def _fetch_market_data(self, akshare_code: str, tushare_code: str) -> Dict[str, Any]:
         """内部方法：从数据源获取市场数据"""
@@ -319,3 +331,50 @@ class DataSourceAdapter:
             logger.error(f"TuShare market data fetch failed: {str(e)}")
         
         return default_data
+    
+    retry(max_tries=3, delay_seconds=2)
+    def get_industry_metrics(self, symbol: str) -> Dict[str, Any]:
+        """
+        获取行业指标数据
+        
+        Args:
+            symbol: 股票代码
+            
+        Returns:
+            包含行业指标的字典
+        """
+        logger.info(f"Getting industry metrics for {symbol}")
+        
+        # 转换股票代码
+        akshare_code, tushare_code, exchange_prefix = self.convert_stock_code(symbol)
+        
+        # 缓存键
+        cache_key = f"industry_metrics_{symbol}"
+        
+        # 使用缓存
+        industry_metrics = get_cached_data(
+            cache_key,
+            lambda: self._fetch_industry_metrics(akshare_code),
+            ttl_days=1  # 行业数据每天更新一次即可
+        )
+        
+        return industry_metrics
+    
+    def _fetch_industry_metrics(self, akshare_code: str) -> Dict[str, Any]:
+        """内部方法：从数据源获取行业指标"""
+        from .industry import query_industry_metrics
+        
+        try:
+            # 使用行业模块查询指标
+            industry_data = query_industry_metrics(akshare_code)
+            return industry_data
+        except Exception as e:
+            logger.error(f"Industry metrics fetch failed: {str(e)}")
+            # 返回默认值
+            return {
+                "stock": akshare_code,
+                "industry": "未知行业",
+                "industry_avg_pe": 15,
+                "industry_avg_pb": 1.5,
+                "industry_growth": 0.05
+            }

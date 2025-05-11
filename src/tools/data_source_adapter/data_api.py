@@ -48,12 +48,24 @@ class DataAPI:
     
     def get_market_data(self, ticker: str) -> Dict[str, Any]:
         """
-        获取市场数据
+        获取市场数据（现在包含行业指标）
         
         Args:
             ticker: 股票代码
             
         Returns:
-            包含市场数据的字典
+            包含市场数据和行业指标的字典
         """
         return self.adapter.get_market_data(ticker)
+    
+    def get_industry_metrics(self, ticker: str) -> Dict[str, Any]:
+        """
+        获取行业指标数据
+        
+        Args:
+            ticker: 股票代码
+            
+        Returns:
+            包含行业指标的字典
+        """
+        return self.adapter.get_industry_metrics(ticker)

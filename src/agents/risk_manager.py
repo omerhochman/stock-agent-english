@@ -321,26 +321,108 @@ def risk_management_agent(state: AgentState):
     logger.info(f"辩论信号debate_signal为：{debate_signal}")
     logger.info(f"辩论置信度debate_confidence为：{debate_confidence}")
     # 基于风险分数和辩论信号的决策规则
-    if risk_score >= 10:  
-        trading_action = "hold"  # 非常高风险，持有观望
-    elif risk_score >= 8:  
+    if risk_score >= 9:  
+        trading_action = "hold"  
+        # 理由：极高风险(9-10/10)，市场极其危险，
+        # 无论辩论结果如何，都应立即停止所有交易操作，保持观望，
+        # 避免在高风险环境中遭受重大损失
+        
+    elif risk_score >= 7:  
         if debate_signal == "bearish":
-            trading_action = "sell"  # 高风险 + 看空 = 卖出
+            trading_action = "sell"  
+            # 理由：高风险（7-8/10）且看空信号，双重警示，
+            # 应及时卖出以避免潜在损失，保护投资组合
         else:
-            trading_action = "reduce"  # 高风险但非看空 = 减仓
-    else:
-        if debate_signal == "bullish" and debate_confidence > 0.3:
-            trading_action = "buy"
-        elif debate_signal == "bearish" and debate_confidence > 0.5:
+            trading_action = "reduce"  
+            # 理由：高风险环境但非看空，市场可能有不确定性，
+            # 通过减仓来降低风险暴露，但不是全部清仓，
+            # 保留部分仓位以防市场反转
+            
+    elif risk_score >= 5:  # 新增中高风险区间
+        if debate_signal == "bearish" and debate_confidence >= 0.3:
             trading_action = "sell"
-        elif debate_signal == "neutral" and debate_confidence > 0.3:
-            # 基于其他因素决定
-            if market_risk_score < 3:  # 市场风险低
+            # 理由：中高风险（5-6/10）且看空信号，即使置信度不是很高（30%），
+            # 在这个风险水平下也应该及时卖出，避免承担过多风险
+        elif debate_signal == "bullish" and debate_confidence >= 0.4:
+            trading_action = "buy"
+            # 理由：中高风险但看多信号强烈（置信度≥40%），
+            # 在风险可控的情况下可以谨慎买入
+        else:
+            trading_action = "reduce"
+            # 理由：中高风险环境下信号不明确，
+            # 通过减仓来降低整体风险暴露
+            
+    elif risk_score >= 3:  # 新增中等风险区间
+        if debate_signal == "bearish" and debate_confidence >= 0.25:
+            trading_action = "sell"
+            # 理由：中等风险（3-4/10）下看空信号，
+            # 即使置信度较低（25%），也应该考虑卖出，
+            # 及早规避可能的下跌风险
+        elif debate_signal == "bearish" and debate_confidence < 0.25:
+            trading_action = "reduce"
+            # 理由：中等风险下看空但置信度很低（<25%），
+            # 不确定性很大，减仓但不全部清仓，保留后续操作空间
+        elif debate_signal == "bullish" and debate_confidence >= 0.35:
+            trading_action = "buy"
+            # 理由：中等风险下看多信号较强（置信度≥35%），
+            # 可以考虑买入，但要求比低风险时更高的置信度
+        else:
+            trading_action = "hold"
+            # 理由：中等风险下信号不明确，维持现状最安全
+            
+    else:  # risk_score < 3：低风险区间
+        if debate_signal == "bullish" and debate_confidence >= 0.3:
+            trading_action = "buy"
+            # 理由：低风险环境且看多信号强烈（置信度≥30%），
+            # 适合积极布局，抓住市场上涨机会
+            
+        elif debate_signal == "bearish" and debate_confidence >= 0.35:
+            trading_action = "sell"
+            # 理由：即使在低风险环境，如果有一定把握的看空信号（置信度≥35%），
+            # 也应该果断卖出，避免错过逃顶机会
+            
+        elif debate_signal == "neutral" and debate_confidence >= 0.3:
+            # 信号中性但置信度较高，需要结合市场风险评分进行细化决策
+            
+            if market_risk_score <= 2:  # 市场风险极低
                 trading_action = "buy"
-            elif market_risk_score > 7:  # 市场风险高
+                # 理由：中性信号，但市场风险极低（≤2/10），
+                # 适合积极建仓，利用低风险环境获取收益
+                
+            elif market_risk_score >= 6:  # 市场风险偏高
                 trading_action = "sell"
-            else:
+                # 理由：虽然信号中性，但市场风险偏高（≥6/10），
+                # 应该主动减少仓位，防范潜在风险
+                
+            else:  # 市场风险适中（3-5）
                 trading_action = "hold"
+                # 理由：中性信号，中等市场风险，维持现状最安全，
+                # 等待更明确的信号再做决定
+                
+        elif debate_signal == "bullish" and debate_confidence < 0.3:
+            trading_action = "hold"
+            # 理由：看多信号但置信度太低（<30%），
+            # 分析师团队意见不一致，信息不足，
+            # 保持观望等待更明确信号
+            
+        elif debate_signal == "bearish" and debate_confidence < 0.35:
+            trading_action = "hold"
+            # 理由：看空信号但置信度不够高（<35%），
+            # 在低风险环境下不确定性太大，
+            # 维持现状避免过早离场
+            
+        elif debate_signal == "neutral" and debate_confidence < 0.3:
+            trading_action = "hold"
+            # 理由：中性信号且置信度很低，信息极其不明确，
+            # 分析师团队无法形成一致意见，
+            # 任何操作都可能是错误的，保持观望最安全
+            
+        else:
+            # 捕获所有未预料到的情况
+            trading_action = "hold"
+            # 理由：遇到未定义的情况（如非标准的 debate_signal 值），
+            # 或其他未覆盖的边缘情况，
+            # 保守起见选择持有，避免在不明确情况下做决定
 
     # 8. GARCH模型拟合和预测
     garch_results = {}

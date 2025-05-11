@@ -138,14 +138,7 @@ class Backtester:
                     num_of_news=self.num_of_news,
                     tickers=self.tickers
                 )
-                
-                # 记录原始返回结果的类型和内容
-                self.logger.info(f"智能体返回结果类型: {type(result)}")
-                if isinstance(result, str) and len(result) > 200:
-                    self.logger.info(f"智能体返回结果 (前200字符): {result[:200]}...")
-                else:
-                    self.logger.info(f"智能体返回结果: {result}")
-                
+                                
                 # 根据返回结果类型不同处理
                 if isinstance(result, dict):
                     # 如果返回的是字典，直接使用
@@ -388,8 +381,8 @@ class Backtester:
             self.has_benchmark = False
 
         self.logger.info("\n开始回测...")
-        print(f"{'日期':<12} {'代码':<6} {'操作':<6} {'数量':>8} {'价格':>8} {'现金':>12} {'持仓':>8} {'总值':>12} {'看多':>8} {'看空':>8} {'中性':>8}")
-        print("-" * 110)
+        self.logger.info(f"{'日期':<12} {'代码':<6} {'操作':<6} {'数量':>8} {'价格':>8} {'现金':>12} {'持仓':>8} {'总值':>12} {'看多':>8} {'看空':>8} {'中性':>8}")
+        self.logger.info("-" * 110)
 
         for current_date in dates:
             lookback_start = (current_date - timedelta(days=30)).strftime("%Y-%m-%d")
@@ -533,10 +526,10 @@ class Backtester:
             })
             
             # 打印交易记录
-            print(f"{current_date_str:<12} {self.ticker:<6} {action:<6} {executed_quantity:>8.0f} {current_price:>8.2f} {self.portfolio['cash']:>12.2f} {self.portfolio['stock']:>8.0f} {total_value:>12.2f} {bullish_count:>8} {bearish_count:>8} {neutral_count:>8}")
+            self.logger.info(f"{current_date_str:<12} {self.ticker:<6} {action:<6} {executed_quantity:>8.0f} {current_price:>8.2f} {self.portfolio['cash']:>12.2f} {self.portfolio['stock']:>8.0f} {total_value:>12.2f} {bullish_count:>8} {bearish_count:>8} {neutral_count:>8}")
 
         # 回测完成，记录总结
-        self.logger.info("\n回测完成")
+        self.logger.info("回测完成")
         self.logger.info(f"交易次数: {len(self.trade_history)}")
         self.logger.info(f"初始资金: {self.initial_capital:,.2f}")
         self.logger.info(f"最终总值: {self.portfolio.get('portfolio_value', 0):,.2f}")
@@ -680,9 +673,9 @@ class Backtester:
         }
         
         # 打印性能指标
-        print("\n=== 回测性能指标 ===")
+        self.logger.info("\n=== 回测性能指标 ===")
         for name, value in self.metrics.items():
-            print(f"{name}: {value}")
+            self.logger.info(f"{name}: {value}")
     
     def _create_enhanced_charts(self, performance_df):
         """创建增强的分析图表"""
@@ -771,7 +764,7 @@ class Backtester:
         plt.savefig(filename, dpi=300, bbox_inches='tight')
         plt.close(fig)
         
-        print(f"收益与回撤图表已保存至: {filename}")
+        self.logger.info(f"收益与回撤图表已保存至: {filename}")
     
     def _create_trade_analysis_chart(self, performance_df, filename):
         """创建交易分析图表"""
@@ -880,7 +873,7 @@ class Backtester:
         plt.savefig(filename, dpi=300, bbox_inches='tight')
         plt.close(fig)
         
-        print(f"交易分析图表已保存至: {filename}")
+        self.logger.info(f"交易分析图表已保存至: {filename}")
     
     def _create_monthly_returns_heatmap(self, performance_df, filename):
         """创建月度收益热图"""
@@ -900,7 +893,7 @@ class Backtester:
         
         # 如果数据不足，添加补充
         if len(returns_table) < 3:
-            print("数据不足以生成月度热图，跳过")
+            self.logger.info("数据不足以生成月度热图，跳过")
             return
         
         returns_pivot = returns_table.pivot_table(
@@ -934,7 +927,7 @@ class Backtester:
         plt.savefig(filename, dpi=300, bbox_inches='tight')
         plt.close(fig)
         
-        print(f"月度收益热图已保存至: {filename}")
+        self.logger.info(f"月度收益热图已保存至: {filename}")
     
     def _create_risk_return_chart(self, performance_df, filename):
         """创建风险收益分析图表"""
@@ -1018,7 +1011,7 @@ class Backtester:
         plt.savefig(filename, dpi=300, bbox_inches='tight')
         plt.close(fig)
         
-        print(f"风险收益分析图表已保存至: {filename}")
+        self.logger.info(f"风险收益分析图表已保存至: {filename}")
 
 
 if __name__ == "__main__":
