@@ -329,12 +329,18 @@ def risk_management_agent(state: AgentState):
         else:
             trading_action = "reduce"  # 高风险但非看空 = 减仓
     else:
-        if debate_signal == "bullish" and debate_confidence > 0.4: 
-            trading_action = "buy"  # 低风险 + 看多 = 买入
-        elif debate_signal == "bearish" and debate_confidence > 0.6:
-            trading_action = "sell"  # 低风险 + 强看空 = 卖出
-        else:
-            trading_action = "hold"  # 其他情况 = 持有
+        if debate_signal == "bullish" and debate_confidence > 0.3:
+            trading_action = "buy"
+        elif debate_signal == "bearish" and debate_confidence > 0.5:
+            trading_action = "sell"
+        elif debate_signal == "neutral" and debate_confidence > 0.3:
+            # 基于其他因素决定
+            if market_risk_score < 3:  # 市场风险低
+                trading_action = "buy"
+            elif market_risk_score > 7:  # 市场风险高
+                trading_action = "sell"
+            else:
+                trading_action = "hold"
 
     # 8. GARCH模型拟合和预测
     garch_results = {}

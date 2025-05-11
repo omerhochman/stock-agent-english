@@ -18,6 +18,16 @@ torch.manual_seed(42)
 np.random.seed(42)
 random.seed(42)
 
+# 明确设置使用CUDA设备
+torch.cuda.manual_seed(42)
+torch.cuda.manual_seed_all(42)
+# 确保CUDA可用时使用GPU
+DEVICE = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+logger.info(f"使用设备: {DEVICE}")
+if torch.cuda.is_available():
+    logger.info(f"CUDA设备名称: {torch.cuda.get_device_name(0)}")
+    logger.info(f"CUDA设备数量: {torch.cuda.device_count()}")
+
 
 class StockTradingEnv(gym.Env):
     """股票交易环境，实现OpenAI Gym接口"""
@@ -369,7 +379,7 @@ class ActorCritic(nn.Module):
             action_prob: 选择动作的概率
             state_value: 状态价值
         """
-        state = torch.FloatTensor(state).unsqueeze(0)
+        state = torch.FloatTensor(state).unsqueeze(0).to(DEVICE)  # 使用全局DEVICE
         action_probs, state_value = self.forward(state)
         action_dist = Categorical(action_probs)
         action = action_dist.sample()
@@ -400,9 +410,9 @@ class PPOAgent:
         self.eps_clip = eps_clip
         self.k_epochs = k_epochs
         
-        # 确定设备
+        # 明确使用CUDA设备
         if device is None:
-            self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+            self.device = DEVICE  # 使用全局设备配置
         else:
             self.device = torch.device(device)
             
@@ -559,12 +569,18 @@ class RLTrader:
         os.makedirs(model_dir, exist_ok=True)
         
         self.hidden_dim = hidden_dim
-        self.device = device
+        # 明确使用CUDA设备
+        if device is None:
+            self.device = DEVICE  # 使用全局设备配置
+        else:
+            self.device = device
+        
         self.env = None
         self.agent = None
         self.trained = False
         
         self.logger = setup_logger('rl_trader')
+        self.logger.info(f"RLTrader初始化完成，使用设备: {self.device}")
     
     def train(self, df, initial_balance=100000, transaction_fee_percent=0.001,
           n_episodes=1000, batch_size=64, reward_scaling=100.0, max_steps=252,
@@ -599,7 +615,7 @@ class RLTrader:
             state_dim=state_dim,
             action_dim=action_dim,
             hidden_dim=self.hidden_dim,
-            device=self.device
+            device=self.device  # 明确传递设备参数
         )
         
         # 训练记录
@@ -697,7 +713,7 @@ class RLTrader:
                 state_dim=state_dim,
                 action_dim=action_dim,
                 hidden_dim=self.hidden_dim,
-                device=self.device
+                device=self.device  # 明确传递设备参数
             )
             self.load_model(model_name)
         
@@ -873,7 +889,7 @@ class RLTradingAgent:
         Args:
             model_dir: 模型保存目录
         """
-        self.rl_trader = RLTrader(model_dir=model_dir)
+        self.rl_trader = RLTrader(model_dir=model_dir, device='cuda')  # 明确指定使用cuda
         self.window_size = 20  # 观察窗口大小
         self.logger = setup_logger('rl_trading_agent')
         self.is_trained = False
@@ -939,7 +955,8 @@ class RLTradingAgent:
         self.rl_trader.agent = PPOAgent(
             state_dim=state_dim,
             action_dim=action_dim,
-            hidden_dim=self.rl_trader.hidden_dim
+            hidden_dim=self.rl_trader.hidden_dim,
+            device='cuda'  # 明确指定使用cuda
         )
         
         # 加载模型

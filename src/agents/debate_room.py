@@ -228,7 +228,7 @@ def debate_room_agent(state: AgentState):
             f"计算混合置信度差异: 原始差异={confidence_diff:.4f}, LLM评分={llm_score:.4f}, 混合差异={mixed_confidence_diff:.4f}")
 
         # 基于混合置信度差异确定最终建议
-        if abs(mixed_confidence_diff) < 0.1:  # 接近争论
+        if abs(mixed_confidence_diff) < 0.05:  # 接近争论
             final_signal = "neutral"
             reasoning = "Balanced debate with strong arguments on both sides"
             confidence = max(bull_confidence, bear_confidence)

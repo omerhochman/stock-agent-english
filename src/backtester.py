@@ -156,6 +156,13 @@ class Backtester:
                         self.logger.warning("结果字典中没有decision字段，使用默认决策")
                         result["decision"] = {"action": "hold", "quantity": 0}
                     
+                    # 确保决策字典包含必要字段
+                    if isinstance(result["decision"], dict):
+                        if "action" not in result["decision"]:
+                            result["decision"]["action"] = "hold"
+                        if "quantity" not in result["decision"]:
+                            result["decision"]["quantity"] = 0
+                    
                     # 如果没有分析师信号，添加空字典
                     if "analyst_signals" not in result:
                         result["analyst_signals"] = {}
@@ -180,55 +187,59 @@ class Backtester:
                         self.logger.info("JSON解析成功")
                         
                         # 检查结果是否有action和quantity字段
-                        has_action = False
                         if isinstance(parsed_result, dict):
+                            # 检查是否直接包含action和quantity
                             if "action" in parsed_result and "quantity" in parsed_result:
-                                has_action = True
-                                # 直接返回决策
                                 self.logger.info(f"发现直接的决策: action={parsed_result['action']}, quantity={parsed_result['quantity']}")
                                 return {
-                                    "decision": parsed_result,
-                                    "analyst_signals": {}
+                                    "decision": {
+                                        "action": parsed_result["action"],
+                                        "quantity": parsed_result["quantity"]
+                                    },
+                                    "analyst_signals": parsed_result.get("analyst_signals", {})
                                 }
+                            
+                            # 检查是否包含decision字段
                             elif "decision" in parsed_result:
-                                has_action = True
                                 self.logger.info(f"发现决策字段: {parsed_result['decision']}")
-                        
-                        # 构建标准格式的结果
-                        formatted_result = {
-                            "decision": {"action": "hold", "quantity": 0},  # 默认决策
-                            "analyst_signals": {}
-                        }
-                        
-                        # 检查并处理决策字段
-                        if "decision" in parsed_result:
-                            if isinstance(parsed_result["decision"], dict):
-                                formatted_result["decision"] = parsed_result["decision"]
-                            elif isinstance(parsed_result["decision"], str):
-                                # 如果决策是字符串，尝试解析内容
-                                decision_text = parsed_result["decision"].lower()
-                                if "buy" in decision_text:
-                                    formatted_result["decision"] = {"action": "buy", "quantity": 100}
-                                elif "sell" in decision_text:
-                                    formatted_result["decision"] = {"action": "sell", "quantity": 100}
-                        
-                        # 处理智能体信号
-                        if "agent_signals" in parsed_result and isinstance(parsed_result["agent_signals"], list):
-                            for signal in parsed_result["agent_signals"]:
-                                if isinstance(signal, dict) and "agent_name" in signal:
-                                    agent_name = signal.get("agent_name", "unknown")
-                                    formatted_result["analyst_signals"][agent_name] = {
-                                        "signal": signal.get("signal", "unknown"),
-                                        "confidence": signal.get("confidence", 0)
+                                decision = parsed_result["decision"]
+                                
+                                # 确保决策是字典格式
+                                if isinstance(decision, dict):
+                                    # 确保必要字段存在
+                                    if "action" not in decision:
+                                        decision["action"] = "hold"
+                                    if "quantity" not in decision:
+                                        decision["quantity"] = 0
+                                        
+                                    return {
+                                        "decision": decision,
+                                        "analyst_signals": parsed_result.get("analyst_signals", {})
                                     }
-                                    
-                                    # 复制其他可能的字段
-                                    for key, value in signal.items():
-                                        if key not in ["agent_name", "signal", "confidence"]:
-                                            formatted_result["analyst_signals"][agent_name][key] = value
+                                elif isinstance(decision, str):
+                                    # 如果决策是字符串，尝试解析内容
+                                    decision_text = decision.lower()
+                                    if "buy" in decision_text:
+                                        action = "buy"
+                                        quantity = 100  # 默认数量
+                                    elif "sell" in decision_text:
+                                        action = "sell"
+                                        quantity = 100  # 默认数量
+                                    else:
+                                        action = "hold"
+                                        quantity = 0
+                                        
+                                    return {
+                                        "decision": {"action": action, "quantity": quantity},
+                                        "analyst_signals": parsed_result.get("analyst_signals", {})
+                                    }
                         
-                        self.logger.info(f"最终处理后的决策: {formatted_result['decision']}")
-                        return formatted_result
+                        # 如果没有找到决策信息，返回默认决策
+                        self.logger.warning("未找到有效的决策信息，返回默认决策")
+                        return {
+                            "decision": {"action": "hold", "quantity": 0},
+                            "analyst_signals": parsed_result.get("analyst_signals", {}) if isinstance(parsed_result, dict) else {}
+                        }
                     
                     except json.JSONDecodeError as e:
                         # JSON解析失败，尝试从文本中提取决策
@@ -431,10 +442,29 @@ class Backtester:
 
                 self.logger.info("\n综合决策:")
 
-            agent_decision = output.get(
-                "decision", {"action": "hold", "quantity": 0})
-            action, quantity = agent_decision.get(
-                "action", "hold"), agent_decision.get("quantity", 0)
+            # 修复：确保 agent_decision 有正确的结构
+            agent_decision = output.get("decision", {})
+            
+            # 验证决策字典的结构
+            if not isinstance(agent_decision, dict):
+                self.logger.warning(f"agent_decision 不是字典类型: {type(agent_decision)}")
+                agent_decision = {"action": "hold", "quantity": 0}
+            
+            # 安全地获取 action 和 quantity
+            action = agent_decision.get("action", "hold")
+            quantity = agent_decision.get("quantity", 0)
+            
+            # 确保 action 是有效的操作类型
+            if action not in ["buy", "sell", "hold"]:
+                self.logger.warning(f"无效的操作类型: {action}，默认为 hold")
+                action = "hold"
+            
+            # 确保 quantity 是数字类型
+            try:
+                quantity = int(quantity)
+            except (ValueError, TypeError):
+                self.logger.warning(f"无效的数量: {quantity}，默认为 0")
+                quantity = 0
 
             # 记录决策详情
             self.logger.info(f"行动: {action.upper()}")
@@ -512,7 +542,7 @@ class Backtester:
         self.logger.info(f"最终总值: {self.portfolio.get('portfolio_value', 0):,.2f}")
         
         # 计算总收益率
-        if hasattr(self.portfolio, 'portfolio_value'):
+        if 'portfolio_value' in self.portfolio:
             total_return = (self.portfolio['portfolio_value'] - self.initial_capital) / self.initial_capital
             self.logger.info(f"总收益率: {total_return * 100:.2f}%")
         
