@@ -16,3 +16,4 @@ src/data/macro_analysis_cache.json
 debug.log
 test/src/*
 best_model.pth
+best_lstm_model.pth
