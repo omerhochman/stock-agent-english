@@ -6,7 +6,9 @@ Forked From：https://github.com/24mlight/A_Share_investment_Agent.git
 
 ## 系统概述
 
-这是一个基于智能体（Agent）的A股投资决策系统，通过多个专业智能体协同工作，实现数据收集、分析、决策和风险管理的全流程自动化。系统采用模块化设计，每个智能体负责特定的分析任务，最终由Portfolio Manager综合各方分析结果做出交易决策。
+这是一个基于智能体（Agent）的 A 股投资决策系统，通过多个专业智能体协同工作，实现数据收集、分析、决策和风险管理的全流程自动化。系统采用模块化设计，每个智能体负责特定的分析任务，最终由 Portfolio Manager 综合各方分析结果做出交易决策。
+
+本项目还另外嵌入了 MCP 分析模块，详见[这个目录](./src/mcp_api/)
 
 ## 系统组成
 
@@ -17,7 +19,7 @@ Forked From：https://github.com/24mlight/A_Share_investment_Agent.git
 3. **Fundamentals Analyst** - 分析基本面数据并生成交易信号
 4. **Sentiment Analyst** - 分析市场情绪并生成交易信号
 5. **Valuation Analyst** - 计算股票内在价值并生成交易信号
-6. **AI Model Analyst** - 运行AI模型预测并生成交易信号
+6. **AI Model Analyst** - 运行 AI 模型预测并生成交易信号
 7. **Macro Analyst** - 分析宏观经济环境并生成交易信号
 8. **Researcher Bull** - 从多头角度分析综合研究结果
 9. **Researcher Bear** - 从空头角度分析综合研究结果
@@ -108,7 +110,7 @@ python -m src.backtester --ticker 600054 --start-date 2022-01-01 --end-date 2022
 python -m src.backtester --ticker 600054 --initial-capital 500000
 ```
 
-**注意**：当前回测系统存在一个已知问题 - 在某些情况下系统可能会过度倾向于持有(hold)策略，导致长时间不交易。这可能与风险管理参数过于保守、多个分析师信号互相抵消或分析师置信度偏低有关。如果遇到此问题，可尝试调整风险参数或修改Portfolio Manager的决策逻辑。
+**注意**：当前回测系统存在一个已知问题 - 在某些情况下系统可能会过度倾向于持有(hold)策略，导致长时间不交易。这可能与风险管理参数过于保守、多个分析师信号互相抵消或分析师置信度偏低有关。如果遇到此问题，可尝试调整风险参数或修改 Portfolio Manager 的决策逻辑。
 
 模型训练与评估：
 
