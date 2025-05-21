@@ -125,17 +125,14 @@ def register_macroeconomic_tools(app: FastMCP, active_data_source: FinancialData
     def get_shibor_data(start_date: Optional[str] = None, end_date: Optional[str] = None) -> str:
         """
         获取指定日期范围内的SHIBOR（上海银行间同业拆放利率）数据
+        注意：当前数据源不支持此功能。此工具仅作为接口保留。
 
         参数:
             start_date: 可选。开始日期，格式为'YYYY-MM-DD'
             end_date: 可选。结束日期，格式为'YYYY-MM-DD'
 
         返回:
-            包含SHIBOR数据的Markdown表格或错误信息
+            信息提示SHIBOR数据暂不可用
         """
-        return call_macro_data_tool(
-            "get_shibor_data",
-            active_data_source.get_shibor_data,
-            "SHIBOR",
-            start_date, end_date
-        )
+        logger.info(f"Tool 'get_shibor_data' called with dates from {start_date or 'default'} to {end_date or 'default'}")
+        return "数据源不支持SHIBOR数据查询功能。您可以查询存款利率(get_deposit_rate_data)或贷款利率(get_loan_rate_data)作为替代。"

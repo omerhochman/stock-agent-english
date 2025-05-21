@@ -45,7 +45,6 @@ def _fetch_financial_data(
     logger.info(f"Fetching {data_type_name} data for {code}, year={year}, quarter={quarter}")
     try:
         with baostock_login_context():
-            # 假设所有这些函数都接受code, year, quarter参数
             rs = bs_query_func(code=code, year=year, quarter=quarter)
 
             if rs.error_code != '0':
@@ -819,13 +818,16 @@ class BaostockDataSource(FinancialDataSource):
 
     def get_shibor_data(self, start_date: Optional[str] = None, end_date: Optional[str] = None) -> pd.DataFrame:
         """
-        使用Baostock获取SHIBOR（上海银行间同业拆放利率）数据。
+        Baostock不提供SHIBOR（上海银行间同业拆放利率）数据API。
+        此方法用空数据帧代替，并引发NoDataFoundError。
         
         参数:
             start_date: 可选。开始日期
             end_date: 可选。结束日期
             
         返回:
-            包含SHIBOR数据的DataFrame
+            抛出NoDataFoundError
         """
-        return _fetch_macro_data(bs.query_shibor_data, "SHIBOR", start_date, end_date)
+        logger.warning("Baostock API不提供SHIBOR数据。尝试请求SHIBOR数据。")
+        from .data_source_interface import NoDataFoundError
+        raise NoDataFoundError("Baostock API不提供SHIBOR数据。请使用其他数据源获取SHIBOR数据。")
