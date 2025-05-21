@@ -1,5 +1,7 @@
 # A 股数据分析 API (MCP 版)
 
+Forked From：https://github.com/24mlight/a-share-mcp-is-just-i-need.git
+
 ## 项目概述
 
 这是一个基于 MCP（Model Control Protocol）架构的中国 A 股市场数据分析 API，旨在为 AI 助手提供全面的中国股市数据访问和分析能力。该项目利用 Baostock 库作为数据源，提供了丰富的股票市场数据、财务报表数据、指数成分股信息以及宏观经济数据的查询功能。
@@ -126,7 +128,7 @@ mcp_server.py
 
 ![mcp配置示例](../../assets/img/mcp_config.png)
 
-### 2. 通过 Claude/GPT 等助手使用
+#### 通过 Claude/GPT 等助手使用
 
 配置完成后，您可以通过 AI 助手来查询和分析 A 股数据。以下是一些示例查询：
 
@@ -139,6 +141,34 @@ mcp_server.py
 ![分析示例3](../../assets/img/mcp_3.png)
 
 ![分析示例4](../../assets/img/mcp_4.png)
+
+### 2. 通过 Cline 进行配置
+
+在 vscode 中下载 cline 插件，在 mcp 配置界面使用 json 配置：
+
+```json
+{
+  "mcpServers": {
+    // 其他mcp的配置....
+    "a-share-mcp": {
+      "timeout": 60,
+      "command": "uv",
+      "args": [
+        "--directory",
+        "C:\\path\\to\\stock_agent\\src\\mcp_api",
+        "run",
+        "python",
+        "mcp_server.py"
+      ],
+      "transportType": "stdio",
+      "disabled": false
+    }
+    // 其他mcp的配置....
+  }
+}
+```
+
+之后便可以进行对话
 
 ## 注意事项
 
