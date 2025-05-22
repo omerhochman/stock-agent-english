@@ -25,6 +25,7 @@ import base64
 import os
 import json
 import re
+import threading
 from wordcloud import WordCloud
 import warnings
 warnings.filterwarnings('ignore')
@@ -37,8 +38,14 @@ st.set_page_config(
 )
 
 # 画图设置
-plt.rcParams['font.sans-serif'] = ['Microsoft YaHei']
+plt.rcParams['font.sans-serif'] = ['SimHei', 'Microsoft YaHei', 'SimSun', 'Arial Unicode MS', 'DejaVu Sans']
 plt.rcParams['axes.unicode_minus'] = False 
+
+# 确保matplotlib能够正确显示中文
+import matplotlib
+matplotlib.rcParams['font.family'] = ['SimHei', 'Microsoft YaHei', 'SimSun']
+matplotlib.rcParams['font.sans-serif'] = ['SimHei', 'Microsoft YaHei', 'SimSun']
+matplotlib.rcParams['axes.unicode_minus'] = False
 
 # AI模型API配置
 LLM_API_CONFIG = {
@@ -450,50 +457,72 @@ def fetch_stock_data(symbol, start_date, end_date):
             pass
         return None
 
-# 获取股票基本信息函数
 def get_stock_basic_info(symbol):
     """获取股票基本信息"""
-    try:
-        # 格式化股票代码
-        if symbol.startswith('6'):
-            bs_symbol = f"sh.{symbol}"
-        elif symbol.startswith(('0', '3')):
-            bs_symbol = f"sz.{symbol}"
-        else:
-            bs_symbol = symbol
+    result = [None]  # 使用列表存储结果，以便在线程中修改
+    done_event = threading.Event()  # 用于标记操作是否完成
+    
+    def _get_info():
+        try:
+            # 格式化股票代码
+            if symbol.startswith('6'):
+                bs_symbol = f"sh.{symbol}"
+            elif symbol.startswith(('0', '3')):
+                bs_symbol = f"sz.{symbol}"
+            else:
+                bs_symbol = symbol
+                
+            # 登录BaoStock
+            lg = bs.login()
+            if lg.error_code != '0':
+                st.error(f"BaoStock登录失败: {lg.error_msg}")
+                done_event.set()
+                return
+                
+            # 获取股票基本信息
+            rs = bs.query_stock_basic(code=bs_symbol)
             
-        # 登录BaoStock
-        lg = bs.login()
-        if lg.error_code != '0':
-            st.error(f"BaoStock登录失败: {lg.error_msg}")
-            return None
-            
-        # 获取股票基本信息
-        rs = bs.query_stock_basic(code=bs_symbol)
-        
-        if rs.error_code != '0':
-            st.error(f"获取股票信息失败: {rs.error_msg}")
+            if rs is None or rs.error_code != '0':
+                error_msg = rs.error_msg if rs is not None else "查询失败"
+                st.error(f"获取股票信息失败: {error_msg}")
+                bs.logout()
+                done_event.set()
+                return
+                
+            data_list = []
+            while (rs.next()):
+                data_list.append(rs.get_row_data())
+                
+            # 登出BaoStock
             bs.logout()
-            return None
             
-        data_list = []
-        while (rs.next()):
-            data_list.append(rs.get_row_data())
+            if data_list:
+                result[0] = data_list[0]
             
-        # 登出BaoStock
-        bs.logout()
-        
-        if data_list:
-            return data_list[0]
-        else:
-            return None
-    except Exception as e:
-        st.error(f"获取股票基本信息失败: {e}")
+            # 标记操作完成
+            done_event.set()
+        except Exception as e:
+            st.error(f"获取股票基本信息失败: {e}")
+            try:
+                bs.logout()
+            except:
+                pass
+            done_event.set()
+    
+    # 创建并启动线程
+    thread = threading.Thread(target=_get_info)
+    thread.daemon = True
+    thread.start()
+    
+    # 等待操作完成或超时
+    if not done_event.wait(timeout=10):
+        st.error("获取股票基本信息超时（10秒）")
         try:
             bs.logout()
         except:
             pass
-        return None
+    
+    return result[0]
 
 # 获取全部股票列表
 def get_stock_list():
@@ -552,15 +581,30 @@ def get_industry_data():
             
         industry_list = []
         while (rs.next()):
-            industry_list.append(rs.get_row_data())
+            row_data = rs.get_row_data()
+            # 确保数据列数一致
+            if len(row_data) == 5:  # 如果API返回5列
+                # 这里根据API实际情况调整，可能需要去掉多余的列或者合并列
+                # 假设第一列是索引列，我们去掉它
+                industry_list.append(row_data[1:])
+            else:
+                industry_list.append(row_data)
             
         # 登出BaoStock
         bs.logout()
         
         if industry_list:
-            df = pd.DataFrame(industry_list, columns=[
-                'code', 'code_name', 'industry', 'industry_classification'
-            ])
+            # 动态获取列名
+            first_row = industry_list[0]
+            if len(first_row) == 4:
+                columns = ['code', 'code_name', 'industry', 'industry_classification']
+            else:
+                # 如果数据格式变化，需要适配新的列名
+                columns = ['code', 'code_name', 'industry', 'industry_classification']
+                # 如果实际列数不匹配，需要调整
+                columns = columns[:len(first_row)]
+                
+            df = pd.DataFrame(industry_list, columns=columns)
             return df
         else:
             return None
@@ -716,79 +760,6 @@ def get_trade_calendar(start_date, end_date):
             return None
     except Exception as e:
         st.error(f"获取交易日历失败: {e}")
-        try:
-            bs.logout()
-        except:
-            pass
-        return None
-
-# 获取公司财务数据
-def get_financial_data(symbol, year, quarter):
-    """获取公司财务数据"""
-    try:
-        # 格式化股票代码
-        if symbol.startswith('6'):
-            bs_symbol = f"sh.{symbol}"
-        elif symbol.startswith(('0', '3')):
-            bs_symbol = f"sz.{symbol}"
-        else:
-            bs_symbol = symbol
-            
-        # 登录BaoStock
-        lg = bs.login()
-        if lg.error_code != '0':
-            st.error(f"BaoStock登录失败: {lg.error_msg}")
-            return None
-            
-        # 获取季度业绩报表
-        rs = bs.query_performance_express_report(bs_symbol, year, quarter)
-        
-        if rs.error_code != '0':
-            st.error(f"获取季度业绩报表失败: {rs.error_msg}")
-            bs.logout()
-            return None
-            
-        data_list = []
-        while (rs.next()):
-            data_list.append(rs.get_row_data())
-            
-        # 获取利润表
-        rs_profit = bs.query_profit_data(bs_symbol, year=year, quarter=quarter)
-        
-        profit_data = []
-        if rs_profit.error_code == '0':
-            while (rs_profit.next()):
-                profit_data.append(rs_profit.get_row_data())
-                
-        # 获取资产负债表
-        rs_balance = bs.query_balance_data(bs_symbol, year=year, quarter=quarter)
-        
-        balance_data = []
-        if rs_balance.error_code == '0':
-            while (rs_balance.next()):
-                balance_data.append(rs_balance.get_row_data())
-                
-        # 获取现金流量表
-        rs_cash = bs.query_cash_flow_data(bs_symbol, year=year, quarter=quarter)
-        
-        cash_flow_data = []
-        if rs_cash.error_code == '0':
-            while (rs_cash.next()):
-                cash_flow_data.append(rs_cash.get_row_data())
-        
-        # 登出BaoStock
-        bs.logout()
-        
-        result = {
-            'performance': pd.DataFrame(data_list) if data_list else None,
-            'profit': pd.DataFrame(profit_data) if profit_data else None,
-            'balance': pd.DataFrame(balance_data) if balance_data else None,
-            'cash_flow': pd.DataFrame(cash_flow_data) if cash_flow_data else None
-        }
-        
-        return result
-    except Exception as e:
-        st.error(f"获取财务数据失败: {e}")
         try:
             bs.logout()
         except:
@@ -1059,14 +1030,34 @@ def plot_candlestick(df):
         'volume': 'Volume'
     })
     
+    # 设置中文字体
+    plt.rcParams['font.sans-serif'] = ['SimHei', 'Microsoft YaHei', 'SimSun']
+    plt.rcParams['axes.unicode_minus'] = False
+    
+    # 创建自定义样式
+    mc = mpf.make_marketcolors(up='red', down='green', inherit=True)
+    s = mpf.make_mpf_style(base_mpf_style='charles', marketcolors=mc, 
+                          gridcolor='lightgray', 
+                          figcolor='white', 
+                          y_on_right=False)
+    
     # 使用mplfinance绘制K线图
     fig, axlist = mpf.plot(df_plot, type='candle', volume=True, 
-                          title='股票K线图',
+                          # 删除title参数
                           ylabel='价格',
                           ylabel_lower='成交量',
-                          style='charles',
+                          style=s,
                           returnfig=True,
                           figsize=(10, 8))
+    
+    # 获取图表的axes，只设置标签字体，不设置标题
+    if len(axlist) > 0:
+        ax_main = axlist[0]
+        ax_main.set_ylabel('价格', fontproperties='SimHei')
+        
+        if len(axlist) > 2:  # 有成交量子图
+            ax_volume = axlist[2]
+            ax_volume.set_ylabel('成交量', fontproperties='SimHei')
     
     return fig
 
@@ -1312,7 +1303,7 @@ def data_acquisition_tab():
                     
         # 添加获取股票基本信息按钮
         if 'stock_symbol' in st.session_state:
-            if st.button("获取股票基本信息"):
+            if st.button("获取股票基本信息", key="get_stock_info_btn"):
                 with st.spinner("正在获取股票基本信息..."):
                     try:
                         symbol = st.session_state.stock_symbol
@@ -1330,46 +1321,6 @@ def data_acquisition_tab():
                             st.warning(f"未找到股票 {symbol} 的基本信息")
                     except Exception as e:
                         st.error(f"获取股票基本信息失败: {e}")
-        
-        # 添加获取财务数据按钮
-        if 'stock_symbol' in st.session_state:
-            st.subheader("财务数据获取")
-            
-            col_year, col_quarter = st.columns(2)
-            with col_year:
-                year = st.selectbox("选择年份", list(range(datetime.now().year, 2005, -1)))
-            with col_quarter:
-                quarter = st.selectbox("选择季度", [1, 2, 3, 4])
-                
-            if st.button("获取财务数据"):
-                with st.spinner("正在获取财务数据..."):
-                    try:
-                        symbol = st.session_state.stock_symbol
-                        financial_data = get_financial_data(symbol, year, quarter)
-                        
-                        if financial_data:
-                            # 显示业绩报表
-                            if financial_data['performance'] is not None and not financial_data['performance'].empty:
-                                st.write("季度业绩报表:")
-                                st.dataframe(financial_data['performance'])
-                                
-                            # 显示利润表摘要
-                            if financial_data['profit'] is not None and not financial_data['profit'].empty:
-                                st.write("利润表摘要:")
-                                profit_summary = financial_data['profit']
-                                # 选择关键指标显示
-                                key_profit_metrics = ['code', 'pubDate', 'statDate', 'roeAvg', 'npMargin', 'gpMargin', 'netProfit', 'epsTTM', 'MBRevenue', 'totalShare']
-                                metrics_to_show = [col for col in key_profit_metrics if col in financial_data['profit'].columns]
-                                st.dataframe(financial_data['profit'][metrics_to_show])
-                                
-                                # 保存到会话状态
-                                st.session_state.financial_data = financial_data
-                            else:
-                                st.warning(f"未找到 {symbol} {year}年第{quarter}季度的财务数据")
-                        else:
-                            st.warning(f"未找到 {symbol} {year}年第{quarter}季度的财务数据")
-                    except Exception as e:
-                        st.error(f"获取财务数据失败: {e}")
     
     # 指数数据获取和新闻数据
     with col2:
@@ -1710,7 +1661,7 @@ def data_analysis_tab():
             
             # 使用大模型分析新闻洞察
             st.subheader("新闻洞察分析")
-            if st.button("分析新闻趋势"):
+            if st.button("分析新闻趋势", key="analyze_news_trend_btn"):
                 with st.spinner("正在使用AI分析新闻趋势..."):
                     insights = extract_news_insights_with_llm(st.session_state.news_df)
                     st.info(insights)
@@ -1948,8 +1899,12 @@ def ml_prediction_tab():
                 
                 # 分析每个聚类的特征
                 st.write("各聚类特征均值：")
-                cluster_means = cluster_df.groupby('Cluster').mean()
-                st.dataframe(cluster_means[['Daily_Return', 'Volatility_5d', 'RSI']])
+                # 只选择数值类型的列计算均值，避免对非数值列执行mean操作
+                numeric_cols = cluster_df.select_dtypes(include=['number']).columns.tolist()
+                numeric_cols = [col for col in numeric_cols if col != 'Cluster']
+                if numeric_cols:
+                    cluster_means = cluster_df.groupby('Cluster')[numeric_cols].mean()
+                    st.dataframe(cluster_means)
     else:
         st.info("请先在数据分析标签页中处理股票数据")
 
@@ -2032,14 +1987,16 @@ def visualization_tab():
         st.pyplot(fig)
         
         # 每个聚类的特征分布
-        cluster_stats = st.session_state.cluster_df.groupby('Cluster').agg({
-            'Daily_Return': ['mean', 'std'],
-            'Volatility_5d': ['mean', 'std'],
-            'RSI': ['mean', 'std'] if 'RSI' in st.session_state.cluster_df.columns else None
-        }).dropna(axis=1)
+        # 只选择数值类型的列
+        numeric_cols = st.session_state.cluster_df.select_dtypes(include=['number']).columns.tolist()
+        numeric_cols = [col for col in numeric_cols if col != 'Cluster']
         
-        st.write("聚类统计信息：")
-        st.dataframe(cluster_stats)
+        if numeric_cols:
+            # 创建聚类统计
+            cluster_stats = st.session_state.cluster_df.groupby('Cluster')[numeric_cols].agg(['mean', 'std']).dropna(axis=1)
+            
+            st.write("聚类统计信息：")
+            st.dataframe(cluster_stats)
     
     # 新闻数据可视化
     if 'news_df' in st.session_state:
@@ -2105,13 +2062,34 @@ def visualization_tab():
         })
         index_plot_df.index.name = 'Date'
         
+        # 设置中文字体
+        plt.rcParams['font.sans-serif'] = ['SimHei', 'Microsoft YaHei', 'SimSun']
+        plt.rcParams['axes.unicode_minus'] = False
+        
+        # 创建自定义样式
+        mc = mpf.make_marketcolors(up='red', down='green', inherit=True)
+        s = mpf.make_mpf_style(base_mpf_style='charles', marketcolors=mc, 
+                              gridcolor='lightgray', 
+                              figcolor='white', 
+                              y_on_right=False)
+        
         fig, axlist = mpf.plot(index_plot_df, type='candle', volume=True, 
-                              title=f'{index_name} K线图',
+                              # 删除title参数
                               ylabel='指数点位',
                               ylabel_lower='成交量',
-                              style='charles',
+                              style=s,
                               returnfig=True,
                               figsize=(10, 8))
+        
+        # 获取图表的axes，只设置标签字体，不设置标题
+        if len(axlist) > 0:
+            ax_main = axlist[0]
+            ax_main.set_ylabel('指数点位', fontproperties='SimHei')
+            
+            if len(axlist) > 2:  # 有成交量子图
+                ax_volume = axlist[2]
+                ax_volume.set_ylabel('成交量', fontproperties='SimHei')
+        
         st.pyplot(fig)
 
 # 导出结果标签页
@@ -2121,7 +2099,7 @@ def export_tab():
     # 选择要导出的数据
     export_option = st.selectbox(
         "选择要导出的数据",
-        ['股票原始数据', '处理后的股票数据', '预测结果', '新闻数据', '指数数据', '财务数据']
+        ['股票原始数据', '处理后的股票数据', '预测结果', '新闻数据', '指数数据']
     )
     
     # 选择导出格式
@@ -2206,30 +2184,6 @@ def export_tab():
                     "index_data.xlsx"
                 ), unsafe_allow_html=True)
         
-        elif export_option == '财务数据' and 'financial_data' in st.session_state:
-            financial_data = st.session_state.financial_data
-            
-            # 选择要导出的财务报表类型
-            financial_type = st.selectbox(
-                "选择财务报表类型",
-                ['performance', 'profit', 'balance', 'cash_flow']
-            )
-            
-            if financial_data[financial_type] is not None and not financial_data[financial_type].empty:
-                if export_format == 'CSV':
-                    st.markdown(get_table_download_link(
-                        financial_data[financial_type], 
-                        f"{financial_type}_data.csv", 
-                        "下载CSV文件"
-                    ), unsafe_allow_html=True)
-                else:
-                    st.markdown(export_to_excel(
-                        financial_data[financial_type], 
-                        f"{financial_type}_data.xlsx"
-                    ), unsafe_allow_html=True)
-            else:
-                st.warning(f"没有可用的{financial_type}财务数据")
-                
         else:
             st.warning("没有可用的数据")
     
