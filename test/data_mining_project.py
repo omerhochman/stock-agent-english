@@ -1144,17 +1144,22 @@ def plot_news_sentiment(news_df):
     if news_df.empty or 'sentiment' not in news_df.columns:
         return None
         
+    # 设置中文字体
+    plt.rcParams['font.sans-serif'] = ['SimHei', 'Microsoft YaHei', 'SimSun', 'Arial Unicode MS', 'DejaVu Sans']
+    plt.rcParams['axes.unicode_minus'] = False
+        
     # 按日期分组计算平均情感得分
     if 'date' in news_df.columns:
         sentiment_by_date = news_df.groupby('date')['sentiment'].mean().reset_index()
         
         fig, ax = plt.subplots(figsize=(10, 6))
         ax.bar(sentiment_by_date['date'], sentiment_by_date['sentiment'], color='skyblue')
-        ax.set_title('每日新闻情感得分')
-        ax.set_xlabel('日期')
-        ax.set_ylabel('情感得分（负面→正面）')
+        ax.set_title('每日新闻情感得分', fontproperties='SimHei', fontsize=14)
+        ax.set_xlabel('日期', fontproperties='SimHei', fontsize=12)
+        ax.set_ylabel('情感得分（负面→正面）', fontproperties='SimHei', fontsize=12)
         ax.grid(True, axis='y')
         plt.xticks(rotation=45)
+        plt.tight_layout()
         
         return fig
     return None
@@ -1182,17 +1187,69 @@ def generate_news_wordcloud(news_df):
         
     text = ' '.join(all_keywords)
     
+    # 设置中文字体
+    plt.rcParams['font.sans-serif'] = ['SimHei', 'Microsoft YaHei', 'SimSun', 'Arial Unicode MS', 'DejaVu Sans']
+    plt.rcParams['axes.unicode_minus'] = False
+    
+    # 尝试多个可能的中文字体路径
+    font_paths = [
+        'simhei.ttf',
+        'C:/Windows/Fonts/simhei.ttf',
+        'C:/Windows/Fonts/msyh.ttc',  # 微软雅黑
+        'C:/Windows/Fonts/simsun.ttc',  # 宋体
+        '/System/Library/Fonts/PingFang.ttc',  # macOS
+        '/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf'  # Linux
+    ]
+    
+    font_path = None
+    for path in font_paths:
+        if os.path.exists(path):
+            font_path = path
+            break
+    
     # 生成词云
-    wordcloud = WordCloud(width=800, height=400, background_color='white', 
-                          font_path='simhei.ttf' if os.path.exists('simhei.ttf') else None,
-                          max_words=100).generate(text)
+    wordcloud = WordCloud(
+        width=800, 
+        height=400, 
+        background_color='white', 
+        font_path=font_path,
+        max_words=100,
+        collocations=False,
+        relative_scaling=0.5
+    ).generate(text)
     
     # 显示词云
     fig, ax = plt.subplots(figsize=(10, 6))
     ax.imshow(wordcloud, interpolation='bilinear')
     ax.axis('off')
-    ax.set_title('新闻关键词词云')
+    ax.set_title('新闻关键词词云', fontproperties='SimHei', fontsize=14)
+    plt.tight_layout()
     
+    return fig
+
+def plot_news_sentiment_distribution(news_df):
+    """绘制新闻情感分布直方图"""
+    if news_df.empty or 'sentiment' not in news_df.columns:
+        return None
+    
+    # 设置中文字体
+    plt.rcParams['font.sans-serif'] = ['SimHei', 'Microsoft YaHei', 'SimSun', 'Arial Unicode MS', 'DejaVu Sans']
+    plt.rcParams['axes.unicode_minus'] = False
+    
+    fig, ax = plt.subplots(figsize=(10, 6))
+    ax.hist(news_df['sentiment'], bins=20, color='skyblue', alpha=0.7, edgecolor='black')
+    ax.set_xlabel('情感得分', fontproperties='SimHei', fontsize=12)
+    ax.set_ylabel('频率', fontproperties='SimHei', fontsize=12)
+    ax.set_title('新闻情感分布直方图', fontproperties='SimHei', fontsize=14)
+    ax.grid(True, alpha=0.3)
+    
+    # 添加统计信息
+    mean_sentiment = news_df['sentiment'].mean()
+    ax.axvline(mean_sentiment, color='red', linestyle='--', linewidth=2, 
+               label=f'平均值: {mean_sentiment:.3f}')
+    ax.legend(prop={'family': 'SimHei'})
+    
+    plt.tight_layout()
     return fig
 
 # 保存结果函数
@@ -1387,12 +1444,18 @@ def data_acquisition_tab():
                 
                 # 显示行业分布图表
                 st.write("行业分布:")
+                # 设置中文字体
+                plt.rcParams['font.sans-serif'] = ['SimHei', 'Microsoft YaHei', 'SimSun', 'Arial Unicode MS', 'DejaVu Sans']
+                plt.rcParams['axes.unicode_minus'] = False
+                
                 fig, ax = plt.subplots(figsize=(10, 6))
-                ax.bar(industry_counts['行业'][:15], industry_counts['上市公司数量'][:15])
-                ax.set_xlabel('行业')
-                ax.set_ylabel('上市公司数量')
-                ax.set_title('各行业上市公司数量(前15名)')
+                ax.bar(industry_counts['行业'][:15], industry_counts['上市公司数量'][:15], 
+                       color='steelblue', alpha=0.7)
+                ax.set_xlabel('行业', fontproperties='SimHei', fontsize=12)
+                ax.set_ylabel('上市公司数量', fontproperties='SimHei', fontsize=12)
+                ax.set_title('各行业上市公司数量(前15名)', fontproperties='SimHei', fontsize=14)
                 plt.xticks(rotation=45, ha='right')
+                ax.grid(True, alpha=0.3, axis='y')
                 plt.tight_layout()
                 st.pyplot(fig)
                 
@@ -1517,12 +1580,18 @@ def data_analysis_tab():
             
             elif viz_type == "收益率分布":
                 if st.button("生成收益率分布图"):
+                    # 设置中文字体
+                    plt.rcParams['font.sans-serif'] = ['SimHei', 'Microsoft YaHei', 'SimSun', 'Arial Unicode MS', 'DejaVu Sans']
+                    plt.rcParams['axes.unicode_minus'] = False
+                    
                     fig, ax = plt.subplots(figsize=(10, 6))
-                    ax.hist(st.session_state.processed_df['Daily_Return'].dropna(), bins=50)
-                    ax.set_title("日收益率分布")
-                    ax.set_xlabel("日收益率")
-                    ax.set_ylabel("频率")
-                    ax.grid(True)
+                    ax.hist(st.session_state.processed_df['Daily_Return'].dropna(), bins=50, 
+                           color='lightgreen', alpha=0.7, edgecolor='black')
+                    ax.set_title("日收益率分布", fontproperties='SimHei', fontsize=14)
+                    ax.set_xlabel("日收益率", fontproperties='SimHei', fontsize=12)
+                    ax.set_ylabel("频率", fontproperties='SimHei', fontsize=12)
+                    ax.grid(True, alpha=0.3)
+                    plt.tight_layout()
                     st.pyplot(fig)
     elif 'uploaded_df' in st.session_state:
         if all(col in st.session_state.uploaded_df.columns for col in ['open', 'high', 'low', 'close']):
@@ -1562,15 +1631,19 @@ def data_analysis_tab():
                 st.dataframe(index_df.describe())
                 
                 # 绘制指数走势图
+                # 设置中文字体
+                plt.rcParams['font.sans-serif'] = ['SimHei', 'Microsoft YaHei', 'SimSun', 'Arial Unicode MS', 'DejaVu Sans']
+                plt.rcParams['axes.unicode_minus'] = False
+                
                 fig, ax = plt.subplots(figsize=(10, 6))
                 ax.plot(index_df.index, index_df['close'], label='收盘价')
                 ax.plot(index_df.index, index_df['MA5'], label='5日均线')
                 ax.plot(index_df.index, index_df['MA20'], label='20日均线')
                 ax.plot(index_df.index, index_df['MA60'], label='60日均线')
-                ax.set_title(f'{index_name}走势图')
-                ax.set_xlabel('日期')
-                ax.set_ylabel('价格')
-                ax.legend()
+                ax.set_title(f'{index_name}走势图', fontproperties='SimHei', fontsize=14)
+                ax.set_xlabel('日期', fontproperties='SimHei', fontsize=12)
+                ax.set_ylabel('指数点位', fontproperties='SimHei', fontsize=12)
+                ax.legend(prop={'family': 'SimHei'})
                 ax.grid(True)
                 plt.xticks(rotation=45)
                 plt.tight_layout()
@@ -1578,11 +1651,12 @@ def data_analysis_tab():
                 
                 # 绘制指数收益率分布图
                 fig, ax = plt.subplots(figsize=(10, 6))
-                ax.hist(index_df['Daily_Return'].dropna(), bins=50)
-                ax.set_title(f'{index_name}日收益率分布')
-                ax.set_xlabel('日收益率')
-                ax.set_ylabel('频率')
-                ax.grid(True)
+                ax.hist(index_df['Daily_Return'].dropna(), bins=50, color='lightblue', alpha=0.7, edgecolor='black')
+                ax.set_title(f'{index_name}日收益率分布', fontproperties='SimHei', fontsize=14)
+                ax.set_xlabel('日收益率', fontproperties='SimHei', fontsize=12)
+                ax.set_ylabel('频率', fontproperties='SimHei', fontsize=12)
+                ax.grid(True, alpha=0.3)
+                plt.tight_layout()
                 st.pyplot(fig)
                 
                 # 如果有股票数据，计算与指数的相关性
@@ -1611,16 +1685,18 @@ def data_analysis_tab():
                         # 绘制散点图
                         fig, ax = plt.subplots(figsize=(10, 6))
                         ax.scatter(index_returns, stock_returns, alpha=0.5)
-                        ax.set_title(f'股票收益率 vs {index_name}收益率 (相关系数: {correlation:.4f})')
-                        ax.set_xlabel(f'{index_name}日收益率')
-                        ax.set_ylabel('股票日收益率')
-                        ax.grid(True)
+                        ax.set_title(f'股票收益率 vs {index_name}收益率 (相关系数: {correlation:.4f})', 
+                                   fontproperties='SimHei', fontsize=14)
+                        ax.set_xlabel(f'{index_name}日收益率', fontproperties='SimHei', fontsize=12)
+                        ax.set_ylabel('股票日收益率', fontproperties='SimHei', fontsize=12)
+                        ax.grid(True, alpha=0.3)
                         
                         # 添加回归线
                         z = np.polyfit(index_returns, stock_returns, 1)
                         p = np.poly1d(z)
-                        ax.plot(index_returns, p(index_returns), "r--")
+                        ax.plot(index_returns, p(index_returns), "r--", linewidth=2)
                         
+                        plt.tight_layout()
                         st.pyplot(fig)
                         
                         # 计算Beta系数
@@ -1641,33 +1717,38 @@ def data_analysis_tab():
         # 情感分析
         if 'sentiment' in st.session_state.news_df.columns:
             st.write("新闻情感分布：")
-            fig, ax = plt.subplots()
-            ax.hist(st.session_state.news_df['sentiment'], bins=20)
-            ax.set_xlabel('情感得分')
-            ax.set_ylabel('频率')
-            ax.set_title('新闻情感分布直方图')
-            st.pyplot(fig)
+            fig = plot_news_sentiment(st.session_state.news_df)
+            if fig:
+                st.pyplot(fig)
+            else:
+                st.info("无法生成情感分析图，请确保新闻数据包含情感分数和日期")
             
             # 平均情感得分
             avg_sentiment = st.session_state.news_df['sentiment'].mean()
             st.metric("平均情感得分", f"{avg_sentiment:.3f}", 
                       delta="积极" if avg_sentiment > 0 else "消极")
-            
-            # 生成词云
-            st.write("新闻关键词词云：")
-            fig = generate_news_wordcloud(st.session_state.news_df)
-            if fig:
-                st.pyplot(fig)
-            
-            # 使用大模型分析新闻洞察
-            st.subheader("新闻洞察分析")
-            if st.button("分析新闻趋势", key="analyze_news_trend_btn"):
-                with st.spinner("正在使用AI分析新闻趋势..."):
-                    insights = extract_news_insights_with_llm(st.session_state.news_df)
-                    st.info(insights)
-                    
-                    # 保存新闻洞察到会话状态
-                    st.session_state.news_insights = insights
+        
+        # 生成词云
+        st.write("新闻关键词词云：")
+        fig = generate_news_wordcloud(st.session_state.news_df)
+        if fig:
+            st.pyplot(fig)
+        
+        # 使用大模型分析新闻洞察
+        st.subheader("新闻洞察分析")
+        if st.button("分析新闻趋势", key="analyze_news_trend_btn"):
+            with st.spinner("正在使用AI分析新闻趋势..."):
+                insights = extract_news_insights_with_llm(st.session_state.news_df)
+                st.info(insights)
+                
+                # 保存新闻洞察到会话状态
+                st.session_state.news_insights = insights
+        
+        # 绘制新闻情感分布直方图
+        st.subheader("新闻情感分布直方图")
+        fig = plot_news_sentiment_distribution(st.session_state.news_df)
+        if fig:
+            st.pyplot(fig)
     else:
         st.info("请先在数据获取标签页中获取新闻数据")
     
@@ -2004,7 +2085,7 @@ def visualization_tab():
         
         news_viz_option = st.radio(
             "选择新闻可视化类型",
-            ['情感分析', '关键词词云'],
+            ['情感分析', '情感分布直方图', '关键词词云'],
             horizontal=True
         )
         
@@ -2014,6 +2095,13 @@ def visualization_tab():
                 st.pyplot(fig)
             else:
                 st.info("无法生成情感分析图，请确保新闻数据包含情感分数和日期")
+        
+        elif news_viz_option == '情感分布直方图':
+            fig = plot_news_sentiment_distribution(st.session_state.news_df)
+            if fig:
+                st.pyplot(fig)
+            else:
+                st.info("无法生成情感分布图，请确保新闻数据包含情感分数")
         
         elif news_viz_option == '关键词词云':
             fig = generate_news_wordcloud(st.session_state.news_df)
@@ -2036,15 +2124,19 @@ def visualization_tab():
             index_df['MA60'] = index_df['close'].rolling(window=60).mean()
         
         # 绘制指数走势图
+        # 设置中文字体
+        plt.rcParams['font.sans-serif'] = ['SimHei', 'Microsoft YaHei', 'SimSun', 'Arial Unicode MS', 'DejaVu Sans']
+        plt.rcParams['axes.unicode_minus'] = False
+        
         fig, ax = plt.subplots(figsize=(10, 6))
         ax.plot(index_df.index, index_df['close'], label='收盘价')
         ax.plot(index_df.index, index_df['MA5'], label='5日均线')
         ax.plot(index_df.index, index_df['MA20'], label='20日均线')
         ax.plot(index_df.index, index_df['MA60'], label='60日均线')
-        ax.set_title(f'{index_name}走势图')
-        ax.set_xlabel('日期')
-        ax.set_ylabel('指数点位')
-        ax.legend()
+        ax.set_title(f'{index_name}走势图', fontproperties='SimHei', fontsize=14)
+        ax.set_xlabel('日期', fontproperties='SimHei', fontsize=12)
+        ax.set_ylabel('指数点位', fontproperties='SimHei', fontsize=12)
+        ax.legend(prop={'family': 'SimHei'})
         ax.grid(True)
         plt.xticks(rotation=45)
         plt.tight_layout()
