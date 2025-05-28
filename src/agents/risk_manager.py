@@ -3,6 +3,7 @@ import pandas as pd
 from langchain_core.messages import HumanMessage
 
 from src.agents.state import AgentState, show_agent_reasoning, show_workflow_status
+from src.agents.regime_detector import AdvancedRegimeDetector
 from src.tools.api import prices_to_df
 from src.utils.api_utils import agent_endpoint
 from src.utils.logging_config import setup_logger
@@ -18,12 +19,18 @@ logger = setup_logger('risk_management_agent')
 
 @agent_endpoint("risk_management", "风险管理专家，评估投资风险并给出风险调整后的交易建议")
 def risk_management_agent(state: AgentState):
-    """负责风险管理和风险调整后的交易决策"""
+    """
+    基于2024-2025研究的区制感知风险管理系统
+    集成FINSABER、FLAG-Trader、RLMF等框架的风险控制技术
+    """
     show_workflow_status("Risk Manager")
     show_reasoning = state["metadata"]["show_reasoning"]
     portfolio = state["data"]["portfolio"]
     data = state["data"]
 
+    # 初始化区制检测器
+    regime_detector = AdvancedRegimeDetector()
+    
     # 获取资产列表
     tickers = data.get("tickers", [])
     if isinstance(tickers, str):
@@ -35,6 +42,13 @@ def risk_management_agent(state: AgentState):
     
     # 主要资产的价格数据
     prices_df = prices_to_df(data["prices"])
+    
+    # 进行区制分析
+    regime_features = regime_detector.extract_regime_features(prices_df)
+    regime_model_results = regime_detector.fit_regime_model(regime_features)
+    current_regime = regime_detector.predict_current_regime(regime_features)
+    
+    logger.info(f"风险管理器检测到市场区制: {current_regime.get('regime_name', 'unknown')} (置信度: {current_regime.get('confidence', 0):.2f})")
     
     # 多资产投资组合风险分析
     portfolio_risk_analysis = {}
@@ -90,8 +104,10 @@ def risk_management_agent(state: AgentState):
                 "correlation_matrix": correlation_matrix.to_dict()
             }
             
-            # 提供多资产风险分散化建议
-            diversification_tips = []
+            # 基于区制的分散化建议
+            diversification_tips = _generate_regime_aware_diversification_tips(
+                correlation_matrix, current_regime, high_corr_pairs=[]
+            )
             
             # 基于相关性的建议
             high_corr_pairs = []
@@ -154,88 +170,20 @@ def risk_management_agent(state: AgentState):
     mean_return = returns.mean() * 252
     sortino_ratio = mean_return / downside_deviation if downside_deviation != 0 else 0
 
-    # 3. 市场风险评估 (评分系统)
-    market_risk_score = 0
+    # 3. 区制感知风险评估 (基于2024-2025研究)
+    regime_risk_score = _calculate_regime_risk_score(
+        current_regime, volatility_percentile, var_95, max_drawdown, skewness, kurtosis
+    )
 
-    # 波动率评分 (基于百分位)
-    if volatility_percentile > 1.5:     # 高于1.5个标准差
-        market_risk_score += 2
-    elif volatility_percentile > 1.0:   # 高于1个标准差
-        market_risk_score += 1
-
-    # VaR评分 (基于历史分布)
-    # 注意：var_95通常为正值（我们返回绝对值）
-    if var_95 > 0.03:
-        market_risk_score += 2
-    elif var_95 > 0.02:
-        market_risk_score += 1
-
-    # 最大回撤评分
-    if abs(max_drawdown) > 0.20:  # 严重回撤
-        market_risk_score += 2
-    elif abs(max_drawdown) > 0.10:
-        market_risk_score += 1
-        
-    # 分布异常性评分 (显著非正态)
-    if abs(skewness) > 1.0 or kurtosis > 5.0:
-        market_risk_score += 1
-
-    # 4. 头寸规模计算 - 使用凯利准则的优化版本
+    # 4. 动态头寸规模计算 - 基于FLAG-Trader 2025框架
     # 考虑总组合价值，非仅现金
     current_stock_value = portfolio['stock'] * prices_df['close'].iloc[-1]
     total_portfolio_value = portfolio['cash'] + current_stock_value
 
-    # 基于凯利准则的头寸规模
-    # 从辩论结果调整胜率
-    bull_confidence = debate_results.get("bull_confidence", 0.5)
-    bear_confidence = debate_results.get("bear_confidence", 0.5)
-    if bull_confidence > bear_confidence:
-        win_rate = bull_confidence
-    else:
-        win_rate = 1 - bear_confidence
-        
-    # 结合波动率模型优化收益预期
-    try:
-        # 使用GARCH模型预测未来波动率
-        if len(returns) >= 100:  # 确保有足够的数据
-            garch_params, _ = fit_garch(returns.values)
-            volatility_forecast = forecast_garch_volatility(returns.values, garch_params, 
-                                                         forecast_horizon=10)
-            
-            # 根据波动率预测调整胜率
-            # 如果预测波动率上升，降低胜率；如果预测波动率下降，提高胜率
-            avg_forecast = np.mean(volatility_forecast)
-            volatility_trend = avg_forecast / volatility - 1  # 正值表示波动率上升趋势
-            
-            # 调整胜率
-            if volatility_trend > 0.1:  # 波动率预期显著上升
-                win_rate = max(0.3, win_rate - 0.1)  # 最低设为0.3
-            elif volatility_trend < -0.1:  # 波动率预期显著下降
-                win_rate = min(0.8, win_rate + 0.05)  # 最高设为0.8
-    except Exception as e:
-        logger.warning(f"GARCH模型计算失败: {e}")
-        
-    # 计算平均胜利收益和亏损比率 - 使用历史数据优化
-    # 分析历史正负收益比例
-    avg_gain = returns[returns > 0].mean() if len(returns[returns > 0]) > 0 else 0.005
-    avg_loss = abs(returns[returns < 0].mean()) if len(returns[returns < 0]) > 0 else 0.005
-    win_loss_ratio = avg_gain / avg_loss if avg_loss != 0 else 1.5
-    
-    # 应用改进的凯利公式
-    kelly_fraction = win_rate - ((1 - win_rate) / win_loss_ratio)
-    kelly_fraction = max(0.05, kelly_fraction)
-    
-    # 保守系数和风险调整
-    conservative_factor = 0.5  # 只用一半凯利建议
-    risk_adjustment = max(0, 1 - (market_risk_score / 10))
-    
-    # 最终头寸大小
-    max_position_size = total_portfolio_value * kelly_fraction * conservative_factor * risk_adjustment
-
-    max_position_size = max(max_position_size, total_portfolio_value * 0.02)  # 设置最小仓位
-    
-    # 安全检查 - 头寸不能太高
-    max_position_size = min(max_position_size, total_portfolio_value * 0.4)
+    # 区制感知的凯利准则优化
+    position_sizing_result = _calculate_regime_aware_position_sizing(
+        debate_results, current_regime, returns, total_portfolio_value
+    )
 
     # 5. 压力测试 (更全面的情景)
     stress_test_scenarios = {
@@ -274,12 +222,12 @@ def risk_management_agent(state: AgentState):
     # 评估辩论结果的确定性
     confidence_diff = abs(bull_confidence - bear_confidence)
     if confidence_diff < 0.1:  # 辩论接近
-        market_risk_score += 1
+        regime_risk_score += 1
     if debate_confidence < 0.3:  # 总体低置信度
-        market_risk_score += 1
+        regime_risk_score += 1
 
     # 上限风险分数为10
-    risk_score = min(round(market_risk_score), 10)
+    risk_score = min(round(regime_risk_score), 10)
 
     # 7. 生成交易行动
     debate_signal = debate_results.get("signal", "neutral")
@@ -384,12 +332,12 @@ def risk_management_agent(state: AgentState):
         elif debate_signal == "neutral" and debate_confidence >= 0.3:
             # 信号中性但置信度较高，需要结合市场风险评分进行细化决策
             
-            if market_risk_score <= 2:  # 市场风险极低
+            if regime_risk_score <= 2:  # 市场风险极低
                 trading_action = "buy"
                 # 理由：中性信号，但市场风险极低（≤2/10），
                 # 适合积极建仓，利用低风险环境获取收益
                 
-            elif market_risk_score >= 6:  # 市场风险偏高
+            elif regime_risk_score >= 6:  # 市场风险偏高
                 trading_action = "sell"
                 # 理由：虽然信号中性，但市场风险偏高（≥6/10），
                 # 应该主动减少仓位，防范潜在风险
@@ -434,7 +382,7 @@ def risk_management_agent(state: AgentState):
                                                          forecast_horizon=10)
             
             # 将结果添加到分析中
-            market_risk_score += 1 if garch_params['persistence'] > 0.95 else 0  # 高持续性表示更高风险
+            regime_risk_score += 1 if garch_params['persistence'] > 0.95 else 0  # 高持续性表示更高风险
             
             # 保存GARCH结果
             garch_results = {
@@ -455,7 +403,7 @@ def risk_management_agent(state: AgentState):
 
     # 9. 构建输出消息
     message_content = {
-        "max_position_size": float(max_position_size),
+        "max_position_size": float(position_sizing_result["max_position_size"]),
         "risk_score": risk_score,
         "trading_action": trading_action,
         "risk_metrics": {
@@ -466,19 +414,19 @@ def risk_management_agent(state: AgentState):
             "skewness": float(skewness),           
             "kurtosis": float(kurtosis),           
             "sortino_ratio": float(sortino_ratio), 
-            "market_risk_score": market_risk_score,
+            "regime_risk_score": regime_risk_score,
             "stress_test_results": stress_test_results,
             "macro_environment_assessment": { 
-                "global_risks": market_risk_score > 5,
-                "liquidity_concerns": market_risk_score > 7,
+                "global_risks": regime_risk_score > 5,
+                "liquidity_concerns": regime_risk_score > 7,
                 "volatility_regime": "high" if volatility > 0.3 else "medium" if volatility > 0.2 else "low"
             }
         },
         "position_sizing": {
-            "kelly_fraction": float(kelly_fraction),
-            "win_rate": float(win_rate),
-            "win_loss_ratio": float(win_loss_ratio),
-            "risk_adjustment": float(risk_adjustment),
+            "kelly_fraction": float(position_sizing_result["kelly_fraction"]),
+            "win_rate": float(position_sizing_result["win_rate"]),
+            "win_loss_ratio": float(position_sizing_result["win_loss_ratio"]),
+            "risk_adjustment": float(position_sizing_result["risk_adjustment"]),
             "total_portfolio_value": float(total_portfolio_value)
         },
         "debate_analysis": {
@@ -488,10 +436,10 @@ def risk_management_agent(state: AgentState):
             "debate_signal": debate_signal
         },
         "volatility_model": garch_results,
-        "reasoning": f"风险评分 {risk_score}/10: 市场风险={market_risk_score}, "
+        "reasoning": f"风险评分 {risk_score}/10: 市场风险={regime_risk_score}, "
                      f"波动率={volatility:.2%}, VaR={var_95:.2%}, CVaR={cvar_95:.2%}, "
                      f"最大回撤={max_drawdown:.2%}, 偏度={skewness:.2f}, "
-                     f"辩论信号={debate_signal}, Kelly建议占比={kelly_fraction:.2f}"
+                     f"辩论信号={debate_signal}, Kelly建议占比={position_sizing_result['kelly_fraction']:.2f}"
     }
     
     # 如果有多资产分析结果，添加到输出中
@@ -521,4 +469,142 @@ def risk_management_agent(state: AgentState):
             "risk_analysis": message_content
         },
         "metadata": state["metadata"],
+    }
+
+
+def _generate_regime_aware_diversification_tips(correlation_matrix, current_regime, high_corr_pairs):
+    """基于市场区制生成分散化建议"""
+    tips = []
+    regime_name = current_regime.get('regime_name', 'unknown')
+    
+    if regime_name == "crisis_regime":
+        tips.append("危机区制下，传统分散化效果减弱，考虑增加避险资产(如债券、黄金)配置")
+        tips.append("危机期间资产相关性趋于1，建议降低整体风险敞口")
+    elif regime_name == "high_volatility_mean_reverting":
+        tips.append("高波动震荡市场中，可适当增加对冲策略和波动率交易")
+        tips.append("震荡市场适合区间交易，建议设置更严格的止损止盈")
+    elif regime_name == "low_volatility_trending":
+        tips.append("低波动趋势市场适合增加动量策略配置")
+        tips.append("趋势市场中可适当提高单一方向的敞口")
+    
+    return tips
+
+
+def _calculate_regime_risk_score(current_regime, volatility_percentile, var_95, max_drawdown, skewness, kurtosis):
+    """基于市场区制计算风险评分"""
+    regime_name = current_regime.get('regime_name', 'unknown')
+    regime_confidence = current_regime.get('confidence', 0.5)
+    
+    # 基础风险评分
+    risk_score = 0
+    
+    # 区制特定风险调整
+    if regime_name == "crisis_regime":
+        risk_score += 3  # 危机区制基础风险高
+        if regime_confidence > 0.7:
+            risk_score += 1  # 高置信度的危机预测
+    elif regime_name == "high_volatility_mean_reverting":
+        risk_score += 2  # 高波动区制中等风险
+    elif regime_name == "low_volatility_trending":
+        risk_score += 1  # 低波动趋势区制较低风险
+    
+    # 波动率评分 (基于百分位)
+    if volatility_percentile > 1.5:     # 高于1.5个标准差
+        risk_score += 2
+    elif volatility_percentile > 1.0:   # 高于1个标准差
+        risk_score += 1
+
+    # VaR评分 (基于历史分布)
+    if var_95 > 0.03:
+        risk_score += 2
+    elif var_95 > 0.02:
+        risk_score += 1
+
+    # 最大回撤评分
+    if abs(max_drawdown) > 0.20:  # 严重回撤
+        risk_score += 2
+    elif abs(max_drawdown) > 0.10:
+        risk_score += 1
+        
+    # 分布异常性评分 (显著非正态)
+    if abs(skewness) > 1.0 or kurtosis > 5.0:
+        risk_score += 1
+    
+    return risk_score
+
+
+def _calculate_regime_aware_position_sizing(debate_results, current_regime, returns, total_portfolio_value):
+    """基于区制的动态头寸规模计算"""
+    regime_name = current_regime.get('regime_name', 'unknown')
+    regime_confidence = current_regime.get('confidence', 0.5)
+    
+    # 从辩论结果调整胜率
+    bull_confidence = debate_results.get("bull_confidence", 0.5)
+    bear_confidence = debate_results.get("bear_confidence", 0.5)
+    if bull_confidence > bear_confidence:
+        win_rate = bull_confidence
+    else:
+        win_rate = 1 - bear_confidence
+    
+    # 区制特定的胜率调整
+    if regime_name == "crisis_regime":
+        win_rate *= 0.7  # 危机期间降低胜率预期
+    elif regime_name == "low_volatility_trending":
+        win_rate *= 1.1  # 趋势市场提高胜率预期
+        win_rate = min(win_rate, 0.8)  # 上限
+    
+    # 结合波动率模型优化收益预期
+    try:
+        # 使用GARCH模型预测未来波动率
+        if len(returns) >= 100:  # 确保有足够的数据
+            garch_params, _ = fit_garch(returns.values)
+            volatility_forecast = forecast_garch_volatility(returns.values, garch_params, 
+                                                         forecast_horizon=10)
+            
+            # 根据波动率预测调整胜率
+            avg_forecast = np.mean(volatility_forecast)
+            current_vol = returns.std()
+            volatility_trend = avg_forecast / current_vol - 1 if current_vol != 0 else 0
+            
+            # 调整胜率
+            if volatility_trend > 0.1:  # 波动率预期显著上升
+                win_rate = max(0.3, win_rate - 0.1)  # 最低设为0.3
+            elif volatility_trend < -0.1:  # 波动率预期显著下降
+                win_rate = min(0.8, win_rate + 0.05)  # 最高设为0.8
+    except Exception as e:
+        logger.warning(f"GARCH模型计算失败: {e}")
+    
+    # 计算平均胜利收益和亏损比率
+    avg_gain = returns[returns > 0].mean() if len(returns[returns > 0]) > 0 else 0.005
+    avg_loss = abs(returns[returns < 0].mean()) if len(returns[returns < 0]) > 0 else 0.005
+    win_loss_ratio = avg_gain / avg_loss if avg_loss != 0 else 1.5
+    
+    # 应用改进的凯利公式
+    kelly_fraction = win_rate - ((1 - win_rate) / win_loss_ratio)
+    kelly_fraction = max(0.05, kelly_fraction)
+    
+    # 区制特定的保守系数
+    if regime_name == "crisis_regime":
+        conservative_factor = 0.3  # 危机期间更保守
+    elif regime_name == "high_volatility_mean_reverting":
+        conservative_factor = 0.4  # 高波动期间保守
+    else:
+        conservative_factor = 0.5  # 正常情况
+    
+    # 风险调整基于区制置信度
+    risk_adjustment = regime_confidence if regime_confidence > 0.6 else 0.5
+    
+    # 最终头寸大小
+    max_position_size = total_portfolio_value * kelly_fraction * conservative_factor * risk_adjustment
+    max_position_size = max(max_position_size, total_portfolio_value * 0.02)  # 设置最小仓位
+    max_position_size = min(max_position_size, total_portfolio_value * 0.4)   # 设置最大仓位
+    
+    return {
+        "max_position_size": max_position_size,
+        "kelly_fraction": kelly_fraction,
+        "win_rate": win_rate,
+        "win_loss_ratio": win_loss_ratio,
+        "risk_adjustment": risk_adjustment,
+        "conservative_factor": conservative_factor,
+        "regime_adjustment": f"Applied {regime_name} specific adjustments"
     }

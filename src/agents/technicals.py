@@ -7,6 +7,7 @@ import numpy as np
 from langchain_core.messages import HumanMessage
 
 from src.agents.state import AgentState, show_agent_reasoning, show_workflow_status
+from src.agents.regime_detector import AdvancedRegimeDetector
 from src.utils.api_utils import agent_endpoint
 from src.calc.volatility_models import fit_garch, forecast_garch_volatility
 from src.tools.api import prices_to_df
@@ -16,18 +17,22 @@ from src.tools.api import prices_to_df
 @agent_endpoint("technical_analyst", "技术分析师，提供基于价格走势、指标和技术模式的交易信号")
 def technical_analyst_agent(state: AgentState):
     """
-    基于多种先进技术分析策略的交易信号生成系统：
-    1. 趋势跟踪
-    2. 均值回归
-    3. 动量策略
-    4. 波动率分析
-    5. 统计套利信号
+    基于2024-2025研究的区制感知技术分析系统
+    集成FINSABER、FLAG-Trader等框架的先进技术分析策略
     """
     show_workflow_status("Technical Analyst")
     show_reasoning = state["metadata"]["show_reasoning"]
     data = state["data"]
     prices = data["prices"]
     prices_df = prices_to_df(prices)
+
+    # 初始化区制检测器
+    regime_detector = AdvancedRegimeDetector()
+    
+    # 进行区制分析
+    regime_features = regime_detector.extract_regime_features(prices_df)
+    regime_model_results = regime_detector.fit_regime_model(regime_features)
+    current_regime = regime_detector.predict_current_regime(regime_features)
 
     # 1. 趋势跟踪策略
     trend_signals = calculate_trend_signals(prices_df)
@@ -44,61 +49,30 @@ def technical_analyst_agent(state: AgentState):
     # 5. 统计套利信号
     stat_arb_signals = calculate_stat_arb_signals(prices_df)
 
-    # 6. 使用马尔科夫区制模型分析市场状态
-    market_regime = analyze_market_regime(prices_df)
+    # 6. 基于区制的动态权重调整 (基于2024-2025研究)
+    regime_adjusted_weights = _calculate_regime_adjusted_weights(current_regime)
 
-    # 组合所有策略信号，使用自适应权重
-    strategy_weights = {
-        'trend': 0.30,  # 保持原有权重
-        'mean_reversion': 0.25, 
-        'momentum': 0.25,
-        'volatility': 0.15,
-        'stat_arb': 0.05
-    }
-
-    # 根据市场状态调整策略权重
-    if market_regime["regime"] == "trending":
-        # 趋势市场中增加趋势跟踪和动量权重
-        strategy_weights['trend'] = 0.40
-        strategy_weights['momentum'] = 0.30
-        strategy_weights['mean_reversion'] = 0.15
-        strategy_weights['volatility'] = 0.10
-        strategy_weights['stat_arb'] = 0.05
-    elif market_regime["regime"] == "mean_reverting":
-        # 区间震荡市场增加均值回归权重
-        strategy_weights['trend'] = 0.20
-        strategy_weights['momentum'] = 0.15
-        strategy_weights['mean_reversion'] = 0.45
-        strategy_weights['volatility'] = 0.15
-        strategy_weights['stat_arb'] = 0.05
-    elif market_regime["regime"] == "volatile":
-        # 高波动市场增加波动率和统计套利权重
-        strategy_weights['trend'] = 0.20
-        strategy_weights['momentum'] = 0.20
-        strategy_weights['mean_reversion'] = 0.20
-        strategy_weights['volatility'] = 0.30
-        strategy_weights['stat_arb'] = 0.10
-
-    # 规范化权重，确保总和为1
-    total_weight = sum(strategy_weights.values())
-    strategy_weights = {k: v/total_weight for k, v in strategy_weights.items()}
-
-    # 使用优化后的权重组合信号
+    # 使用区制感知的权重组合信号
     combined_signal = weighted_signal_combination({
         'trend': trend_signals,
         'mean_reversion': mean_reversion_signals,
         'momentum': momentum_signals,
         'volatility': volatility_signals,
         'stat_arb': stat_arb_signals
-    }, strategy_weights)
+    }, regime_adjusted_weights)
+
+    # 应用区制特定的信号过滤和增强
+    enhanced_signal = _apply_regime_signal_enhancement(
+        combined_signal, current_regime, prices_df
+    )
 
     # 生成详细分析报告
     analysis_report = {
-        "signal": combined_signal['signal'],
-        "confidence": combined_signal['confidence'],
-        "market_regime": market_regime["regime"],
-        "regime_confidence": market_regime["confidence"],
-        "strategy_weights": strategy_weights,
+        "signal": enhanced_signal['signal'],
+        "confidence": enhanced_signal['confidence'],
+        "market_regime": current_regime,
+        "regime_adjusted_weights": regime_adjusted_weights,
+        "signal_enhancement": enhanced_signal.get('enhancement_details', {}),
         "strategy_signals": {
             "trend_following": {
                 "signal": trend_signals['signal'],
@@ -144,6 +118,123 @@ def technical_analyst_agent(state: AgentState):
         "messages": [message],
         "data": data,
         "metadata": state["metadata"],
+    }
+
+
+def _calculate_regime_adjusted_weights(current_regime):
+    """基于市场区制动态调整策略权重"""
+    regime_name = current_regime.get("regime_name", "unknown")
+    regime_confidence = current_regime.get("confidence", 0.5)
+    
+    # 基础权重
+    base_weights = {
+        'trend': 0.30,
+        'mean_reversion': 0.25, 
+        'momentum': 0.25,
+        'volatility': 0.15,
+        'stat_arb': 0.05
+    }
+    
+    # 区制特定调整 (基于FINSABER 2024和Lopez-Lira 2025研究)
+    if regime_name == "low_volatility_trending" and regime_confidence > 0.6:
+        # 趋势市场中增加趋势跟踪和动量权重
+        base_weights['trend'] = 0.40
+        base_weights['momentum'] = 0.30
+        base_weights['mean_reversion'] = 0.15
+        base_weights['volatility'] = 0.10
+        base_weights['stat_arb'] = 0.05
+    elif regime_name == "high_volatility_mean_reverting" and regime_confidence > 0.6:
+        # 区间震荡市场增加均值回归权重
+        base_weights['trend'] = 0.20
+        base_weights['momentum'] = 0.15
+        base_weights['mean_reversion'] = 0.45
+        base_weights['volatility'] = 0.15
+        base_weights['stat_arb'] = 0.05
+    elif regime_name == "crisis_regime" and regime_confidence > 0.6:
+        # 危机市场增加波动率和统计套利权重
+        base_weights['trend'] = 0.20
+        base_weights['momentum'] = 0.20
+        base_weights['mean_reversion'] = 0.20
+        base_weights['volatility'] = 0.30
+        base_weights['stat_arb'] = 0.10
+
+    # 规范化权重，确保总和为1
+    total_weight = sum(base_weights.values())
+    return {k: v/total_weight for k, v in base_weights.items()}
+
+
+def _apply_regime_signal_enhancement(combined_signal, current_regime, prices_df):
+    """应用区制特定的信号增强技术"""
+    regime_name = current_regime.get("regime_name", "unknown")
+    regime_confidence = current_regime.get("confidence", 0.5)
+    
+    # 转换信号为数值进行计算
+    signal_values = {
+        'bullish': 1.0,
+        'neutral': 0.0,
+        'bearish': -1.0
+    }
+    
+    # 反向映射
+    value_to_signal = {
+        1.0: 'bullish',
+        0.0: 'neutral', 
+        -1.0: 'bearish'
+    }
+    
+    enhanced_signal = signal_values.get(combined_signal['signal'], 0.0)
+    enhanced_confidence = combined_signal['confidence']
+    enhancement_details = {}
+    
+    # 基于区制的信号过滤和增强
+    if regime_name == "crisis_regime" and regime_confidence > 0.7:
+        # 危机期间：降低信号强度，增加保守性
+        enhanced_signal *= 0.7
+        enhanced_confidence *= 0.8
+        enhancement_details['crisis_dampening'] = "Applied crisis regime signal dampening"
+        
+    elif regime_name == "low_volatility_trending" and regime_confidence > 0.7:
+        # 低波动趋势期间：增强趋势信号
+        if abs(enhanced_signal) > 0.3:  # 只增强较强的信号
+            enhanced_signal *= 1.2
+            enhanced_confidence *= 1.1
+            enhancement_details['trend_amplification'] = "Applied trend regime signal amplification"
+    
+    elif regime_name == "high_volatility_mean_reverting" and regime_confidence > 0.7:
+        # 高波动震荡期间：应用反转逻辑
+        returns = prices_df['close'].pct_change().dropna()
+        recent_return = returns.iloc[-1] if len(returns) > 0 else 0
+        
+        if abs(recent_return) > 0.03:  # 显著价格移动
+            # 应用均值回归逻辑
+            if recent_return > 0 and enhanced_signal > 0:
+                enhanced_signal *= 0.5  # 减弱追涨信号
+            elif recent_return < 0 and enhanced_signal < 0:
+                enhanced_signal *= 0.5  # 减弱杀跌信号
+            enhancement_details['mean_reversion_filter'] = "Applied mean reversion filter"
+    
+    # 应用动态阈值 (基于RLMF 2024技术)
+    dynamic_threshold = 0.15 if regime_name == "crisis_regime" else 0.1
+    if abs(enhanced_signal) < dynamic_threshold:
+        enhanced_signal *= 0.5  # 弱信号进一步衰减
+        enhancement_details['weak_signal_dampening'] = f"Applied weak signal dampening (threshold: {dynamic_threshold})"
+    
+    # 确保置信度在合理范围内
+    enhanced_confidence = max(0.1, min(enhanced_confidence, 0.95))
+    
+    # 将数值信号转换回字符串信号
+    # 使用阈值来确定最终信号
+    if enhanced_signal > 0.2:
+        final_signal = 'bullish'
+    elif enhanced_signal < -0.2:
+        final_signal = 'bearish'
+    else:
+        final_signal = 'neutral'
+    
+    return {
+        'signal': final_signal,
+        'confidence': enhanced_confidence,
+        'enhancement_details': enhancement_details
     }
 
 

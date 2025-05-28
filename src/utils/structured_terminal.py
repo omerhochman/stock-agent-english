@@ -339,9 +339,19 @@ class StructuredTerminalOutput:
                 # 提取信号和置信度（如果有）
                 if "signal" in data:
                     signal = data.get("signal", "")
-                    signal_icon = STATUS_ICONS.get(signal.lower(), "")
+                    # 确保signal是字符串类型
+                    if isinstance(signal, (int, float)):
+                        # 将数值信号转换为字符串
+                        if signal > 0.2:
+                            signal = "bullish"
+                        elif signal < -0.2:
+                            signal = "bearish"
+                        else:
+                            signal = "neutral"
+                    signal_str = str(signal)
+                    signal_icon = STATUS_ICONS.get(signal_str.lower(), "")
                     result.append(
-                        f"{SYMBOLS['vertical']} 信号: {signal_icon} {signal}")
+                        f"{SYMBOLS['vertical']} 信号: {signal_icon} {signal_str}")
 
                 if "confidence" in data:
                     conf = data.get("confidence", "")
