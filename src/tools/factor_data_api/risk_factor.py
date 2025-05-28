@@ -198,10 +198,18 @@ class RiskFactorAPI:
         daily_rf = (1 + risk_free_rate) ** (1 / 252) - 1
         excess_return = annualized_return - risk_free_rate
         
-        if annualized_volatility == 0:
+        # 检查数值稳定性
+        if annualized_volatility == 0 or np.isclose(annualized_volatility, 0, atol=1e-10):
+            return 0.0
+        
+        if not np.isfinite(annualized_volatility) or not np.isfinite(excess_return):
             return 0.0
         
         sharpe_ratio = excess_return / annualized_volatility
+        
+        # 确保返回有限值
+        if not np.isfinite(sharpe_ratio):
+            return 0.0
         
         return sharpe_ratio
     

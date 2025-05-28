@@ -8,6 +8,7 @@ from src.tools.api import prices_to_df
 import json
 import ast
 import pandas as pd
+import logging
 
 # 获取日志记录器
 logger = setup_logger('debate_room')
@@ -68,12 +69,16 @@ def debate_room_agent(state: AgentState):
                         
                         if msg.name in agent_type_mapping:
                             signal_type = agent_type_mapping[msg.name]
+                            # 确保信号值的正确处理
+                            raw_signal = content.get('signal', 'neutral')
+                            confidence = content.get('confidence', 0.5)
+                            
                             agent_signals[signal_type] = {
-                                'signal': content.get('signal', 0),
-                                'confidence': content.get('confidence', 0.5),
+                                'signal': raw_signal,
+                                'confidence': confidence,
                                 'raw_data': content
                             }
-                            logger.debug(f"收集到{signal_type}信号: {content.get('signal', 0)} (置信度: {content.get('confidence', 0.5)})")
+                            logger.debug(f"收集到{signal_type}信号: {raw_signal} (置信度: {confidence})")
                         
                         # 同时保持原有的研究员逻辑
                         if msg.name.startswith("researcher_"):
@@ -96,6 +101,16 @@ def debate_room_agent(state: AgentState):
             final_confidence = aggregated_result['aggregated_confidence']
             
             logger.info(f"自适应信号聚合结果: {final_signal:.3f} (置信度: {final_confidence:.3f})")
+            logger.debug(f"原始信号: {aggregated_result.get('original_signal', 'N/A'):.3f}, "
+                        f"应用衰减: {aggregated_result.get('attenuation_applied', False)}, "
+                        f"动态阈值: {aggregated_result.get('dynamic_threshold', 'N/A')}")
+            
+            # 记录各信号的具体贡献
+            for signal_type, contribution in aggregated_result.get('signal_contributions', {}).items():
+                logger.debug(f"{signal_type} 贡献: 信号={contribution['signal']}, "
+                           f"置信度={contribution['confidence']:.3f}, "
+                           f"权重={contribution['weight']:.3f}, "
+                           f"贡献值={contribution['contribution']:.4f}")
             
             # 创建增强的分析报告
             enhanced_analysis = {
@@ -155,15 +170,31 @@ def debate_room_agent(state: AgentState):
                 adaptive_weight = 0.7 if regime_confidence > 0.6 else 0.5
                 llm_weight = 1 - adaptive_weight
                 
-                enhanced_analysis['signal'] = (
-                    adaptive_weight * enhanced_analysis['signal'] + 
+                # 确保信号是数值格式用于融合
+                current_signal = enhanced_analysis['signal']
+                if isinstance(current_signal, str):
+                    # 将字符串信号转换为数值
+                    signal_mapping = {'bullish': 1.0, 'neutral': 0.0, 'bearish': -1.0}
+                    numeric_signal = signal_mapping.get(current_signal.lower(), 0.0)
+                else:
+                    numeric_signal = float(current_signal)
+                
+                # 执行融合
+                fused_signal = (
+                    adaptive_weight * numeric_signal + 
                     llm_weight * llm_enhanced_analysis['llm_score']
                 )
+                
+                enhanced_analysis['signal'] = fused_signal
                 enhanced_analysis['llm_analysis'] = llm_enhanced_analysis
                 enhanced_analysis['fusion_weights'] = {
                     'adaptive_aggregation': adaptive_weight,
                     'llm_analysis': llm_weight
                 }
+                enhanced_analysis['original_signal'] = current_signal  # 保留原始信号用于调试
+
+        # 转换数值信号为字符串信号（为了与风险管理器兼容）
+        enhanced_analysis = _convert_numeric_signal_to_string(enhanced_analysis)
 
         # 创建最终消息
         message = HumanMessage(
@@ -186,7 +217,7 @@ def debate_room_agent(state: AgentState):
         logger.error(f"辩论室处理过程中发生错误: {e}")
         # 返回默认中性结果
         default_analysis = {
-            "signal": 0,
+            "signal": "neutral",
             "confidence": 0.3,
             "error": str(e),
             "aggregation_method": "error_fallback"
@@ -209,10 +240,29 @@ def _traditional_debate_logic(state: AgentState, researcher_messages: dict, logg
     # 这里实现原有的简单平均逻辑作为回退
     if len(researcher_messages) < 2:
         return {
-            "signal": 0,
+            "signal": "neutral",
             "confidence": 0.3,
             "aggregation_method": "insufficient_data"
         }
+    
+    def _parse_confidence(conf_value):
+        """解析置信度值，支持字符串和数值格式"""
+        if isinstance(conf_value, str):
+            if conf_value.endswith('%'):
+                try:
+                    return float(conf_value[:-1]) / 100.0
+                except ValueError:
+                    return 0.5
+            try:
+                return float(conf_value)
+            except ValueError:
+                return 0.5
+        elif isinstance(conf_value, (int, float)):
+            if conf_value > 1.0:
+                return conf_value / 100.0
+            return float(conf_value)
+        else:
+            return 0.5
     
     # 转换研究员观点为数值信号
     perspective_values = {
@@ -231,7 +281,10 @@ def _traditional_debate_logic(state: AgentState, researcher_messages: dict, logg
             data = json.loads(msg.content)
             # 研究员使用 perspective 而不是 signal
             perspective = data.get('perspective', 'neutral')
-            confidence = data.get('confidence', 0.5)
+            raw_confidence = data.get('confidence', 0.5)
+            
+            # 解析置信度
+            confidence = _parse_confidence(raw_confidence)
             
             # 转换观点为数值
             numeric_signal = perspective_values.get(perspective, 0.0)
@@ -239,7 +292,8 @@ def _traditional_debate_logic(state: AgentState, researcher_messages: dict, logg
             total_signal += numeric_signal * confidence
             total_confidence += confidence
             count += 1
-        except:
+        except Exception as e:
+            logger.warning(f"解析研究员 {name} 数据时出错: {e}")
             continue
     
     if count > 0:
@@ -249,8 +303,16 @@ def _traditional_debate_logic(state: AgentState, researcher_messages: dict, logg
         avg_signal = 0
         avg_confidence = 0.3
     
+    # 转换数值信号为字符串信号
+    if avg_signal > 0.1:  # 从0.2降低到0.1
+        signal_str = "bullish"
+    elif avg_signal < -0.1:  # 从-0.2降低到-0.1
+        signal_str = "bearish"
+    else:
+        signal_str = "neutral"
+    
     return {
-        "signal": avg_signal,
+        "signal": signal_str,
         "confidence": avg_confidence,
         "aggregation_method": "traditional_average"
     }
@@ -258,11 +320,33 @@ def _traditional_debate_logic(state: AgentState, researcher_messages: dict, logg
 
 def _get_llm_enhanced_analysis(researcher_data: dict, agent_signals: dict, current_regime: dict, state: AgentState, logger) -> dict:
     """获取LLM增强分析"""
+    
+    def _parse_confidence_for_display(conf_value):
+        """解析置信度值用于显示"""
+        if isinstance(conf_value, str):
+            if conf_value.endswith('%'):
+                try:
+                    return float(conf_value[:-1]) / 100.0
+                except ValueError:
+                    return 0.5
+            try:
+                return float(conf_value)
+            except ValueError:
+                return 0.5
+        elif isinstance(conf_value, (int, float)):
+            if conf_value > 1.0:
+                return conf_value / 100.0
+            return float(conf_value)
+        else:
+            return 0.5
+    
     # 构建发送给 LLM 的提示（保持原有逻辑但增强）
+    regime_confidence = _parse_confidence_for_display(current_regime.get('confidence', 0))
+    
     llm_prompt = f"""
 You are a professional financial analyst. Analyze the following investment research and provide your third-party analysis.
 
-Current Market Regime: {current_regime.get('regime_name', 'unknown')} (Confidence: {current_regime.get('confidence', 0):.2f})
+Current Market Regime: {current_regime.get('regime_name', 'unknown')} (Confidence: {regime_confidence:.2f})
 
 RESEARCH PERSPECTIVES:
 """
@@ -270,7 +354,8 @@ RESEARCH PERSPECTIVES:
     # 添加研究员观点
     for name, data in researcher_data.items():
         perspective = name.replace("researcher_", "").replace("_agent", "").upper()
-        llm_prompt += f"\n{perspective} VIEW (Confidence: {data.get('confidence', 0)}):\n"
+        researcher_confidence = _parse_confidence_for_display(data.get('confidence', 0))
+        llm_prompt += f"\n{perspective} VIEW (Confidence: {researcher_confidence:.2f}):\n"
         for point in data.get("thesis_points", []):
             llm_prompt += f"- {point}\n"
     
@@ -278,12 +363,23 @@ RESEARCH PERSPECTIVES:
     if agent_signals:
         llm_prompt += f"\nQUANTITATIVE SIGNALS:\n"
         for signal_type, signal_data in agent_signals.items():
-            llm_prompt += f"- {signal_type.title()}: {signal_data.get('signal', 0):.2f} (Confidence: {signal_data.get('confidence', 0):.2f})\n"
+            signal_value = signal_data.get('signal', 'neutral')
+            confidence_value = signal_data.get('confidence', 0)
+            
+            # 处理信号值显示
+            if isinstance(signal_value, str):
+                signal_display = signal_value
+            else:
+                signal_display = f"{signal_value:.2f}"
+            
+            # 处理置信度显示
+            parsed_confidence = _parse_confidence_for_display(confidence_value)
+            llm_prompt += f"- {signal_type.title()}: {signal_display} (Confidence: {parsed_confidence:.2f})\n"
     
     llm_prompt += f"""
 MARKET REGIME CONTEXT:
 - Detected regime: {current_regime.get('regime_name', 'unknown')}
-- Regime confidence: {current_regime.get('confidence', 0):.2f}
+- Regime confidence: {regime_confidence:.2f}
 
 Please provide your analysis in the following JSON format:
 {{
@@ -328,3 +424,25 @@ Ensure your response is valid JSON format and includes all fields above. Respond
         logger.error(f"LLM增强分析失败: {e}")
     
     return {"llm_score": 0, "error": "LLM analysis failed"}
+
+
+def _convert_numeric_signal_to_string(analysis: dict) -> dict:
+    """将数值信号转换为字符串信号"""
+    if "signal" in analysis and isinstance(analysis["signal"], (int, float)):
+        numeric_signal = analysis["signal"]
+        original_signal = numeric_signal
+        
+        # 降低转换阈值使系统对较小信号更敏感
+        if numeric_signal > 0.1:  # 从0.2降低到0.1
+            analysis["signal"] = "bullish"
+        elif numeric_signal < -0.1:  # 从-0.2降低到-0.1
+            analysis["signal"] = "bearish"
+        else:
+            analysis["signal"] = "neutral"
+        
+        # 添加转换日志用于调试
+        logger = logging.getLogger(__name__)
+        logger.info(f"信号转换: {original_signal:.4f} -> {analysis['signal']} "
+                   f"(阈值: ±0.1)")  # 改为INFO级别以便在日志中可见
+    
+    return analysis

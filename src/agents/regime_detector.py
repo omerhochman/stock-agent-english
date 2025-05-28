@@ -35,26 +35,27 @@ class AdvancedRegimeDetector:
         features['returns'] = returns
         features['log_returns'] = np.log(1 + returns)
         
-        # 波动率特征 (多时间尺度)
+        # 波动率特征 (多时间尺度) - 使用更短的窗口以保留更多数据
         features['volatility_5d'] = returns.rolling(5).std()
-        features['volatility_21d'] = returns.rolling(21).std()
-        features['volatility_63d'] = returns.rolling(63).std()
-        features['volatility_ratio'] = features['volatility_5d'] / features['volatility_21d']
+        features['volatility_10d'] = returns.rolling(10).std()  # 改为10天而不是21天
+        features['volatility_20d'] = returns.rolling(20).std()  # 改为20天而不是63天
+        features['volatility_ratio'] = features['volatility_5d'] / features['volatility_10d']
         
-        # 趋势特征
+        # 趋势特征 - 使用更短的窗口
+        features['price_ma_ratio_10'] = prices_df['close'] / prices_df['close'].rolling(10).mean()
         features['price_ma_ratio_20'] = prices_df['close'] / prices_df['close'].rolling(20).mean()
-        features['price_ma_ratio_50'] = prices_df['close'] / prices_df['close'].rolling(50).mean()
-        features['ma_slope_20'] = prices_df['close'].rolling(20).mean().pct_change(5)
+        features['ma_slope_10'] = prices_df['close'].rolling(10).mean().pct_change(3)
         
         # 动量特征
+        features['momentum_3d'] = returns.rolling(3).sum()
         features['momentum_5d'] = returns.rolling(5).sum()
-        features['momentum_21d'] = returns.rolling(21).sum()
-        features['rsi'] = self._calculate_rsi(prices_df['close'])
+        features['momentum_10d'] = returns.rolling(10).sum()
+        features['rsi'] = self._calculate_rsi(prices_df['close'], period=10)  # 使用更短周期
         
         # 成交量特征 (如果有成交量数据)
         if 'volume' in prices_df.columns:
-            features['volume_ma_ratio'] = prices_df['volume'] / prices_df['volume'].rolling(20).mean()
-            features['price_volume_trend'] = (returns * np.log(1 + prices_df['volume'].pct_change())).rolling(10).mean()
+            features['volume_ma_ratio'] = prices_df['volume'] / prices_df['volume'].rolling(10).mean()
+            features['price_volume_trend'] = (returns * np.log(1 + prices_df['volume'].pct_change())).rolling(5).mean()
         
         # 市场微观结构特征
         features['high_low_ratio'] = (prices_df['high'] - prices_df['low']) / prices_df['close']
@@ -63,8 +64,11 @@ class AdvancedRegimeDetector:
         # 跳跃检测 (基于Barndorff-Nielsen & Shephard测试)
         features['jump_indicator'] = self._detect_jumps(returns)
         
-        # 长记忆性特征 (Hurst指数)
-        features['hurst_21d'] = returns.rolling(21).apply(lambda x: self._calculate_hurst(x) if len(x) >= 10 else np.nan)
+        # 长记忆性特征 (Hurst指数) - 使用更短窗口
+        features['hurst_10d'] = returns.rolling(10).apply(lambda x: self._calculate_hurst(x) if len(x) >= 8 else np.nan)
+        
+        # 填充初始的NaN值，使用前向填充和后向填充
+        features = features.fillna(method='bfill').fillna(method='ffill')
         
         return features.dropna()
     
@@ -74,24 +78,32 @@ class AdvancedRegimeDetector:
         gain = (delta.where(delta > 0, 0)).rolling(window=period).mean()
         loss = (-delta.where(delta < 0, 0)).rolling(window=period).mean()
         rs = gain / loss
-        return 100 - (100 / (1 + rs))
+        rsi = 100 - (100 / (1 + rs))
+        return rsi.fillna(50)  # 用中性值50填充NaN
     
-    def _detect_jumps(self, returns: pd.Series, threshold: float = 3.0) -> pd.Series:
-        """检测价格跳跃"""
-        rolling_std = returns.rolling(21).std()
+    def _detect_jumps(self, returns: pd.Series, threshold: float = 2.5) -> pd.Series:
+        """检测价格跳跃 - 降低阈值以增加敏感性"""
+        rolling_std = returns.rolling(10).std()  # 使用更短窗口
         standardized_returns = returns / rolling_std
-        return (np.abs(standardized_returns) > threshold).astype(int)
+        jumps = (np.abs(standardized_returns) > threshold).astype(int)
+        return jumps.fillna(0)  # 用0填充NaN
     
     def _calculate_hurst(self, ts: pd.Series) -> float:
         """计算Hurst指数"""
         try:
-            if len(ts) < 10:
+            if len(ts) < 8:
                 return 0.5
             
-            lags = range(2, min(len(ts)//2, 20))
+            lags = range(2, min(len(ts)//2, 10))  # 减少lag范围
+            if len(lags) < 2:
+                return 0.5
+                
             tau = [np.sqrt(np.std(np.subtract(ts[lag:], ts[:-lag]))) for lag in lags]
+            if any(t <= 0 for t in tau):
+                return 0.5
+                
             poly = np.polyfit(np.log(lags), np.log(tau), 1)
-            return poly[0] * 2.0
+            return max(0.1, min(0.9, poly[0] * 2.0))  # 限制在合理范围内
         except:
             return 0.5
     
@@ -99,47 +111,172 @@ class AdvancedRegimeDetector:
         """
         拟合高斯混合模型进行区制识别
         """
-        # 选择关键特征进行建模
-        key_features = [
-            'returns', 'volatility_21d', 'volatility_ratio', 
-            'price_ma_ratio_20', 'momentum_21d', 'rsi',
-            'high_low_ratio', 'jump_indicator', 'hurst_21d'
-        ]
-        
-        # 过滤存在的特征
-        available_features = [f for f in key_features if f in features.columns]
-        model_data = features[available_features].dropna()
-        
-        if len(model_data) < 50:
-            return {"error": "Insufficient data for regime modeling"}
-        
-        # 标准化特征
-        scaled_features = self.scaler.fit_transform(model_data)
-        
-        # 拟合高斯混合模型
-        self.regime_model = GaussianMixture(
-            n_components=self.n_regimes,
-            covariance_type='full',
-            random_state=42,
-            max_iter=200
-        )
-        
-        self.regime_model.fit(scaled_features)
-        
-        # 预测区制
-        regime_probs = self.regime_model.predict_proba(scaled_features)
-        regime_labels = self.regime_model.predict(scaled_features)
-        
-        # 计算区制特征
-        regime_stats = self._analyze_regime_characteristics(model_data, regime_labels)
-        
-        return {
-            "regime_probabilities": regime_probs,
-            "regime_labels": regime_labels,
-            "regime_characteristics": regime_stats,
-            "model_score": self.regime_model.score(scaled_features),
-            "feature_names": available_features
-        }
+        try:
+            # 选择关键特征进行建模 - 使用更基础的特征
+            key_features = [
+                'returns', 'volatility_10d', 'volatility_ratio', 
+                'price_ma_ratio_10', 'momentum_5d', 'rsi',
+                'high_low_ratio', 'jump_indicator', 'hurst_10d'
+            ]
+            
+            # 过滤存在的特征
+            available_features = [f for f in key_features if f in features.columns]
+            model_data = features[available_features].dropna()
+            
+            # 降低数据要求阈值
+            if len(model_data) < 20:  # 从50降低到20
+                # 数据不足时使用简化的区制检测
+                return self._simplified_regime_detection(features)
+            
+            # 标准化特征
+            scaled_features = self.scaler.fit_transform(model_data)
+            
+            # 拟合高斯混合模型
+            temp_model = GaussianMixture(
+                n_components=self.n_regimes,
+                covariance_type='diag',  # 改为对角协方差矩阵，减少参数
+                random_state=42,
+                max_iter=100,  # 减少迭代次数
+                init_params='kmeans'  # 使用kmeans初始化
+            )
+            
+            temp_model.fit(scaled_features)
+            
+            # 只有拟合成功后才设置模型
+            self.regime_model = temp_model
+            
+            # 预测区制
+            regime_probs = self.regime_model.predict_proba(scaled_features)
+            regime_labels = self.regime_model.predict(scaled_features)
+            
+            # 计算区制特征
+            regime_stats = self._analyze_regime_characteristics(model_data, regime_labels)
+            
+            return {
+                "regime_probabilities": regime_probs,
+                "regime_labels": regime_labels,
+                "regime_characteristics": regime_stats,
+                "model_score": self.regime_model.score(scaled_features),
+                "feature_names": available_features
+            }
+        except Exception as e:
+            # 拟合失败时不设置模型，返回错误信息
+            return {"error": f"Model fitting failed: {str(e)}"}
+    
+    def _simplified_regime_detection(self, features: pd.DataFrame) -> Dict:
+        """
+        简化的区制检测，用于数据不足的情况
+        基于基本的统计特征进行区制分类
+        """
+        try:
+            # 使用基本特征进行简化分析
+            basic_features = ['returns']
+            if 'volatility_5d' in features.columns:
+                basic_features.append('volatility_5d')
+            if 'momentum_3d' in features.columns:
+                basic_features.append('momentum_3d')
+            
+            available_data = features[basic_features].dropna()
+            
+            # 进一步降低数据要求
+            if len(available_data) < 5:  # 从10降低到5
+                # 即使数据极少，也尝试基于最基本的统计进行分类
+                if 'returns' in features.columns and len(features['returns'].dropna()) >= 3:
+                    returns = features['returns'].dropna()
+                    avg_return = returns.mean()
+                    volatility = returns.std()
+                    
+                    # 极简分类逻辑
+                    if volatility > 0.02:  # 高波动
+                        regime_name = "high_volatility_mean_reverting"
+                        confidence = 0.3
+                    elif avg_return > 0.001:  # 正收益
+                        regime_name = "low_volatility_trending"
+                        confidence = 0.3
+                    elif avg_return < -0.001:  # 负收益
+                        regime_name = "crisis_regime"
+                        confidence = 0.4
+                    else:
+                        regime_name = "low_volatility_trending"  # 默认
+                        confidence = 0.2
+                    
+                    return {
+                        "simplified_regime": True,
+                        "regime_name": regime_name,
+                        "confidence": confidence,
+                        "data_points": len(returns),
+                        "avg_return": float(avg_return),
+                        "volatility": float(volatility),
+                        "note": "Used minimal data regime detection"
+                    }
+                else:
+                    # 完全没有数据时的默认处理
+                    return {
+                        "simplified_regime": True,
+                        "regime_name": "low_volatility_trending",  # 默认为低波动趋势
+                        "confidence": 0.1,
+                        "data_points": 0,
+                        "avg_return": 0.0,
+                        "volatility": 0.01,
+                        "note": "Default regime due to insufficient data"
+                    }
+            
+            # 计算基本统计量
+            returns = available_data['returns']
+            avg_return = returns.mean()
+            volatility = returns.std()
+            
+            # 计算额外指标
+            recent_volatility = returns.tail(min(10, len(returns))).std()
+            vol_trend = recent_volatility / volatility if volatility > 0 else 1.0
+            
+            # 改进的区制分类逻辑
+            if volatility > 0.025:  # 高波动阈值
+                if avg_return < -0.005:  # 显著负收益
+                    regime_name = "crisis_regime"
+                    confidence = 0.7
+                else:
+                    regime_name = "high_volatility_mean_reverting"
+                    confidence = 0.6
+            elif volatility > 0.015:  # 中等波动
+                if abs(avg_return) > 0.003:  # 有明显趋势
+                    regime_name = "low_volatility_trending"
+                    confidence = 0.5
+                else:
+                    regime_name = "high_volatility_mean_reverting"
+                    confidence = 0.4
+            else:  # 低波动
+                regime_name = "low_volatility_trending"
+                confidence = 0.5
+            
+            # 基于波动率趋势调整
+            if vol_trend > 1.5:  # 波动率快速上升
+                if regime_name == "low_volatility_trending":
+                    regime_name = "high_volatility_mean_reverting"
+                confidence *= 0.9
+            
+            return {
+                "simplified_regime": True,
+                "regime_name": regime_name,
+                "confidence": confidence,
+                "data_points": len(available_data),
+                "avg_return": float(avg_return),
+                "volatility": float(volatility),
+                "vol_trend": float(vol_trend),
+                "note": "Used simplified regime detection"
+            }
+            
+        except Exception as e:
+            # 即使简化检测失败，也返回一个默认区制而不是错误
+            return {
+                "simplified_regime": True,
+                "regime_name": "low_volatility_trending",  # 默认区制
+                "confidence": 0.1,
+                "data_points": 0,
+                "avg_return": 0.0,
+                "volatility": 0.01,
+                "error": f"Simplified detection failed: {str(e)}, using default regime"
+            }
     
     def _analyze_regime_characteristics(self, data: pd.DataFrame, labels: np.ndarray) -> Dict:
         """分析各个区制的特征"""
@@ -152,8 +289,8 @@ class AdvancedRegimeDetector:
             if len(regime_data) > 0:
                 regime_chars[regime] = {
                     "avg_return": float(regime_data['returns'].mean()),
-                    "volatility": float(regime_data['volatility_21d'].mean()),
-                    "momentum": float(regime_data['momentum_21d'].mean()),
+                    "volatility": float(regime_data['volatility_10d'].mean()),
+                    "momentum": float(regime_data['momentum_5d'].mean()),
                     "frequency": float(np.sum(regime_mask) / len(labels)),
                     "avg_duration": self._calculate_avg_duration(regime_mask),
                     "regime_name": self._classify_regime(regime_data)
@@ -181,11 +318,11 @@ class AdvancedRegimeDetector:
     
     def _classify_regime(self, regime_data: pd.DataFrame) -> str:
         """基于特征自动分类区制类型"""
-        avg_vol = regime_data['volatility_21d'].mean()
-        avg_momentum = regime_data['momentum_21d'].mean()
+        avg_vol = regime_data['volatility_10d'].mean()
+        avg_momentum = regime_data['momentum_5d'].mean()
         avg_return = regime_data['returns'].mean()
         
-        if avg_vol > regime_data['volatility_21d'].quantile(0.7):
+        if avg_vol > regime_data['volatility_10d'].quantile(0.7):
             if avg_return < -0.001:
                 return "crisis_regime"
             else:
@@ -199,22 +336,53 @@ class AdvancedRegimeDetector:
     def predict_current_regime(self, features: pd.DataFrame) -> Dict:
         """预测当前市场区制"""
         if self.regime_model is None:
-            return {"error": "Model not fitted"}
+            # 如果没有完整模型，尝试使用简化检测
+            simplified_result = self._simplified_regime_detection(features)
+            
+            # 简化检测现在总是返回一个有效的区制，不会返回错误
+            return {
+                "regime_name": simplified_result.get("regime_name", "low_volatility_trending"),
+                "confidence": simplified_result.get("confidence", 0.1),
+                "predicted_regime": -1,
+                "regime_probabilities": {},
+                "simplified": True,
+                "data_points": simplified_result.get("data_points", 0),
+                "note": simplified_result.get("note", "Used simplified detection"),
+                "avg_return": simplified_result.get("avg_return", 0.0),
+                "volatility": simplified_result.get("volatility", 0.01)
+            }
         
-        # 获取最新特征
-        latest_features = features.iloc[-1:][self.regime_model.feature_names_in_]
-        scaled_features = self.scaler.transform(latest_features)
-        
-        # 预测区制概率
-        regime_probs = self.regime_model.predict_proba(scaled_features)[0]
-        predicted_regime = np.argmax(regime_probs)
-        
-        return {
-            "predicted_regime": int(predicted_regime),
-            "regime_name": self.regime_names.get(predicted_regime, f"regime_{predicted_regime}"),
-            "regime_probabilities": {f"regime_{i}": float(prob) for i, prob in enumerate(regime_probs)},
-            "confidence": float(np.max(regime_probs))
-        }
+        try:
+            # 获取最新特征
+            latest_features = features.iloc[-1:][self.regime_model.feature_names_in_]
+            scaled_features = self.scaler.transform(latest_features)
+            
+            # 预测区制概率
+            regime_probs = self.regime_model.predict_proba(scaled_features)[0]
+            predicted_regime = np.argmax(regime_probs)
+            
+            return {
+                "predicted_regime": int(predicted_regime),
+                "regime_name": self.regime_names.get(predicted_regime, f"regime_{predicted_regime}"),
+                "regime_probabilities": {f"regime_{i}": float(prob) for i, prob in enumerate(regime_probs)},
+                "confidence": float(np.max(regime_probs)),
+                "simplified": False
+            }
+        except Exception as e:
+            # 如果预测过程中出现任何错误，尝试简化检测
+            simplified_result = self._simplified_regime_detection(features)
+            
+            # 简化检测现在总是返回一个有效的区制
+            return {
+                "regime_name": simplified_result.get("regime_name", "low_volatility_trending"),
+                "confidence": simplified_result.get("confidence", 0.1),
+                "predicted_regime": -1,
+                "regime_probabilities": {},
+                "simplified": True,
+                "error": f"Full prediction failed, used simplified: {str(e)}",
+                "data_points": simplified_result.get("data_points", 0),
+                "note": simplified_result.get("note", "Fallback to simplified detection")
+            }
 
 def adaptive_signal_aggregation(signals: Dict, regime_info: Dict, confidence_threshold: float = 0.6) -> Dict:
     """
@@ -223,6 +391,13 @@ def adaptive_signal_aggregation(signals: Dict, regime_info: Dict, confidence_thr
     """
     regime_name = regime_info.get("regime_name", "unknown")
     regime_confidence = regime_info.get("confidence", 0.5)
+    
+    # 信号值映射
+    signal_value_mapping = {
+        'bullish': 1.0,
+        'neutral': 0.0,
+        'bearish': -1.0
+    }
     
     # 基础权重 (来自FINSABER 2024研究)
     base_weights = {
@@ -274,11 +449,46 @@ def adaptive_signal_aggregation(signals: Dict, regime_info: Dict, confidence_thr
     weighted_confidence = 0
     signal_contributions = {}
     
+    def _parse_confidence(conf_value):
+        """解析置信度值，支持字符串和数值格式"""
+        if isinstance(conf_value, str):
+            # 处理百分比格式 (如 "50%")
+            if conf_value.endswith('%'):
+                try:
+                    return float(conf_value[:-1]) / 100.0
+                except ValueError:
+                    return 0.5
+            # 处理纯数字字符串
+            try:
+                return float(conf_value)
+            except ValueError:
+                return 0.5
+        elif isinstance(conf_value, (int, float)):
+            # 如果是数值，确保在0-1范围内
+            if conf_value > 1.0:
+                return conf_value / 100.0  # 假设是百分比形式
+            return float(conf_value)
+        else:
+            return 0.5  # 默认置信度
+    
     for signal_type, weight in adjusted_weights.items():
         if signal_type in signals:
             signal_data = signals[signal_type]
-            signal_value = signal_data.get('signal', 0)
-            signal_conf = signal_data.get('confidence', 0.5)
+            raw_signal = signal_data.get('signal', 'neutral')
+            raw_confidence = signal_data.get('confidence', 0.5)
+            
+            # 解析置信度
+            signal_conf = _parse_confidence(raw_confidence)
+            
+            # 应用最小置信度下限，避免过低的置信度完全抵消信号
+            signal_conf = max(signal_conf, 0.2)  # 最低置信度为0.2
+            
+            # 转换字符串信号为数值
+            if isinstance(raw_signal, str):
+                signal_value = signal_value_mapping.get(raw_signal.lower(), 0.0)
+            else:
+                # 如果已经是数值，直接使用
+                signal_value = float(raw_signal)
             
             # 使用置信度加权的信号值
             contribution = weight * signal_value * signal_conf
@@ -289,15 +499,19 @@ def adaptive_signal_aggregation(signals: Dict, regime_info: Dict, confidence_thr
                 'weight': weight,
                 'signal': signal_value,
                 'confidence': signal_conf,
+                'raw_confidence': raw_confidence,  # 保留原始置信度值用于调试
                 'contribution': contribution
             }
     
     # 应用动态阈值 (基于RLMF 2024技术)
-    dynamic_threshold = 0.3 if regime_name == "crisis_regime" else 0.2
+    dynamic_threshold = 0.15 if regime_name == "crisis_regime" else 0.1  # 降低阈值
     
-    # 信号强度调整
+    # 调整信号强度处理逻辑 - 避免过度衰减弱信号
+    original_signal = weighted_signal  # 保存原始信号用于调试
     if abs(weighted_signal) < dynamic_threshold:
-        weighted_signal *= 0.5  # 弱信号进一步衰减
+        # 使用更温和的衰减，而不是直接减半
+        attenuation_factor = 0.8 if abs(weighted_signal) < dynamic_threshold * 0.5 else 0.9
+        weighted_signal *= attenuation_factor
     
     return {
         "aggregated_signal": weighted_signal,
@@ -305,5 +519,7 @@ def adaptive_signal_aggregation(signals: Dict, regime_info: Dict, confidence_thr
         "regime_adjusted_weights": adjusted_weights,
         "signal_contributions": signal_contributions,
         "regime_info": regime_info,
-        "dynamic_threshold": dynamic_threshold
+        "dynamic_threshold": dynamic_threshold,
+        "original_signal": original_signal,  # 添加原始信号用于调试
+        "attenuation_applied": abs(original_signal) < dynamic_threshold  # 标记是否应用了衰减
     } 

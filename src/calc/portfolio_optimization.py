@@ -48,8 +48,19 @@ def portfolio_sharpe_ratio(weights: np.ndarray,
     p_ret = portfolio_return(weights, returns)
     p_vol = portfolio_volatility(weights, cov_matrix)
     
+    # 检查数值稳定性
+    if p_vol == 0 or np.isclose(p_vol, 0, atol=1e-10):
+        return 0.0
+    
+    if not np.isfinite(p_ret) or not np.isfinite(p_vol):
+        return 0.0
+    
     # 计算夏普比率
     sharpe = (p_ret - risk_free_rate) / p_vol
+    
+    # 确保返回有限值
+    if not np.isfinite(sharpe):
+        return 0.0
     
     return sharpe
 
