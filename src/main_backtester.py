@@ -135,6 +135,21 @@ def main():
     except Exception as e:
         logger.error(f"回测过程中发生错误: {str(e)}")
         logger.error("请检查配置参数和数据可用性")
+        
+        # 添加更详细的错误信息
+        import traceback
+        logger.error("详细错误信息:")
+        logger.error(traceback.format_exc())
+        
+        # 提供一些常见问题的解决建议
+        error_msg = str(e).lower()
+        if "broadcast" in error_msg:
+            logger.error("建议：这可能是数据维度不匹配的问题，请检查数据质量和长度")
+        elif "feature_names_in_" in error_msg:
+            logger.error("建议：这可能是模型特征名称的问题，请检查模型训练状态")
+        elif "insufficient data" in error_msg:
+            logger.error("建议：请增加回测时间范围或检查数据可用性")
+        
         sys.exit(1)
 
 def parse_arguments():

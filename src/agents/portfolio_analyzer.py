@@ -31,12 +31,25 @@ def portfolio_analyzer_agent(state: AgentState):
     if isinstance(tickers, str):
         tickers = [ticker.strip() for ticker in tickers.split(',')]
     
+    # 如果只有一个资产或没有资产，静默跳过投资组合分析
     if not tickers or len(tickers) < 2:
-        logger.warning("没有提供足够的资产代码进行投资组合分析")
-        message_content = {
-            "error": "投资组合分析需要至少2个资产代码",
-            "suggestion": "请提供多个资产代码，用逗号分隔，例如 '600519,000858,601398'"
-        }
+        # 对于单资产分析，不显示警告，直接返回简单的分析结果
+        if len(tickers) == 1:
+            logger.info(f"单资产分析模式: {tickers[0]}")
+            message_content = {
+                "analysis_type": "single_asset",
+                "ticker": tickers[0],
+                "note": "单资产分析，跳过投资组合优化",
+                "portfolio_analysis": None
+            }
+        else:
+            logger.info("未提供资产代码，跳过投资组合分析")
+            message_content = {
+                "analysis_type": "no_assets",
+                "note": "未提供资产代码，跳过投资组合分析",
+                "portfolio_analysis": None
+            }
+        
         message = HumanMessage(
             content=json.dumps(message_content),
             name="portfolio_analyzer_agent",

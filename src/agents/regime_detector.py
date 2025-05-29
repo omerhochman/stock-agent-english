@@ -17,6 +17,7 @@ class AdvancedRegimeDetector:
         self.lookback_window = lookback_window
         self.regime_model = None
         self.scaler = StandardScaler()
+        self.feature_names = None  # 手动存储特征名称
         self.regime_names = {
             0: "low_volatility_trending",
             1: "high_volatility_mean_reverting", 
@@ -28,23 +29,37 @@ class AdvancedRegimeDetector:
         提取多维度市场特征用于区制识别
         基于Lopez-Lira 2025框架的特征工程
         """
+        if prices_df.empty or len(prices_df) < 10:
+            # 如果数据太少，返回空的DataFrame
+            return pd.DataFrame()
+        
         features = pd.DataFrame(index=prices_df.index)
         
         # 价格相关特征
         returns = prices_df['close'].pct_change()
         features['returns'] = returns
-        features['log_returns'] = np.log(1 + returns)
+        
+        # 安全计算对数收益率，避免log(0)或log(负数)
+        safe_returns = returns.fillna(0)
+        safe_returns = np.where(safe_returns <= -1, -0.999, safe_returns)  # 避免log(0)
+        features['log_returns'] = np.log(1 + safe_returns)
         
         # 波动率特征 (多时间尺度) - 使用更短的窗口以保留更多数据
         features['volatility_5d'] = returns.rolling(5).std()
         features['volatility_10d'] = returns.rolling(10).std()  # 改为10天而不是21天
         features['volatility_20d'] = returns.rolling(20).std()  # 改为20天而不是63天
-        features['volatility_ratio'] = features['volatility_5d'] / features['volatility_10d']
+        
+        # 安全计算比率，避免除零
+        vol_5d = features['volatility_5d'].fillna(0.01)
+        vol_10d = features['volatility_10d'].fillna(0.01)
+        features['volatility_ratio'] = np.where(vol_10d != 0, vol_5d / vol_10d, 1.0)
         
         # 趋势特征 - 使用更短的窗口
-        features['price_ma_ratio_10'] = prices_df['close'] / prices_df['close'].rolling(10).mean()
-        features['price_ma_ratio_20'] = prices_df['close'] / prices_df['close'].rolling(20).mean()
-        features['ma_slope_10'] = prices_df['close'].rolling(10).mean().pct_change(3)
+        ma_10 = prices_df['close'].rolling(10).mean()
+        ma_20 = prices_df['close'].rolling(20).mean()
+        features['price_ma_ratio_10'] = np.where(ma_10 != 0, prices_df['close'] / ma_10, 1.0)
+        features['price_ma_ratio_20'] = np.where(ma_20 != 0, prices_df['close'] / ma_20, 1.0)
+        features['ma_slope_10'] = ma_10.pct_change(3)
         
         # 动量特征
         features['momentum_3d'] = returns.rolling(3).sum()
@@ -54,12 +69,22 @@ class AdvancedRegimeDetector:
         
         # 成交量特征 (如果有成交量数据)
         if 'volume' in prices_df.columns:
-            features['volume_ma_ratio'] = prices_df['volume'] / prices_df['volume'].rolling(10).mean()
-            features['price_volume_trend'] = (returns * np.log(1 + prices_df['volume'].pct_change())).rolling(5).mean()
+            volume_ma = prices_df['volume'].rolling(10).mean()
+            features['volume_ma_ratio'] = np.where(volume_ma != 0, prices_df['volume'] / volume_ma, 1.0)
+            
+            # 安全计算价格成交量趋势
+            volume_change = prices_df['volume'].pct_change().fillna(0)
+            safe_volume_change = np.where(volume_change <= -1, -0.999, volume_change)
+            features['price_volume_trend'] = (returns * np.log(1 + safe_volume_change)).rolling(5).mean()
         
         # 市场微观结构特征
-        features['high_low_ratio'] = (prices_df['high'] - prices_df['low']) / prices_df['close']
-        features['close_position'] = (prices_df['close'] - prices_df['low']) / (prices_df['high'] - prices_df['low'])
+        high_low_diff = prices_df['high'] - prices_df['low']
+        features['high_low_ratio'] = np.where(prices_df['close'] != 0, high_low_diff / prices_df['close'], 0.0)
+        
+        # 安全计算收盘位置
+        hl_range = prices_df['high'] - prices_df['low']
+        close_low_diff = prices_df['close'] - prices_df['low']
+        features['close_position'] = np.where(hl_range != 0, close_low_diff / hl_range, 0.5)
         
         # 跳跃检测 (基于Barndorff-Nielsen & Shephard测试)
         features['jump_indicator'] = self._detect_jumps(returns)
@@ -68,7 +93,11 @@ class AdvancedRegimeDetector:
         features['hurst_10d'] = returns.rolling(10).apply(lambda x: self._calculate_hurst(x) if len(x) >= 8 else np.nan)
         
         # 填充初始的NaN值，使用前向填充和后向填充
-        features = features.fillna(method='bfill').fillna(method='ffill')
+        features = features.bfill().ffill()
+        
+        # 最终检查：确保没有无穷大或NaN值
+        features = features.replace([np.inf, -np.inf], np.nan)
+        features = features.fillna(0)
         
         return features.dropna()
     
@@ -144,6 +173,8 @@ class AdvancedRegimeDetector:
             
             # 只有拟合成功后才设置模型
             self.regime_model = temp_model
+            # 手动存储特征名称，因为GaussianMixture没有feature_names_in_属性
+            self.feature_names = available_features
             
             # 预测区制
             regime_probs = self.regime_model.predict_proba(scaled_features)
@@ -335,7 +366,7 @@ class AdvancedRegimeDetector:
     
     def predict_current_regime(self, features: pd.DataFrame) -> Dict:
         """预测当前市场区制"""
-        if self.regime_model is None:
+        if self.regime_model is None or self.feature_names is None:
             # 如果没有完整模型，尝试使用简化检测
             simplified_result = self._simplified_regime_detection(features)
             
@@ -354,7 +385,7 @@ class AdvancedRegimeDetector:
         
         try:
             # 获取最新特征
-            latest_features = features.iloc[-1:][self.regime_model.feature_names_in_]
+            latest_features = features.iloc[-1:][self.feature_names]
             scaled_features = self.scaler.transform(latest_features)
             
             # 预测区制概率

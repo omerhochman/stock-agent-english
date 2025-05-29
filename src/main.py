@@ -3,6 +3,7 @@ import argparse
 import uuid
 import threading
 import uvicorn
+import logging
 
 from datetime import datetime, timedelta
 from langgraph.graph import END, StateGraph
@@ -27,7 +28,8 @@ from src.agents.portfolio_analyzer import portfolio_analyzer_agent
 from src.agents.ai_model_analyst import ai_model_analyst_agent 
 
 # --- Logging Imports ---
-from src.utils.output_logger import OutputLogger
+from src.utils.output_logger import SimpleConsoleLogger
+from src.utils.logging_config import setup_global_logging, set_console_level
 from src.utils.llm_interaction_logger import (
     set_global_log_storage,
     get_log_storage,
@@ -53,9 +55,12 @@ try:
 except ImportError:
     HAS_STRUCTURED_OUTPUT = False
 
-# Initialize standard output logging
-# This will create a timestamped log file in the logs directory
-sys.stdout = OutputLogger()
+# Initialize logging system
+# 设置全局日志配置：控制台只显示WARNING及以上，文件记录所有级别
+setup_global_logging(console_level=logging.WARNING, file_level=logging.DEBUG)
+
+# Use simple console logger that doesn't create additional files
+sys.stdout = SimpleConsoleLogger()
 
 # 1. Initialize Log Storage
 log_storage = get_log_storage()
@@ -259,8 +264,24 @@ if __name__ == "__main__":
                         help='Initial stock position (default: 0)')
     parser.add_argument('--summary', action='store_true',
                         help='Show beautiful summary report at the end')
+    parser.add_argument('--log-level', type=str, default='WARNING',
+                        choices=['DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL'],
+                        help='Console log level (default: WARNING)')
+    parser.add_argument('--verbose', '-v', action='store_true',
+                        help='Enable verbose output (equivalent to --log-level INFO)')
 
     args = parser.parse_args()
+
+    # 根据参数设置日志级别
+    if args.verbose:
+        log_level = logging.INFO
+    else:
+        log_level = getattr(logging, args.log_level.upper())
+    
+    # 重新设置控制台日志级别
+    set_console_level(log_level)
+    
+    print(f"日志级别设置为: {logging.getLevelName(log_level)}")
 
     # --- Date Handling ---
     current_date = datetime.now()

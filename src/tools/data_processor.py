@@ -1,6 +1,7 @@
 import pandas as pd
 from datetime import datetime
 from typing import Dict, Any, List, Union
+import numpy as np
 
 class DataProcessor:
     """数据处理类，提供数据清洗、转换和增强功能"""
@@ -15,7 +16,7 @@ class DataProcessor:
         Returns:
             处理后的DataFrame
         """
-        if df.empty:
+        if df.empty or len(df) < 5:
             return df
         
         # 创建副本避免修改原始数据
@@ -30,8 +31,12 @@ class DataProcessor:
         # 3. 计算派生指标
         processed_df = self._calculate_derived_metrics(processed_df)
         
-        # 4. 排序数据
-        processed_df = processed_df.sort_values('date', ascending=True)
+        # 4. 最终数据清理
+        processed_df = self._final_data_cleanup(processed_df)
+        
+        # 5. 排序数据
+        if 'date' in processed_df.columns:
+            processed_df = processed_df.sort_values('date', ascending=True)
         
         return processed_df
     
@@ -87,23 +92,51 @@ class DataProcessor:
         if 'daily_return' not in df.columns:
             df['daily_return'] = df['close'].pct_change()
         
-        # 计算真实波动幅度
+        # 计算真实波动幅度 - 修复潜在的广播错误
         if 'true_range' not in df.columns:
             high_low = df['high'] - df['low']
             high_close_prev = (df['high'] - df['close'].shift(1)).abs()
             low_close_prev = (df['low'] - df['close'].shift(1)).abs()
-            df['true_range'] = pd.concat([high_low, high_close_prev, low_close_prev], axis=1).max(axis=1)
+            
+            # 确保所有序列长度一致，处理NaN值
+            high_low = high_low.fillna(0)
+            high_close_prev = high_close_prev.fillna(0)
+            low_close_prev = low_close_prev.fillna(0)
+            
+            # 使用numpy的maximum函数而不是pandas的concat和max
+            df['true_range'] = np.maximum.reduce([high_low, high_close_prev, low_close_prev])
         
         # 计算典型价格
         if 'typical_price' not in df.columns:
             df['typical_price'] = (df['high'] + df['low'] + df['close']) / 3
         
-        # 计算移动平均线（简单的5日和20日）
+        # 计算移动平均线（包括系统需要的ma10）
         if 'ma5' not in df.columns:
             df['ma5'] = df['close'].rolling(window=5).mean()
         
+        if 'ma10' not in df.columns:
+            df['ma10'] = df['close'].rolling(window=10).mean()
+        
         if 'ma20' not in df.columns:
             df['ma20'] = df['close'].rolling(window=20).mean()
+        
+        # 计算MACD指标
+        if 'macd' not in df.columns:
+            exp1 = df['close'].ewm(span=12, adjust=False).mean()
+            exp2 = df['close'].ewm(span=26, adjust=False).mean()
+            df['macd'] = exp1 - exp2
+            df['macd_signal'] = df['macd'].ewm(span=9, adjust=False).mean()
+            df['macd_hist'] = df['macd'] - df['macd_signal']
+        
+        # 计算RSI指标（使用正确的命名）
+        if 'rsi' not in df.columns:
+            delta = df['close'].diff()
+            gain = (delta.where(delta > 0, 0)).rolling(window=14).mean()
+            loss = (-delta.where(delta < 0, 0)).rolling(window=14).mean()
+            rs = gain / loss
+            df['rsi'] = 100 - (100 / (1 + rs))
+            # 填充NaN值
+            df['rsi'] = df['rsi'].fillna(50)
         
         return df
     
@@ -194,13 +227,14 @@ class DataProcessor:
     
     def _add_rsi(self, df: pd.DataFrame) -> pd.DataFrame:
         """添加RSI指标"""
-        delta = df['close'].diff()
-        up = delta.clip(lower=0)
-        down = -1 * delta.clip(upper=0)
-        ema_up = up.ewm(com=13, adjust=False).mean()
-        ema_down = down.ewm(com=13, adjust=False).mean()
-        rs = ema_up / ema_down
-        df['rsi_14'] = 100 - (100 / (1 + rs))
+        if 'rsi' not in df.columns:
+            delta = df['close'].diff()
+            gain = (delta.where(delta > 0, 0)).rolling(window=14).mean()
+            loss = (-delta.where(delta < 0, 0)).rolling(window=14).mean()
+            rs = gain / loss
+            df['rsi'] = 100 - (100 / (1 + rs))
+            # 填充NaN值
+            df['rsi'] = df['rsi'].fillna(50)
         return df
     
     def _add_bollinger_bands(self, df: pd.DataFrame) -> pd.DataFrame:
@@ -208,6 +242,29 @@ class DataProcessor:
         df['20ma'] = df['close'].rolling(window=20).mean()
         df['upper_band'] = df['20ma'] + (df['close'].rolling(window=20).std() * 2)
         df['lower_band'] = df['20ma'] - (df['close'].rolling(window=20).std() * 2)
+        return df
+    
+    def _final_data_cleanup(self, df: pd.DataFrame) -> pd.DataFrame:
+        """最终数据清理，处理无穷大值和异常值"""
+        # 替换无穷大值
+        df = df.replace([np.inf, -np.inf], np.nan)
+        
+        # 处理数值列的异常值
+        numeric_columns = df.select_dtypes(include=[np.number]).columns
+        
+        for col in numeric_columns:
+            if col in df.columns:
+                # 计算合理的范围（使用分位数）
+                q1 = df[col].quantile(0.01)
+                q99 = df[col].quantile(0.99)
+                
+                # 限制极端值
+                if pd.notna(q1) and pd.notna(q99) and q99 > q1:
+                    df[col] = df[col].clip(lower=q1, upper=q99)
+                
+                # 填充剩余的NaN值
+                df[col] = df[col].fillna(df[col].median())
+        
         return df
 
 # 创建单例实例
