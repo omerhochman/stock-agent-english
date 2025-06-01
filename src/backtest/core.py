@@ -12,6 +12,9 @@ from .baselines.momentum import MomentumStrategy
 from .baselines.mean_reversion import MeanReversionStrategy
 from .baselines.moving_average import MovingAverageStrategy
 from .baselines.random_walk import RandomWalkStrategy
+from .baselines.rsi_strategy import RSIStrategy
+from .baselines.bollinger_strategy import BollingerStrategy
+from .baselines.macd_strategy import MACDStrategy
 from .evaluation.significance import SignificanceTester
 from .evaluation.metrics import PerformanceMetrics
 from .evaluation.comparison import StrategyComparator
@@ -36,6 +39,8 @@ class BacktestConfig:
     rebalance_frequency: str = "day"
     risk_free_rate: float = 0.03
     confidence_level: float = 0.05
+    use_cache: bool = True  # 是否使用数据缓存
+    cache_ttl_days: int = 3  # 缓存有效期（天）
     
 @dataclass 
 class BacktestResult:
@@ -156,20 +161,56 @@ class Backtester:
                 name="Mean-Reversion-Short"
             ),
             
-            # 4. 移动平均策略（多组合）
-            MovingAverageStrategy(
-                short_window=50,
-                long_window=200,
-                signal_threshold=0.02
-            ),
+            # 4. 移动平均策略（优化参数）
             MovingAverageStrategy(
                 short_window=20,
                 long_window=60,
-                signal_threshold=0.01,
+                signal_threshold=0.01
+            ),
+            MovingAverageStrategy(
+                short_window=10,
+                long_window=30,
+                signal_threshold=0.005,
                 name="Moving-Average-Short"
             ),
             
-            # 5. 随机游走策略（控制组）- 真正的随机性
+            # 5. RSI策略（多参数组合）
+            RSIStrategy(
+                rsi_period=14,
+                overbought=70,
+                oversold=30,
+                name="RSI-Standard"
+            ),
+            
+            # 6. 布林带策略（均值回归和突破模式）
+            BollingerStrategy(
+                period=20,
+                std_dev=2.0,
+                strategy_mode="mean_reversion",
+                name="Bollinger-MeanReversion"
+            ),
+            BollingerStrategy(
+                period=20,
+                std_dev=2.0,
+                strategy_mode="breakout",
+                name="Bollinger-Breakout"
+            ),
+            
+            # 7. MACD策略（多参数组合）
+            MACDStrategy(
+                fast_period=12,
+                slow_period=26,
+                signal_period=9,
+                name="MACD-Standard"
+            ),
+            MACDStrategy(
+                fast_period=8,
+                slow_period=21,
+                signal_period=5,
+                name="MACD-Fast"
+            ),
+            
+            # 8. 随机游走策略（控制组）- 真正的随机性
             RandomWalkStrategy(
                 trade_probability=0.1,
                 max_position_ratio=0.5,
@@ -210,6 +251,10 @@ class Backtester:
         trade_history = []
         daily_returns = []
         
+        # 添加调试计数器
+        decision_count = 0
+        trade_count = 0
+        
         for current_date in dates:
             try:
                 # 获取智能体决策
@@ -218,12 +263,19 @@ class Backtester:
                     portfolio
                 )
                 
+                decision_count += 1
+                
+                # 调试输出
+                if decision_count <= 5:  # 只显示前5个决策
+                    self.logger.info(f"日期 {current_date.strftime('%Y-%m-%d')}: 决策 = {decision_data}")
+                
                 # 获取当前价格
                 current_price = self._get_current_price(
                     current_date.strftime("%Y-%m-%d")
                 )
                 
                 if current_price is None:
+                    self.logger.warning(f"无法获取 {current_date.strftime('%Y-%m-%d')} 的价格数据")
                     continue
                 
                 # 执行交易
@@ -235,8 +287,11 @@ class Backtester:
                     self.cost_model
                 )
                 
-                # 更新投资组合 - 交易执行器已经更新了portfolio
-                trade_history.extend(executed_trades)
+                # 记录交易
+                if executed_trades:
+                    trade_count += len(executed_trades)
+                    trade_history.extend(executed_trades)
+                    self.logger.info(f"执行交易: {executed_trades}")
                 
                 # 计算投资组合价值
                 total_value = portfolio["cash"] + portfolio["stock"] * current_price
@@ -263,6 +318,17 @@ class Backtester:
             except Exception as e:
                 self.logger.error(f"处理日期 {current_date} 时出错: {e}")
                 continue
+        
+        # 汇总统计
+        self.logger.info(f"AI Agent回测完成:")
+        self.logger.info(f"  - 处理决策数: {decision_count}")
+        self.logger.info(f"  - 执行交易数: {trade_count}")
+        self.logger.info(f"  - 最终现金: {portfolio['cash']:.2f}")
+        self.logger.info(f"  - 最终持股: {portfolio['stock']}")
+        
+        if len(daily_returns) == 0:
+            self.logger.warning("没有生成任何收益数据")
+            daily_returns = [0.0]  # 防止空数组导致的错误
         
         # 计算性能指标
         metrics = PerformanceMetrics()
@@ -651,13 +717,38 @@ class Backtester:
                 tickers=self.tickers
             )
             
-            # 解析结果
+            # 解析结果 - 增强的解析逻辑
             if isinstance(result, dict) and "decision" in result:
                 return result["decision"]
             elif isinstance(result, str):
                 import json
-                parsed = json.loads(result.replace('```json\n', '').replace('\n```', '').strip())
-                return parsed.get("decision", {"action": "hold", "quantity": 0})
+                try:
+                    # 尝试解析JSON
+                    parsed = json.loads(result.replace('```json\n', '').replace('\n```', '').strip())
+                    
+                    # 如果是portfolio_management_agent的返回格式
+                    if isinstance(parsed, dict):
+                        # 检查是否有嵌套的decision结构
+                        if "decision" in parsed:
+                            decision = parsed["decision"]
+                        else:
+                            decision = parsed
+                        
+                        # 提取action和quantity
+                        action = decision.get("action", "hold")
+                        quantity = decision.get("quantity", 0)
+                        
+                        # 确保quantity是整数
+                        if isinstance(quantity, (int, float)):
+                            quantity = int(quantity)
+                        else:
+                            quantity = 0
+                        
+                        return {"action": action, "quantity": quantity}
+                    
+                except (json.JSONDecodeError, KeyError) as e:
+                    self.logger.warning(f"解析JSON决策失败: {e}, 使用默认决策")
+                    return {"action": "hold", "quantity": 0}
             else:
                 return {"action": "hold", "quantity": 0}
                 

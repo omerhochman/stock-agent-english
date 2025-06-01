@@ -27,37 +27,40 @@ class MovingAverageStrategy(BaseStrategy):
         """
         prices = data['close']
         
+        # 降低数据要求：只需要long_window天的数据
         if len(prices) < self.long_window:
             return Signal(
                 action='hold',
                 quantity=0,
                 confidence=0.5,
-                reasoning=f"Insufficient data: need {self.long_window} periods"
-            )
-        
-        # 需要额外的数据来计算前一期的移动平均线
-        if len(prices) < self.long_window + 1:
-            return Signal(
-                action='hold',
-                quantity=0,
-                confidence=0.5,
-                reasoning=f"Insufficient data for trend calculation: need {self.long_window + 1} periods"
+                reasoning=f"Insufficient data: need {self.long_window} periods, got {len(prices)}"
             )
         
         # 计算当前移动平均线
         short_ma = prices.tail(self.short_window).mean()
         long_ma = prices.tail(self.long_window).mean()
         
-        # 计算前一期移动平均线
-        prev_short_ma = prices.iloc[-(self.short_window+1):-1].mean()
-        prev_long_ma = prices.iloc[-(self.long_window+1):-1].mean()
+        # 计算前一期移动平均线（如果数据足够）
+        if len(prices) >= self.long_window + 1:
+            prev_short_ma = prices.iloc[-(self.short_window+1):-1].mean()
+            prev_long_ma = prices.iloc[-(self.long_window+1):-1].mean()
+            
+            # 使用交叉信号
+            golden_cross = (prev_short_ma <= prev_long_ma and short_ma > long_ma)
+            death_cross = (prev_short_ma >= prev_long_ma and short_ma < long_ma)
+        else:
+            # 数据不足时，使用简单的位置关系
+            golden_cross = short_ma > long_ma * (1 + self.signal_threshold)
+            death_cross = short_ma < long_ma * (1 - self.signal_threshold)
+            prev_short_ma = short_ma
+            prev_long_ma = long_ma
         
         current_price = prices.iloc[-1]
         position_ratio = (portfolio.stock * current_price) / (portfolio.cash + portfolio.stock * current_price)
         
-        # 黄金交叉 - 买入信号（简化条件）
-        if (prev_short_ma <= prev_long_ma and short_ma > long_ma and position_ratio < 0.9):
-            # 简单的交叉买入
+        # 黄金交叉 - 买入信号
+        if golden_cross and position_ratio < 0.9:
+            # 计算买入数量
             max_investment = portfolio.cash * 0.8  # 投入80%现金
             quantity = int(max_investment / current_price)
             
@@ -71,13 +74,14 @@ class MovingAverageStrategy(BaseStrategy):
                         'short_ma': short_ma,
                         'long_ma': long_ma,
                         'prev_short_ma': prev_short_ma,
-                        'prev_long_ma': prev_long_ma
+                        'prev_long_ma': prev_long_ma,
+                        'data_length': len(prices)
                     }
                 )
         
-        # 死亡交叉 - 卖出信号（简化条件）
-        elif (prev_short_ma >= prev_long_ma and short_ma < long_ma and portfolio.stock > 0):
-            # 简单的交叉卖出
+        # 死亡交叉 - 卖出信号
+        elif death_cross and portfolio.stock > 0:
+            # 计算卖出数量
             quantity = int(portfolio.stock * 0.8)  # 卖出80%持仓
             
             if quantity > 0:
@@ -90,7 +94,8 @@ class MovingAverageStrategy(BaseStrategy):
                         'short_ma': short_ma,
                         'long_ma': long_ma,
                         'prev_short_ma': prev_short_ma,
-                        'prev_long_ma': prev_long_ma
+                        'prev_long_ma': prev_long_ma,
+                        'data_length': len(prices)
                     }
                 )
         
@@ -99,11 +104,12 @@ class MovingAverageStrategy(BaseStrategy):
             action='hold',
             quantity=0,
             confidence=0.5,
-            reasoning=f"No crossover: Short MA {short_ma:.2f}, Long MA {long_ma:.2f}",
+            reasoning=f"No crossover: Short MA {short_ma:.2f}, Long MA {long_ma:.2f} (data: {len(prices)} days)",
             metadata={
                 'short_ma': short_ma,
                 'long_ma': long_ma,
                 'prev_short_ma': prev_short_ma,
-                'prev_long_ma': prev_long_ma
+                'prev_long_ma': prev_long_ma,
+                'data_length': len(prices)
             }
         )

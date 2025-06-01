@@ -26,57 +26,136 @@ class PerformanceMetrics:
         if risk_free_rate is None:
             risk_free_rate = self.risk_free_rate
             
+        # 检查输入数据的有效性
+        if len(returns) == 0:
+            return self._get_zero_metrics()
+        
+        # 过滤无效值
+        valid_returns = returns[np.isfinite(returns)]
+        if len(valid_returns) == 0:
+            return self._get_zero_metrics()
+        
+        # 如果所有收益率都是0，返回特殊处理的指标
+        if np.all(valid_returns == 0):
+            return self._get_zero_return_metrics(len(valid_returns))
+            
         daily_rf_rate = risk_free_rate / 252  # 日度无风险利率
-        excess_returns = returns - daily_rf_rate
+        excess_returns = valid_returns - daily_rf_rate
         
         # 基础统计指标
         metrics = {
             # 收益指标
-            'total_return': self.total_return(returns),
-            'annual_return': self.annual_return(returns),
-            'cumulative_return': self.cumulative_return(returns),
+            'total_return': self.total_return(valid_returns),
+            'annual_return': self.annual_return(valid_returns),
+            'cumulative_return': self.total_return(valid_returns),  # 使用total_return作为cumulative_return的最终值
             
             # 风险指标
-            'volatility': self.volatility(returns),
-            'downside_volatility': self.downside_volatility(returns),
-            'max_drawdown': self.max_drawdown(returns),
-            'var_95': self.value_at_risk(returns, 0.95),
-            'cvar_95': self.conditional_var(returns, 0.95),
+            'volatility': self.volatility(valid_returns),
+            'downside_volatility': self.downside_volatility(valid_returns),
+            'max_drawdown': self.max_drawdown(valid_returns),
+            'var_95': self.value_at_risk(valid_returns, 0.95),
+            'cvar_95': self.conditional_var(valid_returns, 0.95),
             
             # 风险调整收益指标
-            'sharpe_ratio': self.sharpe_ratio(returns, risk_free_rate),
-            'sortino_ratio': self.sortino_ratio(returns, risk_free_rate),
-            'calmar_ratio': self.calmar_ratio(returns),
-            'information_ratio': self.information_ratio(returns, risk_free_rate),
+            'sharpe_ratio': self.sharpe_ratio(valid_returns, risk_free_rate),
+            'sortino_ratio': self.sortino_ratio(valid_returns, risk_free_rate),
+            'calmar_ratio': self.calmar_ratio(valid_returns),
+            'information_ratio': self.information_ratio(valid_returns, risk_free_rate),
             
             # 交易统计
-            'win_rate': self.win_rate(returns),
-            'profit_loss_ratio': self.profit_loss_ratio(returns),
-            'avg_win': self.average_win(returns),
-            'avg_loss': self.average_loss(returns),
+            'win_rate': self.win_rate(valid_returns),
+            'profit_loss_ratio': self.profit_loss_ratio(valid_returns),
+            'avg_win': self.average_win(valid_returns),
+            'avg_loss': self.average_loss(valid_returns),
             
             # 分布特征
-            'skewness': self.skewness(returns),
-            'kurtosis': self.kurtosis(returns),
-            'tail_ratio': self.tail_ratio(returns),
+            'skewness': self.skewness(valid_returns),
+            'kurtosis': self.kurtosis(valid_returns),
+            'tail_ratio': self.tail_ratio(valid_returns),
             
             # 稳定性指标
-            'stability': self.stability_ratio(returns),
-            'ulcer_index': self.ulcer_index(returns),
-            'recovery_factor': self.recovery_factor(returns),
+            'stability': self.stability_ratio(valid_returns),
+            'ulcer_index': self.ulcer_index(valid_returns),
+            'recovery_factor': self.recovery_factor(valid_returns),
             
             # 市场时机指标
-            'up_capture': self.up_capture_ratio(returns),
-            'down_capture': self.down_capture_ratio(returns),
+            'up_capture': self.up_capture_ratio(valid_returns),
+            'down_capture': self.down_capture_ratio(valid_returns),
             
             # 基本统计
-            'total_days': len(returns),
-            'positive_days': np.sum(returns > 0),
-            'negative_days': np.sum(returns < 0),
-            'zero_days': np.sum(returns == 0)
+            'total_days': len(valid_returns),
+            'positive_days': np.sum(valid_returns > 0),
+            'negative_days': np.sum(valid_returns < 0),
+            'zero_days': np.sum(valid_returns == 0)
         }
         
         return metrics
+    
+    def _get_zero_metrics(self) -> Dict[str, Any]:
+        """返回空数据时的默认指标"""
+        return {
+            'total_return': 0.0,
+            'annual_return': 0.0,
+            'cumulative_return': 0.0,
+            'volatility': 0.0,
+            'downside_volatility': 0.0,
+            'max_drawdown': 0.0,
+            'var_95': 0.0,
+            'cvar_95': 0.0,
+            'sharpe_ratio': 0.0,
+            'sortino_ratio': 0.0,
+            'calmar_ratio': 0.0,
+            'information_ratio': 0.0,
+            'win_rate': 0.0,
+            'profit_loss_ratio': 0.0,
+            'avg_win': 0.0,
+            'avg_loss': 0.0,
+            'skewness': 0.0,
+            'kurtosis': 0.0,
+            'tail_ratio': 0.0,
+            'stability': 0.0,
+            'ulcer_index': 0.0,
+            'recovery_factor': 0.0,
+            'up_capture': 0.0,
+            'down_capture': 0.0,
+            'total_days': 0,
+            'positive_days': 0,
+            'negative_days': 0,
+            'zero_days': 0
+        }
+    
+    def _get_zero_return_metrics(self, days: int) -> Dict[str, Any]:
+        """返回收益率全为0时的指标"""
+        return {
+            'total_return': 0.0,
+            'annual_return': 0.0,
+            'cumulative_return': 0.0,
+            'volatility': 0.0,
+            'downside_volatility': 0.0,
+            'max_drawdown': 0.0,
+            'var_95': 0.0,
+            'cvar_95': 0.0,
+            'sharpe_ratio': 0.0,
+            'sortino_ratio': 0.0,
+            'calmar_ratio': 0.0,
+            'information_ratio': 0.0,
+            'win_rate': 0.0,
+            'profit_loss_ratio': 0.0,
+            'avg_win': 0.0,
+            'avg_loss': 0.0,
+            'skewness': 0.0,
+            'kurtosis': 0.0,
+            'tail_ratio': 0.0,
+            'stability': 0.0,
+            'ulcer_index': 0.0,
+            'recovery_factor': 0.0,
+            'up_capture': 0.0,
+            'down_capture': 0.0,
+            'total_days': days,
+            'positive_days': 0,
+            'negative_days': 0,
+            'zero_days': days
+        }
     
     def total_return(self, returns: np.ndarray) -> float:
         """总收益率"""

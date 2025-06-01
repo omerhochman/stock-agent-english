@@ -310,6 +310,12 @@ if __name__ == "__main__":
     # --- Execute Workflow ---
     # Generate run_id here when running directly
     main_run_id = str(uuid.uuid4())
+    
+    # 如果启用了show_reasoning，自动设置日志级别为INFO以显示推理过程
+    if args.show_reasoning:
+        set_console_level(logging.INFO)
+        print("已启用推理显示模式，日志级别已调整为INFO")
+    
     result = run_hedge_fund(
         run_id=main_run_id,
         ticker=args.ticker,

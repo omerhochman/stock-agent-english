@@ -97,7 +97,9 @@ python -m src.main --ticker 600054 --initial-capital 200000 --num-of-news 10
 python -m src.main --ticker 600054 --summary
 ```
 
-回测：
+### 回测系统
+
+#### 基本回测命令
 
 ```bash
 # 基本回测
@@ -108,9 +110,198 @@ python -m src.backtester --ticker 600054 --start-date 2022-01-01 --end-date 2022
 
 # 自定义初始资金
 python -m src.backtester --ticker 600054 --initial-capital 500000
+
+# 显示详细分析过程
+python -m src.backtester --ticker 600054 --show-reasoning
+
+# 生成汇总报告
+python -m src.backtester --ticker 600054 --summary
 ```
 
-**注意**：当前回测系统存在一个已知问题 - 在某些情况下系统可能会过度倾向于持有(hold)策略，导致长时间不交易。这可能与风险管理参数过于保守、多个分析师信号互相抵消或分析师置信度偏低有关。如果遇到此问题，可尝试调整风险参数或修改 Portfolio Manager 的决策逻辑。
+#### 回测参数说明
+
+- `--ticker`: 股票代码（必需）
+- `--start-date`: 回测开始日期（可选，格式为 YYYY-MM-DD，默认为结束日期前一年）
+- `--end-date`: 回测结束日期（可选，格式为 YYYY-MM-DD，默认为昨天）
+- `--initial-capital`: 初始资金（可选，默认为 100,000）
+- `--initial-position`: 初始持仓数量（可选，默认为 0）
+- `--show-reasoning`: 显示每日分析推理过程（可选）
+- `--summary`: 显示回测结束后的汇总报告（可选）
+
+#### 回测输出说明
+
+回测系统会输出以下信息：
+
+1. **每日交易记录**：包括日期、价格、交易动作、数量、现金余额、持仓价值等
+2. **性能指标**：总收益率、年化收益率、夏普比率、最大回撤、波动率等
+3. **风险指标**：VaR、CVaR、索提诺比率、卡玛比率等
+4. **交易统计**：交易次数、胜率、盈亏比等
+
+### 回测测试工具 (test_backtest.py)
+
+#### 概述
+
+`test/test_backtest.py` 是一个专门用于测试和验证回测框架功能的综合测试工具。它提供了多种测试模式，可以对比 AI Agent 策略与传统基准策略的表现，并生成详细的性能分析报告。
+
+#### 主要功能
+
+1. **基准策略测试**：测试多种传统投资策略
+
+   - Buy & Hold（买入持有）
+   - Momentum（动量策略）
+   - Mean Reversion（均值回归）
+   - Moving Average（移动平均）
+   - Random Walk（随机游走）
+
+2. **AI Agent 策略测试**：测试本项目的智能投资代理策略
+
+3. **性能对比分析**：生成详细的策略对比报告和排名
+
+4. **统计显著性检验**：验证策略间的统计显著性差异
+
+#### 使用方法
+
+##### 基本命令
+
+```bash
+# 运行完整测试套件（默认3个月）
+python test/test_backtest.py
+
+# 指定股票代码
+python test/test_backtest.py --ticker 600519
+
+# 快速测试模式（3个月）
+python test/test_backtest.py --quick --ticker 600054
+
+# 中等测试模式（8个月）
+python test/test_backtest.py --medium --ticker 600054
+
+# 完整测试模式（2年）
+python test/test_backtest.py --full --ticker 600054
+
+# 自定义时间范围
+python test/test_backtest.py --start-date 2023-01-01 --end-date 2023-12-31 --ticker 600054
+```
+
+##### 专项测试
+
+```bash
+# 仅测试 AI Agent 策略
+python test/test_backtest.py --ai-only --ticker 600054
+
+# 仅测试基准策略
+python test/test_backtest.py --baseline-only --ticker 600054
+
+# 运行全面比较分析
+python test/test_backtest.py --comparison --ticker 600054
+```
+
+#### 参数说明
+
+- `--quick`: 快速测试模式（3 个月时间范围）
+- `--medium`: 中等测试模式（8 个月时间范围）
+- `--full`: 完整测试模式（2 年时间范围）
+- `--start-date`: 自定义开始日期（YYYY-MM-DD 格式）
+- `--end-date`: 自定义结束日期（YYYY-MM-DD 格式）
+- `--ticker`: 股票代码（默认为 000001）
+- `--ai-only`: 仅测试 AI Agent 策略
+- `--baseline-only`: 仅测试基准策略
+- `--comparison`: 运行全面比较测试
+
+#### 测试输出
+
+测试工具会生成以下类型的报告：
+
+1. **性能对比表格**：
+
+   - 策略排名
+   - 总收益率、年化收益率
+   - 夏普比率、索提诺比率、卡玛比率
+   - 最大回撤、年化波动率
+   - 胜率、盈亏比、交易次数
+   - VaR 风险指标
+
+2. **AI Agent 专项分析**：
+
+   - 在所有策略中的排名
+   - 与平均水平的比较
+   - 综合表现评级（优秀 ⭐⭐⭐ / 良好 ⭐⭐ / 一般 ⭐）
+
+3. **统计显著性检验**：
+   - 策略间的配对比较
+   - Diebold-Mariano 检验
+   - 夏普比率检验
+   - 统计功效分析
+
+#### 测试策略说明
+
+##### 基准策略
+
+1. **Buy & Hold**：买入并持有策略，适合长期投资
+2. **Momentum**：基于价格动量的策略，追涨杀跌
+3. **Mean Reversion**：均值回归策略，逢低买入逢高卖出
+4. **Moving Average**：移动平均策略，基于均线交叉信号
+5. **Random Walk**：随机交易策略，用作基准对照
+
+##### AI Agent 策略
+
+集成了本项目所有智能分析师的综合决策策略，包括：
+
+- 技术分析、基本面分析、情绪分析
+- 估值分析、宏观分析、AI 模型预测
+- 多空辩论、风险管理、投资组合优化
+
+#### 示例输出
+
+```
+==========================================
+回测测试结果汇总
+==========================================
+测试配置:
+  时间范围: 2023-01-01 至 2023-03-31
+  测试时长: 89 天
+  股票代码: 600054
+
+📊 策略表现排名:
+排名 策略名称                   收益率      夏普比率      最大回撤
+1    AI_Agent                  15.23%      1.245        8.45%
+2    Momentum                  12.67%      0.987        12.34%
+3    Buy_Hold                  8.91%       0.756        15.67%
+4    Mean_Reversion           6.45%       0.543        18.23%
+5    Moving_Average           4.32%       0.321        22.11%
+6    Random_Walk              -2.15%      -0.123       25.67%
+
+🎯 AI Agent表现分析:
+  📊 排名: 第1名 (共6个策略)
+  💰 收益率: 15.23%
+  📈 夏普比率: 1.245
+  📉 最大回撤: 8.45%
+  🔄 交易次数: 23
+
+📊 与平均水平比较:
+  收益率差异: +7.57%
+  夏普比率差异: +0.621
+  回撤差异: -6.89%
+  综合评级: 优秀 ⭐⭐⭐
+```
+
+#### 注意事项
+
+1. **测试时间选择**：
+
+   - 快速模式适合功能验证
+   - 中等模式适合策略调优
+   - 完整模式适合正式评估
+
+2. **股票选择**：
+
+   - 建议选择流动性好的大盘股进行测试
+   - 避免选择停牌或数据不完整的股票
+
+3. **结果解读**：
+   - 关注风险调整后的收益指标（如夏普比率）
+   - 注意最大回撤等风险控制指标
+   - 考虑交易频率和实际执行成本
 
 模型训练与评估：
 
@@ -396,7 +587,7 @@ python -m src.tools.test_news_crawler
 ║ ├─ bear_confidence: 0.3000
 ║ ├─ confidence_diff: 0.0524
 ║ ├─ llm_score: -0.6000
-║ ��─ llm_analysis: The bullish perspective highlights several key factors such as technical indicators showing bullish momentum, strong fundamentals, positive market sentiment, and an undervalued stock. However, these points have varying levels of confidence, some of which are relatively low (e.g., technical indicators at ~0.34 confidence). Conversely, the bearish view, supported by the AI model analysis, suggests that the technical rally might be short-lived, fundamentals may not be sustainable, market sentiment ...
+║ ├─ llm_analysis: The bullish perspective highlights several key factors such as technical indicators showing bullish momentum, strong fundamentals, positive market sentiment, and an undervalued stock. However, these points have varying levels of confidence, some of which are relatively low (e.g., technical indicators at ~0.34 confidence). Conversely, the bearish view, supported by the AI model analysis, suggests that the technical rally might be short-lived, fundamentals may not be sustainable, market sentiment ...
 ║ ├─ llm_reasoning: The bearish arguments are supported by a high level of confidence from AI models, indicating a stronger likelihood of a downturn. Additionally, potential over-optimism in market sentiment and risks of unsustainable fundamentals further support a cautious approach. The bullish arguments, while notable, have lower confidence levels, reducing their persuasiveness.
 ║ ├─ mixed_confidence_diff: -0.2536
 ║ ├─ debate_summary:

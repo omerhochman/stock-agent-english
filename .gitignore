@@ -17,3 +17,25 @@ debug.log
 test/src/*
 best_model.pth
 best_lstm_model.pth
+
+# 回测生成的文件
+performance_comparison_*.csv
+statistical_significance_*.csv
+backtest_report_*.html
+backtest_report_*.xlsx
+backtest_report_*.csv
+comprehensive_backtest_report_*.html
+comprehensive_backtest_report_*.xlsx
+comprehensive_backtest_report_*.csv
+ai_agent_analysis_*.csv
+strategy_ranking_*.csv
+backtest_results/*
+backtest_reports/*
+test_results/
+reports/
+
+# 回测缓存和临时文件
+*.backtest
+backtest_cache/
+temp_backtest_*
+*.tmp

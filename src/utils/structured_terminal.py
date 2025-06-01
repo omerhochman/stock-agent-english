@@ -424,8 +424,8 @@ class StructuredTerminalOutput:
         colored_output = colored_output.replace("SELL", "\033[31mSELL\033[0m")  # 红色
         colored_output = colored_output.replace("HOLD", "\033[33mHOLD\033[0m")  # 黄色
         
-        # 使用INFO级别记录，确保在控制台可见
-        logger.info("\n" + colored_output)
+        # 直接使用print输出，不受日志级别限制
+        print("\n" + colored_output)
 
 
 # 创建全局实例

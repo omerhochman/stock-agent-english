@@ -42,6 +42,25 @@ class TradeExecutor:
         action = decision_data.get("action", "hold")
         quantity = decision_data.get("quantity", 0)
         
+        # 智能解析：如果action是hold但quantity>0，说明想要建仓
+        if action == "hold" and quantity > 0:
+            if portfolio["stock"] == 0:  # 当前无持仓，将hold+quantity解释为买入
+                action = "buy"
+            else:  # 当前有持仓，检查是否需要调整仓位
+                current_position_value = portfolio["stock"] * current_price
+                target_position_value = quantity * current_price
+                
+                if target_position_value > current_position_value * 1.1:  # 目标仓位比当前大10%以上
+                    action = "buy"
+                    quantity = quantity - portfolio["stock"]  # 计算需要额外买入的数量
+                elif target_position_value < current_position_value * 0.9:  # 目标仓位比当前小10%以上
+                    action = "sell"
+                    quantity = portfolio["stock"] - quantity  # 计算需要卖出的数量
+                else:
+                    # 目标仓位与当前仓位相近，真正hold
+                    action = "hold"
+                    quantity = 0
+        
         if action == "buy" and quantity > 0:
             trade_result = self._execute_buy_order(
                 quantity, current_price, portfolio, date, cost_model

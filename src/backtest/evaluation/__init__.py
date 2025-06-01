@@ -8,16 +8,19 @@
 - SignificanceTester: 统计显著性检验
 - StrategyComparator: 策略比较分析
 - BacktestVisualizer: 可视化图表生成
+- BacktestTableGenerator: 表格生成器
 """
 
 from .metrics import PerformanceMetrics
 from .significance import SignificanceTester
 from .comparison import StrategyComparator
 from .visualization import BacktestVisualizer
+from .table_generator import BacktestTableGenerator
 
 __all__ = [
     "PerformanceMetrics",
     "SignificanceTester", 
     "StrategyComparator",
-    "BacktestVisualizer"
+    "BacktestVisualizer",
+    "BacktestTableGenerator"
 ] 

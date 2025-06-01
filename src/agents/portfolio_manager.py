@@ -218,8 +218,18 @@ def portfolio_management_agent(state: AgentState):
     )
 
     # 创建投资组合管理消息
+    # 为了确保回测系统能正确解析，包装成包含decision的格式
+    decision_content = {
+        "decision": {
+            "action": optimized_decision.get("action", "hold"),
+            "quantity": optimized_decision.get("quantity", 0),
+            "confidence": optimized_decision.get("confidence", 0.5)
+        },
+        "full_analysis": optimized_decision  # 保留完整分析结果
+    }
+    
     message = HumanMessage(
-        content=json.dumps(optimized_decision),
+        content=json.dumps(decision_content),
         name="portfolio_management",
     )
 

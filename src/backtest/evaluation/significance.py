@@ -1,5 +1,5 @@
 import numpy as np
-from typing import Dict, List, Any, Optional
+from typing import Dict, List, Any, Optional, Tuple
 from scipy import stats
 from scipy.stats import normaltest
 
@@ -84,23 +84,45 @@ class SignificanceTester:
         else:
             return "方法2显著优于方法1"
     
+    def _align_returns(self, returns1: np.ndarray, returns2: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
+        """
+        对齐两个收益率数组，确保它们具有相同的长度
+        使用较短数组的长度，从末尾截取较长的数组
+        """
+        len1, len2 = len(returns1), len(returns2)
+        
+        if len1 == len2:
+            return returns1, returns2
+        
+        # 使用较短的长度
+        min_len = min(len1, len2)
+        
+        # 从末尾截取，保留最近的数据
+        aligned_returns1 = returns1[-min_len:] if len1 > min_len else returns1
+        aligned_returns2 = returns2[-min_len:] if len2 > min_len else returns2
+        
+        return aligned_returns1, aligned_returns2
+
     def paired_t_test(self, returns1: np.ndarray, returns2: np.ndarray) -> Dict[str, Any]:
         """
         配对t检验
         比较两个策略的平均收益率
         """
-        diff = returns1 - returns2
+        # 对齐收益率数组
+        aligned_returns1, aligned_returns2 = self._align_returns(returns1, returns2)
+        
+        diff = aligned_returns1 - aligned_returns2
         
         # 正态性检验
         _, normality_p = normaltest(diff)
         
         if normality_p < 0.05:
             # 使用Wilcoxon符号秩检验（非参数）
-            statistic, p_value = stats.wilcoxon(returns1, returns2, alternative='two-sided')
+            statistic, p_value = stats.wilcoxon(aligned_returns1, aligned_returns2, alternative='two-sided')
             test_type = "Wilcoxon Signed-Rank"
         else:
             # 使用配对t检验
-            statistic, p_value = stats.ttest_rel(returns1, returns2)
+            statistic, p_value = stats.ttest_rel(aligned_returns1, aligned_returns2)
             test_type = "Paired t-test"
         
         return {
@@ -199,9 +221,12 @@ class SignificanceTester:
         夏普比率差异的显著性检验
         Jobson and Korkie (1981), Memmel (2003)
         """
+        # 对齐收益率数组
+        aligned_returns1, aligned_returns2 = self._align_returns(returns1, returns2)
+        
         # 计算夏普比率
-        excess_ret1 = returns1 - risk_free_rate
-        excess_ret2 = returns2 - risk_free_rate
+        excess_ret1 = aligned_returns1 - risk_free_rate
+        excess_ret2 = aligned_returns2 - risk_free_rate
         
         # 安全计算夏普比率
         def safe_sharpe(excess_returns):
@@ -217,7 +242,7 @@ class SignificanceTester:
         sharpe1 = safe_sharpe(excess_ret1)
         sharpe2 = safe_sharpe(excess_ret2)
         
-        n = len(returns1)
+        n = len(aligned_returns1)
         
         # 计算协方差矩阵
         cov_matrix = np.cov(excess_ret1, excess_ret2, ddof=1)
@@ -280,9 +305,12 @@ class SignificanceTester:
         from sklearn.linear_model import LinearRegression
         from scipy.stats import t
         
+        # 对齐收益率数组
+        aligned_strategy_returns, aligned_benchmark_returns = self._align_returns(strategy_returns, benchmark_returns)
+        
         # 准备数据
-        X = benchmark_returns.reshape(-1, 1)
-        y = strategy_returns
+        X = aligned_benchmark_returns.reshape(-1, 1)
+        y = aligned_strategy_returns
         
         # 回归分析
         reg = LinearRegression().fit(X, y)
@@ -296,8 +324,8 @@ class SignificanceTester:
         mse = np.sum(residuals**2) / (n - 2)
         
         # Alpha（截距）的标准误
-        x_mean = np.mean(benchmark_returns)
-        x_var = np.var(benchmark_returns, ddof=1)
+        x_mean = np.mean(aligned_benchmark_returns)
+        x_var = np.var(aligned_benchmark_returns, ddof=1)
         se_alpha = np.sqrt(mse * (1/n + x_mean**2/(n * x_var)))
         
         # t统计量
@@ -373,42 +401,54 @@ class SignificanceTester:
         综合比较分析
         集成多种统计检验方法
         """
+        # 对齐收益率数组以确保一致性
+        aligned_returns1, aligned_returns2 = self._align_returns(strategy1_returns, strategy2_returns)
+        
+        # 记录对齐信息
+        original_len1, original_len2 = len(strategy1_returns), len(strategy2_returns)
+        aligned_len = len(aligned_returns1)
+        
         results = {
             'strategy_names': (strategy1_name, strategy2_name),
-            'sample_size': len(strategy1_returns)
+            'sample_size': aligned_len,
+            'alignment_info': {
+                'original_lengths': (original_len1, original_len2),
+                'aligned_length': aligned_len,
+                'data_trimmed': original_len1 != aligned_len or original_len2 != aligned_len
+            }
         }
         
         # 1. 配对t检验
-        results['paired_test'] = self.paired_t_test(strategy1_returns, strategy2_returns)
+        results['paired_test'] = self.paired_t_test(aligned_returns1, aligned_returns2)
         
         # 2. DM检验（以收益率为基础）
         # 将收益率转换为"误差"（相对于零收益的偏差）
-        errors1 = strategy1_returns  # 可以使用收益率本身
-        errors2 = strategy2_returns
+        errors1 = aligned_returns1  # 可以使用收益率本身
+        errors2 = aligned_returns2
         results['diebold_mariano'] = self.diebold_mariano_test(errors1, errors2)
         
         # 3. 夏普比率检验
-        results['sharpe_test'] = self.sharpe_ratio_test(strategy1_returns, strategy2_returns)
+        results['sharpe_test'] = self.sharpe_ratio_test(aligned_returns1, aligned_returns2)
         
         # 4. 如果有基准，进行Alpha检验
         if benchmark_returns is not None:
-            results['alpha_test_1'] = self.alpha_significance_test(strategy1_returns, benchmark_returns)
-            results['alpha_test_2'] = self.alpha_significance_test(strategy2_returns, benchmark_returns)
+            results['alpha_test_1'] = self.alpha_significance_test(aligned_returns1, benchmark_returns)
+            results['alpha_test_2'] = self.alpha_significance_test(aligned_returns2, benchmark_returns)
         
         # 5. 方差比检验（检验随机游走）
-        results['variance_ratio_1'] = self.variance_ratio_test(strategy1_returns)
-        results['variance_ratio_2'] = self.variance_ratio_test(strategy2_returns)
+        results['variance_ratio_1'] = self.variance_ratio_test(aligned_returns1)
+        results['variance_ratio_2'] = self.variance_ratio_test(aligned_returns2)
         
         # 6. Bootstrap置信区间
         results['bootstrap_mean_1'] = self.bootstrap_confidence_interval(
-            strategy1_returns, np.mean)
+            aligned_returns1, np.mean)
         results['bootstrap_mean_2'] = self.bootstrap_confidence_interval(
-            strategy2_returns, np.mean)
+            aligned_returns2, np.mean)
         
         results['bootstrap_sharpe_1'] = self.bootstrap_confidence_interval(
-            strategy1_returns, lambda x: np.mean(x) / np.std(x, ddof=1) if np.std(x, ddof=1) > 0 else 0)
+            aligned_returns1, lambda x: np.mean(x) / np.std(x, ddof=1) if np.std(x, ddof=1) > 0 else 0)
         results['bootstrap_sharpe_2'] = self.bootstrap_confidence_interval(
-            strategy2_returns, lambda x: np.mean(x) / np.std(x, ddof=1) if np.std(x, ddof=1) > 0 else 0)
+            aligned_returns2, lambda x: np.mean(x) / np.std(x, ddof=1) if np.std(x, ddof=1) > 0 else 0)
         
         # 7. 生成综合结论
         results['summary'] = self._generate_comparison_summary(results)

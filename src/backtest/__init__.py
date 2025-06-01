@@ -43,7 +43,10 @@ from .baselines import (
     MomentumStrategy,
     MeanReversionStrategy,
     MovingAverageStrategy,
-    RandomWalkStrategy
+    RandomWalkStrategy,
+    RSIStrategy,
+    BollingerStrategy,
+    MACDStrategy
 )
 
 # 评估模块

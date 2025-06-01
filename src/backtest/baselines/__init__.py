@@ -6,6 +6,9 @@ from .momentum import MomentumStrategy
 from .mean_reversion import MeanReversionStrategy
 from .moving_average import MovingAverageStrategy
 from .random_walk import RandomWalkStrategy
+from .rsi_strategy import RSIStrategy
+from .bollinger_strategy import BollingerStrategy
+from .macd_strategy import MACDStrategy
 
 # 策略注册表
 STRATEGY_REGISTRY = {
@@ -14,6 +17,9 @@ STRATEGY_REGISTRY = {
     'mean_reversion': MeanReversionStrategy,
     'moving_average': MovingAverageStrategy,
     'random_walk': RandomWalkStrategy,
+    'rsi_strategy': RSIStrategy,
+    'bollinger_strategy': BollingerStrategy,
+    'macd_strategy': MACDStrategy,
 }
 
 def get_strategy(strategy_name: str, **kwargs) -> BaseStrategy:
