@@ -2,6 +2,8 @@
 
 Forked From：https://github.com/24mlight/A_Share_investment_Agent.git
 
+课程项目用版：https://github.com/1517005260/AShareAgent
+
 ![System Architecture V2](assets/img/structure.svg)
 
 ## 系统概述
