@@ -4,7 +4,7 @@ Forked From：https://github.com/24mlight/A_Share_investment_Agent.git
 
 Course Project Version：https://github.com/1517005260/AShareAgent
 
-![System Architecture V2](assets/img/structure.svg)
+![System Architecture V2](assets/img/structure.svg?sanitize=true)
 
 ## System Overview
 
