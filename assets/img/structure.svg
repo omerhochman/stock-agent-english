@@ -8,7 +8,7 @@
   <text x="150" y="400" font-size="16" font-weight="bold" fill="#555">Layer 3: Research Analysis</text>
   <text x="150" y="500" font-size="16" font-weight="bold" fill="#555">Layer 4: Debate Decision</text>
   <text x="150" y="580" font-size="16" font-weight="bold" fill="#555">Layer 5: Risk Assessment</text>
-  <text x="150" y="660" font-size="16" font-weight="bold" fill="#555">Layer 6: Macro & Portfolio Management</text>
+  <text x="150" y="660" font-size="16" font-weight="bold" fill="#555">Layer 6: Macro &amp; Portfolio Management</text>
   
   <!-- Layer 1: Market Data -->
   <rect x="420" y="90" width="160" height="60" rx="10" fill="#4e79a7" />
@@ -59,7 +59,7 @@
   <text x="500" y="610" text-anchor="middle" font-size="14" fill="white">Risk Management Agent</text>
   <text x="500" y="630" text-anchor="middle" font-size="12" fill="white">risk_management_agent</text>
 
-  <!-- Layer 6: Macro & Portfolio Management -->
+  <!-- Layer 6: Macro &amp; Portfolio Management -->
   <rect x="420" y="660" width="160" height="60" rx="10" fill="#af7aa1" />
   <text x="500" y="690" text-anchor="middle" font-size="14" fill="white">Macro Analysis Agent</text>
   <text x="500" y="710" text-anchor="middle" font-size="12" fill="white">macro_analyst_agent</text>
