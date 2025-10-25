@@ -13,7 +13,7 @@ const schema = z.object({
   data: z
     .array(data)
     .describe(
-      "Data for word cloud chart, such as, [{ value: '4.272', text: '形成' }].",
+      "Data for word cloud chart, such as, [{ value: '4.272', text: 'formation' }].",
     )
     .nonempty({ message: "Word cloud chart data cannot be empty." }),
   width: WidthSchema,

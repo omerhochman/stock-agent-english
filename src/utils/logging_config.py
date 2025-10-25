@@ -7,37 +7,37 @@ from datetime import datetime
 from pathlib import Path
 
 
-# 预定义的图标
+# Predefined icons
 SUCCESS_ICON = "✓"
 ERROR_ICON = "✗"
 WAIT_ICON = "🔄"
 
-# 全局日志配置
+# Global logging configuration
 _log_dir = None
-_console_level = logging.WARNING  # 默认控制台只显示WARNING及以上
-_file_level = logging.DEBUG       # 文件记录所有级别
+_console_level = logging.WARNING  # Default console only shows WARNING and above
+_file_level = logging.DEBUG       # File records all levels
 _initialized = False
 
 
 class ColoredFormatter(logging.Formatter):
-    """带颜色的控制台日志格式化器"""
+    """Colored console log formatter"""
     
-    # ANSI颜色代码
+    # ANSI color codes
     COLORS = {
-        'DEBUG': '\033[36m',    # 青色
-        'INFO': '\033[32m',     # 绿色
-        'WARNING': '\033[33m',  # 黄色
-        'ERROR': '\033[31m',    # 红色
-        'CRITICAL': '\033[35m', # 紫色
-        'RESET': '\033[0m'      # 重置
+        'DEBUG': '\033[36m',    # Cyan
+        'INFO': '\033[32m',     # Green
+        'WARNING': '\033[33m',  # Yellow
+        'ERROR': '\033[31m',    # Red
+        'CRITICAL': '\033[35m', # Purple
+        'RESET': '\033[0m'      # Reset
     }
     
     def format(self, record):
-        # 简化的控制台格式
+        # Simplified console format
         log_color = self.COLORS.get(record.levelname, self.COLORS['RESET'])
         reset_color = self.COLORS['RESET']
         
-        # 简化格式：只显示时间、级别和消息
+        # Simplified format: only show time, level and message
         formatted_time = datetime.fromtimestamp(record.created).strftime('%H:%M:%S')
         formatted_message = f"{log_color}[{formatted_time}] {record.levelname}: {record.getMessage()}{reset_color}"
         
@@ -45,7 +45,7 @@ class ColoredFormatter(logging.Formatter):
 
 
 class NoiseFilter(logging.Filter):
-    """过滤噪音日志的过滤器"""
+    """Filter for filtering noise logs"""
     
     NOISE_PATTERNS = [
         'HTTP Request', 'HTTP Response', 'Sending HTTP Request',
@@ -57,7 +57,7 @@ class NoiseFilter(logging.Filter):
     
     def filter(self, record):
         message = record.getMessage()
-        # 过滤掉包含噪音模式的日志
+        # Filter out logs containing noise patterns
         return not any(pattern in message for pattern in self.NOISE_PATTERNS)
 
 
@@ -66,14 +66,14 @@ def setup_global_logging(log_dir: Optional[str] = None,
                         file_level: int = logging.DEBUG,
                         max_bytes: int = 10*1024*1024,  # 10MB
                         backup_count: int = 5):
-    """设置全局日志配置
+    """Setup global logging configuration
     
     Args:
-        log_dir: 日志文件目录
-        console_level: 控制台日志级别
-        file_level: 文件日志级别
-        max_bytes: 单个日志文件最大大小
-        backup_count: 保留的备份文件数量
+        log_dir: Log file directory
+        console_level: Console log level
+        file_level: File log level
+        max_bytes: Maximum size of single log file
+        backup_count: Number of backup files to keep
     """
     global _log_dir, _console_level, _file_level, _initialized
     
@@ -83,7 +83,7 @@ def setup_global_logging(log_dir: Optional[str] = None,
     _console_level = console_level
     _file_level = file_level
     
-    # 设置日志目录
+    # Setup log directory
     if log_dir is None:
         _log_dir = Path(__file__).parent.parent.parent / 'logs'
     else:
@@ -91,22 +91,22 @@ def setup_global_logging(log_dir: Optional[str] = None,
     
     _log_dir.mkdir(exist_ok=True)
     
-    # 配置根日志记录器
+    # Configure root logger
     root_logger = logging.getLogger()
     root_logger.setLevel(logging.DEBUG)
     
-    # 清除现有处理器
+    # Clear existing handlers
     for handler in root_logger.handlers[:]:
         root_logger.removeHandler(handler)
     
-    # 创建控制台处理器
+    # Create console handler
     console_handler = logging.StreamHandler(sys.stdout)
     console_handler.setLevel(console_level)
     console_handler.setFormatter(ColoredFormatter())
     console_handler.addFilter(NoiseFilter())
     root_logger.addHandler(console_handler)
     
-    # 创建轮转文件处理器
+    # Create rotating file handler
     log_file = _log_dir / 'application.log'
     file_handler = logging.handlers.RotatingFileHandler(
         log_file, 
@@ -122,7 +122,7 @@ def setup_global_logging(log_dir: Optional[str] = None,
     file_handler.setFormatter(file_formatter)
     root_logger.addHandler(file_handler)
     
-    # 设置第三方库的日志级别
+    # Set log levels for third-party libraries
     third_party_loggers = [
         'urllib3', 'openai', 'httpx', 'httpcore', 
         'asyncio', 'uvicorn', 'requests', 'matplotlib',
@@ -134,36 +134,36 @@ def setup_global_logging(log_dir: Optional[str] = None,
     
     _initialized = True
     
-    # 记录初始化信息
+    # Record initialization information
     logger = logging.getLogger(__name__)
-    logger.info(f"日志系统已初始化 - 控制台级别: {logging.getLevelName(console_level)}, "
-               f"文件级别: {logging.getLevelName(file_level)}")
-    logger.info(f"日志文件: {log_file}")
+    logger.info(f"Logging system initialized - Console level: {logging.getLevelName(console_level)}, "
+               f"File level: {logging.getLevelName(file_level)}")
+    logger.info(f"Log file: {log_file}")
 
 
 def setup_logger(name: str, log_dir: Optional[str] = None) -> logging.Logger:
-    """设置统一的日志配置（兼容旧接口）
+    """Setup unified logging configuration (compatible with old interface)
 
     Args:
-        name: logger的名称
-        log_dir: 日志文件目录（已废弃，使用全局配置）
+        name: Logger name
+        log_dir: Log file directory (deprecated, uses global configuration)
 
     Returns:
-        配置好的logger实例
+        Configured logger instance
     """
-    # 确保全局日志系统已初始化
+    # Ensure global logging system is initialized
     if not _initialized:
         setup_global_logging(log_dir)
     
-    # 获取或创建 logger
+    # Get or create logger
     logger = logging.getLogger(name)
     
-    # 不需要额外配置，使用全局配置
+    # No additional configuration needed, use global configuration
     return logger
 
 
 def set_console_level(level: int):
-    """动态设置控制台日志级别"""
+    """Dynamically set console log level"""
     global _console_level
     _console_level = level
     
@@ -174,11 +174,11 @@ def set_console_level(level: int):
             break
     
     logger = logging.getLogger(__name__)
-    logger.info(f"控制台日志级别已设置为: {logging.getLevelName(level)}")
+    logger.info(f"Console log level set to: {logging.getLevelName(level)}")
 
 
 def get_log_stats():
-    """获取日志统计信息"""
+    """Get log statistics"""
     if not _log_dir:
         return {}
     
@@ -202,7 +202,7 @@ def get_log_stats():
 
 
 def cleanup_old_logs(days: int = 7):
-    """清理指定天数之前的日志文件"""
+    """Clean up log files older than specified days"""
     if not _log_dir:
         return 0
     
@@ -222,6 +222,6 @@ def cleanup_old_logs(days: int = 7):
     
     if cleaned_count > 0:
         logger = logging.getLogger(__name__)
-        logger.info(f"已清理 {cleaned_count} 个旧日志文件")
+        logger.info(f"Cleaned up {cleaned_count} old log files")
     
     return cleaned_count

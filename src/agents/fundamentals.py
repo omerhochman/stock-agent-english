@@ -8,7 +8,7 @@ import json
 ##### Fundamental Agent #####
 
 
-@agent_endpoint("fundamentals", "基本面分析师，分析公司财务指标、盈利能力和增长潜力")
+@agent_endpoint("fundamentals", "Fundamental analyst, analyzing company financial metrics, profitability and growth potential")
 def fundamentals_agent(state: AgentState):
     """Responsible for fundamental analysis"""
     show_workflow_status("Fundamentals Analyst")
@@ -165,7 +165,7 @@ def fundamentals_agent(state: AgentState):
     # Print the reasoning if the flag is set
     if show_reasoning:
         show_agent_reasoning(message_content, "Fundamental Analysis Agent")
-        # 保存推理信息到metadata供API使用
+        # Save reasoning information to metadata for API use
         state["metadata"]["agent_reasoning"] = message_content
 
     show_workflow_status("Fundamentals Analyst", "completed")

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-日志管理工具
-提供日志查看、清理、配置等功能
+Log management tool
+Provides log viewing, cleanup, configuration and other functions
 """
 
 import argparse
@@ -20,75 +20,75 @@ from .logging_config import (
 
 
 def show_log_stats():
-    """显示日志统计信息"""
+    """Display log statistics"""
     stats = get_log_stats()
     
     if not stats:
-        print("没有找到日志文件")
+        print("No log files found")
         return
     
-    print("=== 日志文件统计 ===")
-    print(f"文件总数: {stats.get('file_count', 0)}")
-    print(f"总大小: {stats.get('total_size_mb', 0)} MB")
+    print("=== Log File Statistics ===")
+    print(f"Total files: {stats.get('file_count', 0)}")
+    print(f"Total size: {stats.get('total_size_mb', 0)} MB")
     print()
     
-    print("文件详情:")
+    print("File details:")
     for filename, info in stats.items():
         if isinstance(info, dict):
-            print(f"  {filename}: {info['size_mb']} MB (修改时间: {info['modified']})")
+            print(f"  {filename}: {info['size_mb']} MB (Modified: {info['modified']})")
 
 
 def view_log(filename: Optional[str] = None, lines: int = 50):
-    """查看日志文件内容"""
+    """View log file content"""
     log_dir = Path(__file__).parent.parent.parent / 'logs'
     
     if filename is None:
-        # 显示最新的日志文件
+        # Display the latest log file
         log_files = list(log_dir.glob('*.log*'))
         if not log_files:
-            print("没有找到日志文件")
+            print("No log files found")
             return
         
-        # 按修改时间排序，获取最新的
+        # Sort by modification time, get the latest
         latest_file = max(log_files, key=lambda f: f.stat().st_mtime)
         filename = latest_file.name
     
     log_file = log_dir / filename
     
     if not log_file.exists():
-        print(f"日志文件不存在: {log_file}")
+        print(f"Log file does not exist: {log_file}")
         return
     
-    print(f"=== 查看日志文件: {filename} (最后 {lines} 行) ===")
+    print(f"=== Viewing log file: {filename} (last {lines} lines) ===")
     
     try:
         with open(log_file, 'r', encoding='utf-8') as f:
             all_lines = f.readlines()
             
-        # 显示最后N行
+        # Display last N lines
         display_lines = all_lines[-lines:] if len(all_lines) > lines else all_lines
         
         for line in display_lines:
             print(line.rstrip())
             
     except Exception as e:
-        print(f"读取日志文件失败: {e}")
+        print(f"Failed to read log file: {e}")
 
 
 def clean_logs(days: int = 7, confirm: bool = True):
-    """清理旧日志文件"""
+    """Clean up old log files"""
     if confirm:
-        response = input(f"确定要删除 {days} 天前的日志文件吗? (y/N): ")
+        response = input(f"Are you sure you want to delete log files older than {days} days? (y/N): ")
         if response.lower() != 'y':
-            print("操作已取消")
+            print("Operation cancelled")
             return
     
     cleaned_count = cleanup_old_logs(days)
-    print(f"已清理 {cleaned_count} 个日志文件")
+    print(f"Cleaned up {cleaned_count} log files")
 
 
 def set_log_level(level: str):
-    """设置控制台日志级别"""
+    """Set console log level"""
     level_map = {
         'DEBUG': logging.DEBUG,
         'INFO': logging.INFO,
@@ -99,31 +99,31 @@ def set_log_level(level: str):
     
     level_upper = level.upper()
     if level_upper not in level_map:
-        print(f"无效的日志级别: {level}")
-        print(f"可用级别: {', '.join(level_map.keys())}")
+        print(f"Invalid log level: {level}")
+        print(f"Available levels: {', '.join(level_map.keys())}")
         return
     
     set_console_level(level_map[level_upper])
-    print(f"控制台日志级别已设置为: {level_upper}")
+    print(f"Console log level set to: {level_upper}")
 
 
 def list_log_files():
-    """列出所有日志文件"""
+    """List all log files"""
     log_dir = Path(__file__).parent.parent.parent / 'logs'
     
     if not log_dir.exists():
-        print("日志目录不存在")
+        print("Log directory does not exist")
         return
     
     log_files = list(log_dir.glob('*.log*'))
     
     if not log_files:
-        print("没有找到日志文件")
+        print("No log files found")
         return
     
-    print("=== 日志文件列表 ===")
+    print("=== Log File List ===")
     
-    # 按修改时间排序
+    # Sort by modification time
     log_files.sort(key=lambda f: f.stat().st_mtime, reverse=True)
     
     for log_file in log_files:
@@ -134,30 +134,30 @@ def list_log_files():
 
 
 def main():
-    """命令行入口"""
-    parser = argparse.ArgumentParser(description='日志管理工具')
-    subparsers = parser.add_subparsers(dest='command', help='可用命令')
+    """Command line entry point"""
+    parser = argparse.ArgumentParser(description='Log management tool')
+    subparsers = parser.add_subparsers(dest='command', help='Available commands')
     
-    # stats 命令
-    subparsers.add_parser('stats', help='显示日志统计信息')
+    # stats command
+    subparsers.add_parser('stats', help='Display log statistics')
     
-    # view 命令
-    view_parser = subparsers.add_parser('view', help='查看日志文件')
-    view_parser.add_argument('--file', '-f', help='指定日志文件名')
-    view_parser.add_argument('--lines', '-n', type=int, default=50, help='显示行数 (默认: 50)')
+    # view command
+    view_parser = subparsers.add_parser('view', help='View log file')
+    view_parser.add_argument('--file', '-f', help='Specify log file name')
+    view_parser.add_argument('--lines', '-n', type=int, default=50, help='Number of lines to display (default: 50)')
     
-    # clean 命令
-    clean_parser = subparsers.add_parser('clean', help='清理旧日志文件')
-    clean_parser.add_argument('--days', '-d', type=int, default=7, help='清理多少天前的文件 (默认: 7)')
-    clean_parser.add_argument('--yes', '-y', action='store_true', help='不询问确认')
+    # clean command
+    clean_parser = subparsers.add_parser('clean', help='Clean up old log files')
+    clean_parser.add_argument('--days', '-d', type=int, default=7, help='Clean files older than how many days (default: 7)')
+    clean_parser.add_argument('--yes', '-y', action='store_true', help='Do not ask for confirmation')
     
-    # level 命令
-    level_parser = subparsers.add_parser('level', help='设置控制台日志级别')
+    # level command
+    level_parser = subparsers.add_parser('level', help='Set console log level')
     level_parser.add_argument('level', choices=['DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL'],
-                             help='日志级别')
+                             help='Log level')
     
-    # list 命令
-    subparsers.add_parser('list', help='列出所有日志文件')
+    # list command
+    subparsers.add_parser('list', help='List all log files')
     
     args = parser.parse_args()
     
@@ -165,7 +165,7 @@ def main():
         parser.print_help()
         return
     
-    # 初始化日志系统
+    # Initialize logging system
     setup_global_logging()
     
     if args.command == 'stats':

@@ -10,42 +10,42 @@ from src.utils.logging_config import setup_logger
 from typing import Dict, Tuple, Any
 import random
 
-# 设置日志
+# Setup logging
 logger = setup_logger('reinforcement_learning')
 
-# 设置随机种子以确保结果可重现
+# Set random seeds to ensure reproducible results
 torch.manual_seed(42)
 np.random.seed(42)
 random.seed(42)
 
-# 明确设置使用CUDA设备
+# Explicitly set CUDA device usage
 torch.cuda.manual_seed(42)
 torch.cuda.manual_seed_all(42)
-# 确保CUDA可用时使用GPU
+# Ensure GPU is used when CUDA is available
 DEVICE = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-logger.info(f"使用设备: {DEVICE}")
+logger.info(f"Using device: {DEVICE}")
 if torch.cuda.is_available():
-    logger.info(f"CUDA设备名称: {torch.cuda.get_device_name(0)}")
-    logger.info(f"CUDA设备数量: {torch.cuda.device_count()}")
+    logger.info(f"CUDA device name: {torch.cuda.get_device_name(0)}")
+    logger.info(f"CUDA device count: {torch.cuda.device_count()}")
 
 
 class StockTradingEnv(gym.Env):
-    """股票交易环境，实现OpenAI Gym接口"""
+    """Stock trading environment, implements OpenAI Gym interface"""
     
     def __init__(self, df: pd.DataFrame, initial_balance=100000, 
                 transaction_fee_percent=0.001, tech_indicators=None,
                 reward_scaling=1.0, max_steps=252, window_size=20):
         """
-        初始化交易环境
+        Initialize trading environment
         
         Args:
-            df: 价格数据DataFrame
-            initial_balance: 初始资金
-            transaction_fee_percent: 交易手续费比例
-            tech_indicators: 技术指标列表
-            reward_scaling: 奖励缩放因子
-            max_steps: 每个episode的最大步数
-            window_size: 观察窗口大小
+            df: Price data DataFrame
+            initial_balance: Initial capital
+            transaction_fee_percent: Transaction fee percentage
+            tech_indicators: Technical indicators list
+            reward_scaling: Reward scaling factor
+            max_steps: Maximum steps per episode
+            window_size: Observation window size
         """
         super(StockTradingEnv, self).__init__()
         
@@ -57,7 +57,7 @@ class StockTradingEnv(gym.Env):
         self.max_steps = max_steps
         self.window_size = window_size
         
-        # 技术指标列表，如果为None使用默认指标
+        # Technical indicators list, use default indicators if None
         if tech_indicators is None:
             self.tech_indicator_columns = [
                 'ma5', 'ma10', 'ma20', 'rsi', 'macd', 'macd_signal', 'macd_hist',
@@ -66,16 +66,16 @@ class StockTradingEnv(gym.Env):
         else:
             self.tech_indicator_columns = tech_indicators
         
-        # 确保所有技术指标都在DataFrame中
+        # Ensure all technical indicators are in DataFrame
         missing_columns = [col for col in self.tech_indicator_columns if col not in self.df.columns]
         if missing_columns:
-            logger.warning(f"以下技术指标在DataFrame中不存在: {missing_columns}")
-            # 从列表中移除不存在的指标
+            logger.warning(f"The following technical indicators do not exist in DataFrame: {missing_columns}")
+            # Remove non-existent indicators from list
             self.tech_indicator_columns = [col for col in self.tech_indicator_columns if col in self.df.columns]
         
-        # 状态空间：价格、技术指标、持仓、余额等
-        # 特征数量 = 窗口大小 * (价格特征 + 技术指标) + 持仓和余额信息
-        num_price_features = 5  # OHLCV: 开盘、最高、最低、收盘、成交量
+        # State space: price, technical indicators, position, balance, etc.
+        # Feature count = window size * (price features + technical indicators) + position and balance info
+        num_price_features = 5  # OHLCV: open, high, low, close, volume
         num_tech_indicators = len(self.tech_indicator_columns)
         observation_shape = (self.window_size * (num_price_features + num_tech_indicators) + 2,)
         
@@ -86,93 +86,93 @@ class StockTradingEnv(gym.Env):
             dtype=np.float32
         )
         
-        # 动作空间：买入、卖出、持有 (0: 持有, 1: 买入, 2: 卖出)
+        # Action space: buy, sell, hold (0: hold, 1: buy, 2: sell)
         self.action_space = spaces.Discrete(3)
         
-        # 当前步骤和位置
+        # Current step and position
         self.current_step = None
         self.current_position = 0
         self.total_reward = 0
         self.history = []
         
-        # 初始化环境
+        # Initialize environment
         self.reset()
     
     def _next_observation(self) -> np.ndarray:
         """
-        获取当前窗口的状态特征
+        Get current window state features
         
         Returns:
-            状态特征数组
+            State feature array
         """
-        # 确保在数据范围内
+        # Ensure within data range
         end_idx = min(self.current_step + 1, len(self.df))
         start_idx = max(0, end_idx - self.window_size)
         
-        # 不足窗口大小的部分用第一个数据填充
+        # Fill insufficient window size parts with first data
         padding_size = self.window_size - (end_idx - start_idx)
         
-        # 提取价格数据
+        # Extract price data
         price_features = ['open', 'high', 'low', 'close', 'volume']
         prices = self.df[price_features].iloc[start_idx:end_idx].values
         
-        # 提取技术指标
+        # Extract technical indicators
         tech_indicators = self.df[self.tech_indicator_columns].iloc[start_idx:end_idx].values
         
-        # 填充不足部分
+        # Fill insufficient parts
         if padding_size > 0:
             price_padding = np.repeat(prices[:1], padding_size, axis=0)
             tech_padding = np.repeat(tech_indicators[:1], padding_size, axis=0)
             prices = np.vstack([price_padding, prices])
             tech_indicators = np.vstack([tech_padding, tech_indicators])
         
-        # 归一化处理数据
+        # Normalize data
         prices_mean = np.mean(prices, axis=0)
         prices_std = np.std(prices, axis=0)
         tech_mean = np.mean(tech_indicators, axis=0)
         tech_std = np.std(tech_indicators, axis=0)
         
-        # 避免除以0
+        # Avoid division by zero
         prices_std = np.where(prices_std == 0, 1, prices_std)
         tech_std = np.where(tech_std == 0, 1, tech_std)
         
         normalized_prices = (prices - prices_mean) / prices_std
         normalized_tech = (tech_indicators - tech_mean) / tech_std
         
-        # 拼接价格和技术指标
+        # Concatenate price and technical indicators
         features = np.column_stack([normalized_prices, normalized_tech])
         
-        # 展平为一维数组
+        # Flatten to 1D array
         flattened_features = features.flatten()
         
-        # 添加持仓和余额信息
+        # Add position and balance information
         current_price = self.df['close'].iloc[self.current_step]
         position_value = self.current_position * current_price / self.initial_balance
         cash_ratio = self.balance / self.initial_balance
         
-        # 构建完整的状态特征
+        # Build complete state features
         observation = np.append(flattened_features, [position_value, cash_ratio])
         
         return observation.astype(np.float32)
     
     def _take_action(self, action: int) -> float:
         """
-        执行交易操作并计算奖励
+        Execute trading action and calculate reward
         
         Args:
-            action: 交易动作 (0: 持有, 1: 买入, 2: 卖出)
+            action: Trading action (0: hold, 1: buy, 2: sell)
             
         Returns:
-            奖励值
+            Reward value
         """
         current_price = self.df['close'].iloc[self.current_step]
         prev_portfolio_value = self.balance + self.current_position * current_price
         
-        # 执行交易
-        if action == 1:  # 买入
-            # 计算可买入的最大数量
+        # Execute trade
+        if action == 1:  # Buy
+            # Calculate maximum number of shares that can be bought
             max_possible_shares = self.balance // (current_price * (1 + self.transaction_fee_percent))
-            # 每次使用25%的资金买入
+            # Use 25% of capital each time to buy
             shares_to_buy = max(max_possible_shares // 4, 1)
             
             if shares_to_buy > 0 and self.balance >= shares_to_buy * current_price * (1 + self.transaction_fee_percent):
@@ -188,9 +188,9 @@ class StockTradingEnv(gym.Env):
                 }
                 self.history.append(trade_info)
         
-        elif action == 2:  # 卖出
+        elif action == 2:  # Sell
             if self.current_position > 0:
-                # 每次卖出当前持仓的25%
+                # Sell 25% of current position each time
                 shares_to_sell = max(self.current_position // 4, 1)
                 
                 sell_amount = shares_to_sell * current_price * (1 - self.transaction_fee_percent)
@@ -205,23 +205,23 @@ class StockTradingEnv(gym.Env):
                 }
                 self.history.append(trade_info)
         
-        # 计算新的组合价值
+        # Calculate new portfolio value
         new_portfolio_value = self.balance + self.current_position * current_price
         
-        # 计算收益率
+        # Calculate return rate
         portfolio_return = (new_portfolio_value / prev_portfolio_value) - 1
         
-        # 应用奖励缩放
+        # Apply reward scaling
         reward = portfolio_return * self.reward_scaling
         
-        # 鼓励交易，减少持有惩罚
-        if action == 0:  # 持有
-            # 如果持仓比例低，给予小惩罚
+        # Encourage trading, reduce holding penalty
+        if action == 0:  # Hold
+            # If position ratio is low, give small penalty
             position_ratio = self.current_position * current_price / new_portfolio_value
-            if position_ratio < 0.1:  # 持仓少于10%
-                reward -= 0.001  # 小惩罚，鼓励建仓
-        else:  # 交易(买入或卖出)
-            # 轻微的交易奖励，鼓励探索
+            if position_ratio < 0.1:  # Position less than 10%
+                reward -= 0.001  # Small penalty, encourage position building
+        else:  # Trade (buy or sell)
+            # Slight trading reward, encourage exploration
             reward += 0.0005
         
         self.total_reward += reward
@@ -230,30 +230,30 @@ class StockTradingEnv(gym.Env):
     
     def step(self, action: int) -> Tuple[np.ndarray, float, bool, Dict]:
         """
-        执行一步环境交互
+        Execute one step of environment interaction
         
         Args:
-            action: 交易动作
+            action: Trading action
             
         Returns:
-            observation: 新的状态
-            reward: 奖励值
-            done: 是否结束
-            info: 附加信息
+            observation: New state
+            reward: Reward value
+            done: Whether finished
+            info: Additional information
         """
-        # 执行动作并获取奖励
+        # Execute action and get reward
         reward = self._take_action(action)
         
-        # 前进一步
+        # Move forward one step
         self.current_step += 1
         
-        # 检查是否结束
+        # Check if finished
         done = (self.current_step >= len(self.df) - 1) or (self.current_step >= self.max_steps)
         
-        # 获取新的状态
+        # Get new state
         observation = self._next_observation()
         
-        # 准备附加信息
+        # Prepare additional information
         current_price = self.df['close'].iloc[self.current_step] if self.current_step < len(self.df) else self.df['close'].iloc[-1]
         info = {
             'current_step': self.current_step,
@@ -268,26 +268,26 @@ class StockTradingEnv(gym.Env):
     
     def reset(self):
         """
-        重置环境
+        Reset environment
         
         Returns:
-            初始状态
+            Initial state
         """
         max_start_idx = len(self.df) - self.max_steps
         min_start_idx = self.window_size
         
         if min_start_idx >= max_start_idx:
-            logger.info(f"警告: 数据量不足。window_size={self.window_size}, max_steps={self.max_steps}, 数据长度={len(self.df)}")
-            # 调整参数，确保可以选择起始点
-            adjusted_max_steps = len(self.df) - min_start_idx - 5  # 添加一些缓冲
-            self.max_steps = max(10, adjusted_max_steps)  # 至少10步
+            logger.info(f"Warning: Insufficient data. window_size={self.window_size}, max_steps={self.max_steps}, data length={len(self.df)}")
+            # Adjust parameters to ensure starting point can be selected
+            adjusted_max_steps = len(self.df) - min_start_idx - 5  # Add some buffer
+            self.max_steps = max(10, adjusted_max_steps)  # At least 10 steps
             max_start_idx = len(self.df) - self.max_steps
-            logger.info(f"已调整 max_steps 为 {self.max_steps}")
+            logger.info(f"Adjusted max_steps to {self.max_steps}")
         
-        # 随机选择起始点
+        # Randomly select starting point
         self.current_step = np.random.randint(min_start_idx, max_start_idx)
         
-        # 重置资金和持仓
+        # Reset capital and position
         self.balance = self.initial_balance
         self.current_position = 0
         self.total_reward = 0
@@ -297,10 +297,10 @@ class StockTradingEnv(gym.Env):
     
     def render(self, mode='human'):
         """
-        渲染环境
+        Render environment
         
         Args:
-            mode: 渲染模式
+            mode: Render mode
         """
         if mode == 'human':
             current_price = self.df['close'].iloc[self.current_step]
@@ -315,20 +315,20 @@ class StockTradingEnv(gym.Env):
 
 
 class ActorCritic(nn.Module):
-    """PPO的Actor-Critic网络"""
+    """PPO Actor-Critic network"""
     
     def __init__(self, state_dim: int, action_dim: int, hidden_dim: int = 128):
         """
-        初始化Actor-Critic网络
+        Initialize Actor-Critic network
         
         Args:
-            state_dim: 状态空间维度
-            action_dim: 动作空间维度
-            hidden_dim: 隐藏层维度
+            state_dim: State space dimension
+            action_dim: Action space dimension
+            hidden_dim: Hidden layer dimension
         """
         super(ActorCritic, self).__init__()
         
-        # 共享特征提取层
+        # Shared feature extraction layer
         self.feature_extractor = nn.Sequential(
             nn.Linear(state_dim, hidden_dim),
             nn.ReLU(),
@@ -336,7 +336,7 @@ class ActorCritic(nn.Module):
             nn.ReLU()
         )
         
-        # Actor网络 (策略网络)
+        # Actor network (policy network)
         self.actor = nn.Sequential(
             nn.Linear(hidden_dim, hidden_dim),
             nn.ReLU(),
@@ -344,7 +344,7 @@ class ActorCritic(nn.Module):
             nn.Softmax(dim=-1)
         )
         
-        # Critic网络 (价值网络)
+        # Critic network (value network)
         self.critic = nn.Sequential(
             nn.Linear(hidden_dim, hidden_dim),
             nn.ReLU(),
@@ -353,14 +353,14 @@ class ActorCritic(nn.Module):
     
     def forward(self, state):
         """
-        前向传播
+        Forward propagation
         
         Args:
-            state: 状态
+            state: State
             
         Returns:
-            action_probs: 动作概率
-            state_value: 状态价值
+            action_probs: Action probabilities
+            state_value: State value
         """
         features = self.feature_extractor(state)
         action_probs = self.actor(features)
@@ -369,17 +369,17 @@ class ActorCritic(nn.Module):
     
     def act(self, state):
         """
-        根据策略选择动作
+        Select action based on policy
         
         Args:
-            state: 状态
+            state: State
             
         Returns:
-            action: 选择的动作
-            action_prob: 选择动作的概率
-            state_value: 状态价值
+            action: Selected action
+            action_prob: Probability of selected action
+            state_value: State value
         """
-        state = torch.FloatTensor(state).unsqueeze(0).to(DEVICE)  # 使用全局DEVICE
+        state = torch.FloatTensor(state).unsqueeze(0).to(DEVICE)  # Use global DEVICE
         action_probs, state_value = self.forward(state)
         action_dist = Categorical(action_probs)
         action = action_dist.sample()
@@ -388,72 +388,72 @@ class ActorCritic(nn.Module):
 
 
 class PPOAgent:
-    """PPO智能交易代理"""
+    """PPO intelligent trading agent"""
     
     def __init__(self, state_dim: int, action_dim: int, hidden_dim: int = 128,
                 lr: float = 0.0003, gamma: float = 0.99, eps_clip: float = 0.2,
                 k_epochs: int = 4, device: str = None):
         """
-        初始化PPO代理
+        Initialize PPO agent
         
         Args:
-            state_dim: 状态空间维度
-            action_dim: 动作空间维度
-            hidden_dim: 隐藏层维度
-            lr: 学习率
-            gamma: 折扣因子
-            eps_clip: PPO裁剪参数
-            k_epochs: 策略更新轮数
-            device: 运行设备 ('cuda' 或 'cpu')
+            state_dim: State space dimension
+            action_dim: Action space dimension
+            hidden_dim: Hidden layer dimension
+            lr: Learning rate
+            gamma: Discount factor
+            eps_clip: PPO clipping parameter
+            k_epochs: Number of policy update rounds
+            device: Running device ('cuda' or 'cpu')
         """
         self.gamma = gamma
         self.eps_clip = eps_clip
         self.k_epochs = k_epochs
         
-        # 明确使用CUDA设备
+        # Explicitly use CUDA device
         if device is None:
-            self.device = DEVICE  # 使用全局设备配置
+            self.device = DEVICE  # Use global device configuration
         else:
             self.device = torch.device(device)
             
-        logger.info(f"PPO代理初始化完成，使用设备: {self.device}")
+        logger.info(f"PPO agent initialization completed, using device: {self.device}")
         
-        # 策略网络
+        # Policy network
         self.policy = ActorCritic(state_dim, action_dim, hidden_dim).to(self.device)
         self.optimizer = torch.optim.Adam(self.policy.parameters(), lr=lr)
         
-        # 旧策略
+        # Old policy
         self.old_policy = ActorCritic(state_dim, action_dim, hidden_dim).to(self.device)
         self.old_policy.load_state_dict(self.policy.state_dict())
         
-        # 损失函数
+        # Loss function
         self.MseLoss = nn.MSELoss()
         
-        # 经验缓冲区
+        # Experience buffer
         self.buffer = []
     
     def select_action(self, state):
         """
-        根据当前策略选择动作
+        Select action based on current policy
         
         Args:
-            state: 状态
+            state: State
             
         Returns:
-            action: 选择的动作
-            action_prob: 动作概率
-            state_value: 状态价值
+            action: Selected action
+            action_prob: Action probability
+            state_value: State value
         """
         with torch.no_grad():
             return self.old_policy.act(state)
     
     def update_old_policy(self):
-        """更新旧策略"""
+        """Update old policy"""
         self.old_policy.load_state_dict(self.policy.state_dict())
     
     def store_transition(self, transition):
         """
-        存储状态转移
+        Store state transition
         
         Args:
             transition: (state, action, action_prob, reward, next_state, done)
@@ -462,13 +462,13 @@ class PPOAgent:
     
     def update(self):
         """
-        更新策略
+        Update policy
         
         Returns:
-            actor_loss: Actor网络损失
-            critic_loss: Critic网络损失
+            actor_loss: Actor network loss
+            critic_loss: Critic network loss
         """
-        # 从缓冲区提取数据
+        # Extract data from buffer
         old_states = torch.FloatTensor(np.array([t[0] for t in self.buffer])).to(self.device)
         old_actions = torch.LongTensor(np.array([t[1] for t in self.buffer])).to(self.device)
         old_action_probs = torch.FloatTensor(np.array([t[2] for t in self.buffer])).to(self.device)
@@ -476,7 +476,7 @@ class PPOAgent:
         next_states = [t[4] for t in self.buffer]
         dones = [t[5] for t in self.buffer]
         
-        # 计算累积回报
+        # Calculate cumulative returns
         returns = []
         discounted_reward = 0
         for reward, next_state, done in zip(reversed(rewards), reversed(next_states), reversed(dones)):
@@ -485,41 +485,41 @@ class PPOAgent:
             discounted_reward = reward + (self.gamma * discounted_reward)
             returns.insert(0, discounted_reward)
         
-        # 归一化回报
+        # Normalize returns
         returns = torch.FloatTensor(returns).to(self.device)
         returns = (returns - returns.mean()) / (returns.std() + 1e-5)
         
-        # 多次优化
+        # Multiple optimization
         actor_loss_epoch = 0
         critic_loss_epoch = 0
         
         for _ in range(self.k_epochs):
-            # 获取当前策略的动作概率和状态价值
+            # Get current policy action probabilities and state values
             action_probs, state_values = self.policy(old_states)
             state_values = state_values.squeeze()
             
-            # 计算新旧策略的概率比
+            # Calculate probability ratio between old and new policies
             dist = Categorical(action_probs)
             new_action_probs = dist.log_prob(old_actions).exp()
             
-            # 计算比率
+            # Calculate ratio
             ratios = new_action_probs / old_action_probs
             
-            # 计算优势
+            # Calculate advantages
             advantages = returns - state_values.detach()
             
-            # PPO损失
+            # PPO loss
             surr1 = ratios * advantages
             surr2 = torch.clamp(ratios, 1-self.eps_clip, 1+self.eps_clip) * advantages
             actor_loss = -torch.min(surr1, surr2).mean()
             
-            # 价值损失
+            # Value loss
             critic_loss = self.MseLoss(state_values, returns)
             
-            # 总损失
+            # Total loss
             loss = actor_loss + 0.5 * critic_loss
             
-            # 优化
+            # Optimization
             self.optimizer.zero_grad()
             loss.backward()
             self.optimizer.step()
@@ -527,26 +527,26 @@ class PPOAgent:
             actor_loss_epoch += actor_loss.item()
             critic_loss_epoch += critic_loss.item()
         
-        # 清空缓冲区
+        # Clear buffer
         self.buffer = []
         
         return actor_loss_epoch / self.k_epochs, critic_loss_epoch / self.k_epochs
     
     def save_model(self, path):
         """
-        保存模型
+        Save model
         
         Args:
-            path: 保存路径
+            path: Save path
         """
         torch.save(self.policy.state_dict(), path)
     
     def load_model(self, path):
         """
-        加载模型
+        Load model
         
         Args:
-            path: 模型路径
+            path: Model path
         """
         state_dict = torch.load(path, map_location=self.device, weights_only=True)
         self.policy.load_state_dict(state_dict)
@@ -554,24 +554,24 @@ class PPOAgent:
 
 
 class RLTrader:
-    """强化学习交易系统，集成PPO代理和交易环境"""
+    """Reinforcement learning trading system, integrating PPO agent and trading environment"""
     
     def __init__(self, model_dir: str = 'models', hidden_dim: int = 128, device: str = None):
         """
-        初始化RL交易系统
+        Initialize RL trading system
         
         Args:
-            model_dir: 模型保存目录
-            hidden_dim: 网络隐藏层维度
-            device: 运行设备
+            model_dir: Model save directory
+            hidden_dim: Network hidden layer dimension
+            device: Running device
         """
         self.model_dir = model_dir
         os.makedirs(model_dir, exist_ok=True)
         
         self.hidden_dim = hidden_dim
-        # 明确使用CUDA设备
+        # Explicitly use CUDA device
         if device is None:
-            self.device = DEVICE  # 使用全局设备配置
+            self.device = DEVICE  # Use global device configuration
         else:
             self.device = device
         
@@ -580,24 +580,24 @@ class RLTrader:
         self.trained = False
         
         self.logger = setup_logger('rl_trader')
-        self.logger.info(f"RLTrader初始化完成，使用设备: {self.device}")
+        self.logger.info(f"RLTrader initialization completed, using device: {self.device}")
     
     def train(self, df, initial_balance=100000, transaction_fee_percent=0.001,
           n_episodes=1000, batch_size=64, reward_scaling=100.0, max_steps=252,
           window_size=20):
         """
-        训练强化学习交易模型
+        Train reinforcement learning trading model
         
         Args:
-            df: 价格数据DataFrame
-            initial_balance: 初始资金
-            transaction_fee_percent: 交易手续费比例
-            n_episodes: 训练轮数
-            batch_size: 批量大小
-            reward_scaling: 奖励缩放因子
-            max_steps: 每个episode的最大步数
+            df: Price data DataFrame
+            initial_balance: Initial capital
+            transaction_fee_percent: Transaction fee percentage
+            n_episodes: Number of training episodes
+            batch_size: Batch size
+            reward_scaling: Reward scaling factor
+            max_steps: Maximum steps per episode
         """
-        # 创建交易环境
+        # Create trading environment
         self.env = StockTradingEnv(
             df=df,
             initial_balance=initial_balance,
@@ -607,7 +607,7 @@ class RLTrader:
             window_size=window_size,
         )
         
-        # 创建PPO代理
+        # Create PPO agent
         state_dim = self.env.observation_space.shape[0]
         action_dim = self.env.action_space.n
         
@@ -615,16 +615,16 @@ class RLTrader:
             state_dim=state_dim,
             action_dim=action_dim,
             hidden_dim=self.hidden_dim,
-            device=self.device  # 明确传递设备参数
+            device=self.device  # Explicitly pass device parameter
         )
         
-        # 训练记录
+        # Training records
         episode_rewards = []
         actor_losses = []
         critic_losses = []
         portfolio_values = []
         
-        self.logger.info(f"开始训练，共{n_episodes}轮...")
+        self.logger.info(f"Starting training, {n_episodes} episodes...")
         best_reward = -float('inf')
         
         for episode in range(n_episodes):
@@ -633,16 +633,16 @@ class RLTrader:
             episode_reward = 0
             
             while not done:
-                # 选择动作
+                # Select action
                 action, action_prob, _ = self.agent.select_action(state)
                 
-                # 执行动作
+                # Execute action
                 next_state, reward, done, info = self.env.step(action)
                 
-                # 存储转移
+                # Store transition
                 self.agent.store_transition((state, action, action_prob, reward, next_state, done))
                 
-                # 如果缓冲区满，更新策略
+                # If buffer is full, update policy
                 if len(self.agent.buffer) >= batch_size:
                     actor_loss, critic_loss = self.agent.update()
                     self.agent.update_old_policy()
@@ -652,26 +652,26 @@ class RLTrader:
                 state = next_state
                 episode_reward += reward
             
-            # 记录结果
+            # Record results
             episode_rewards.append(episode_reward)
             portfolio_values.append(info['portfolio_value'])
             
-            # 打印训练进度
+            # Print training progress
             if (episode + 1) % 10 == 0:
                 avg_reward = np.mean(episode_rewards[-10:])
                 avg_value = np.mean(portfolio_values[-10:])
                 self.logger.info(f"Episode {episode+1}/{n_episodes}, Avg Reward: {avg_reward:.4f}, Avg Portfolio: {avg_value:.2f}")
             
-            # 保存最佳模型
+            # Save best model
             if episode_reward > best_reward:
                 best_reward = episode_reward
                 self.save_model("best_model")
         
-        # 最终保存模型
+        # Final model save
         self.save_model("final_model")
         self.trained = True
         
-        # 返回训练记录
+        # Return training records
         training_history = {
             'episode_rewards': episode_rewards,
             'actor_losses': actor_losses,
@@ -684,18 +684,18 @@ class RLTrader:
     def test(self, df: pd.DataFrame, initial_balance: float = 100000,
             transaction_fee_percent: float = 0.001, model_name: str = "best_model"):
         """
-        测试强化学习交易模型
+        Test reinforcement learning trading model
         
         Args:
-            df: 价格数据DataFrame
-            initial_balance: 初始资金
-            transaction_fee_percent: 交易手续费比例
-            model_name: 模型名称
+            df: Price data DataFrame
+            initial_balance: Initial capital
+            transaction_fee_percent: Transaction fee percentage
+            model_name: Model name
             
         Returns:
-            测试结果字典
+            Test results dictionary
         """
-        # 创建测试环境
+        # Create test environment
         test_env = StockTradingEnv(
             df=df,
             initial_balance=initial_balance,
@@ -704,7 +704,7 @@ class RLTrader:
             max_steps=len(df)
         )
         
-        # 确保代理已加载
+        # Ensure agent is loaded
         if self.agent is None:
             state_dim = test_env.observation_space.shape[0]
             action_dim = test_env.action_space.n
@@ -713,16 +713,16 @@ class RLTrader:
                 state_dim=state_dim,
                 action_dim=action_dim,
                 hidden_dim=self.hidden_dim,
-                device=self.device  # 明确传递设备参数
+                device=self.device  # Explicitly pass device parameter
             )
             self.load_model(model_name)
         
-        # 测试
+        # Test
         state = test_env.reset()
         done = False
         total_reward = 0
         
-        # 记录测试过程
+        # Record test process
         states = []
         actions = []
         rewards = []
@@ -732,13 +732,13 @@ class RLTrader:
         prices = []
         
         while not done:
-            # 选择动作
+            # Select action
             action, _, _ = self.agent.select_action(state)
             
-            # 执行动作
+            # Execute action
             next_state, reward, done, info = test_env.step(action)
             
-            # 记录
+            # Record
             states.append(state)
             actions.append(action)
             rewards.append(reward)
@@ -750,24 +750,24 @@ class RLTrader:
             state = next_state
             total_reward += reward
         
-        # 计算性能指标
+        # Calculate performance metrics
         returns = np.array(portfolio_values) / initial_balance - 1
         daily_returns = np.diff(portfolio_values) / portfolio_values[:-1]
         
-        # 计算夏普比率
+        # Calculate Sharpe ratio
         avg_daily_return = np.mean(daily_returns)
         std_daily_return = np.std(daily_returns)
         sharpe_ratio = (avg_daily_return / std_daily_return) * np.sqrt(252) if std_daily_return > 0 else 0
         
-        # 最大回撤
+        # Maximum drawdown
         peak = np.maximum.accumulate(portfolio_values)
         drawdown = (peak - portfolio_values) / peak
         max_drawdown = np.max(drawdown)
         
-        # 总收益率
+        # Total return
         total_return = portfolio_values[-1] / initial_balance - 1
         
-        # 测试结果
+        # Test results
         test_results = {
             'total_reward': total_reward,
             'total_return': total_return,
@@ -781,91 +781,91 @@ class RLTrader:
             'trades': test_env.history
         }
         
-        self.logger.info(f"测试完成，总收益率: {total_return:.2%}, 夏普比率: {sharpe_ratio:.2f}, 最大回撤: {max_drawdown:.2%}")
+        self.logger.info(f"Test completed, total return: {total_return:.2%}, Sharpe ratio: {sharpe_ratio:.2f}, max drawdown: {max_drawdown:.2%}")
         
         return test_results
     
     def save_model(self, model_name: str = "ppo_model"):
         """
-        保存模型
+        Save model
         
         Args:
-            model_name: 模型名称
+            model_name: Model name
         """
         if self.agent is None:
-            self.logger.warning("没有模型可保存")
+            self.logger.warning("No model to save")
             return
         
         model_path = os.path.join(self.model_dir, f"{model_name}.pth")
         self.agent.save_model(model_path)
-        self.logger.info(f"模型保存至 {model_path}")
+        self.logger.info(f"Model saved to {model_path}")
     
     def load_model(self, model_name: str = "ppo_model"):
         """
-        加载模型
+        Load model
         
         Args:
-            model_name: 模型名称
+            model_name: Model name
         """
         model_path = os.path.join(self.model_dir, f"{model_name}.pth")
         
         if not os.path.exists(model_path):
-            self.logger.warning(f"模型文件 {model_path} 不存在")
+            self.logger.warning(f"Model file {model_path} does not exist")
             return False
         
         if self.agent is None:
-            self.logger.warning("请先初始化代理")
+            self.logger.warning("Please initialize agent first")
             return False
         
         self.agent.load_model(model_path)
         self.trained = True
-        self.logger.info(f"模型从 {model_path} 加载成功")
+        self.logger.info(f"Model loaded successfully from {model_path}")
         return True
 
     def generate_trading_signal(self, state):
         """
-        生成交易信号
+        Generate trading signal
         
         Args:
-            state: 当前状态
+            state: Current state
             
         Returns:
-            交易信号字典
+            Trading signal dictionary
         """
         if not self.trained or self.agent is None:
             return {'signal': 'neutral', 'confidence': 0.5}
         
-        # 获取动作和概率
+        # Get action and probability
         with torch.no_grad():
             try:
                 state_tensor = torch.FloatTensor(state).unsqueeze(0).to(self.agent.device)
                 action_probs, _ = self.agent.policy(state_tensor)
                 action_probs = action_probs.squeeze().cpu().numpy()
                 
-                # 打印调试信息
-                logger.info(f"动作概率: {action_probs}")
+                # Print debug information
+                logger.info(f"Action probabilities: {action_probs}")
                 
-                # 选择动作
+                # Select action
                 action = np.argmax(action_probs)
                 
-                # 转换为交易信号
+                # Convert to trading signal
                 signal_map = {0: 'neutral', 1: 'bullish', 2: 'bearish'}
                 
-                # 确保动作在有效范围内
+                # Ensure action is within valid range
                 if action not in signal_map:
-                    logger.info(f"警告: 无效的动作索引 {action}")
-                    action = 0  # 默认为neutral
+                    logger.info(f"Warning: Invalid action index {action}")
+                    action = 0  # Default to neutral
                 
-                # 计算置信度
+                # Calculate confidence
                 confidence = float(action_probs[action])
                 
-                # 构建动作概率字典
+                # Build action probability dictionary
                 action_prob_dict = {}
                 for i, prob in enumerate(action_probs):
                     if i in signal_map:
                         action_prob_dict[signal_map[i]] = float(prob)
                 
-                # 同时使用action_probs和action_probabilities两个键，保证兼容性
+                # Use both action_probs and action_probabilities keys for compatibility
                 return {
                     'signal': signal_map[action],
                     'confidence': confidence,
@@ -873,43 +873,43 @@ class RLTrader:
                     'action_probabilities': action_prob_dict
                 }
             except Exception as e:
-                logger.info(f"生成交易信号时出错: {e}")
+                logger.info(f"Error generating trading signal: {e}")
                 import traceback
                 traceback.logger.info_exc()
                 return {'signal': 'neutral', 'confidence': 0.5}
 
 
 class RLTradingAgent:
-    """强化学习交易Agent，集成到现有系统中"""
+    """Reinforcement learning trading Agent, integrated into existing system"""
     
     def __init__(self, model_dir: str = 'models'):
         """
-        初始化RL交易Agent
+        Initialize RL trading Agent
         
         Args:
-            model_dir: 模型保存目录
+            model_dir: Model save directory
         """
-        self.rl_trader = RLTrader(model_dir=model_dir, device='cuda')  # 明确指定使用cuda
-        self.window_size = 20  # 观察窗口大小
+        self.rl_trader = RLTrader(model_dir=model_dir, device='cuda')  # Explicitly specify using cuda
+        self.window_size = 20  # Observation window size
         self.logger = setup_logger('rl_trading_agent')
         self.is_trained = False
     
     def train(self, price_data: pd.DataFrame, tech_indicators: Dict[str, pd.Series] = None):
         """
-        训练RL交易模型
+        Train RL trading model
         
         Args:
-            price_data: 价格数据
-            tech_indicators: 技术指标
+            price_data: Price data
+            tech_indicators: Technical indicators
         """
         try:
-            # 准备训练数据
+            # Prepare training data
             df = self._prepare_data(price_data, tech_indicators)
             
-            # 训练模型
+            # Train model
             training_history = self.rl_trader.train(
                 df=df,
-                n_episodes=500,  # 减少轮数以加快训练
+                n_episodes=500,  # Reduce episodes to speed up training
                 batch_size=32,
                 reward_scaling=1.0
             )
@@ -918,17 +918,17 @@ class RLTradingAgent:
             return training_history
             
         except Exception as e:
-            self.logger.error(f"训练模型时出错: {str(e)}")
+            self.logger.error(f"Error training model: {str(e)}")
             return None
     
     def load_model(self, model_name: str = "best_model"):
         """
-        加载已训练的模型
+        Load trained model
         
         Args:
-            model_name: 模型名称
+            model_name: Model name
         """
-        # 创建空环境以初始化agent
+        # Create empty environment to initialize agent
         dummy_df = pd.DataFrame({
             'open': [100] * 100,
             'high': [110] * 100,
@@ -937,18 +937,18 @@ class RLTradingAgent:
             'volume': [1000] * 100
         })
         
-        # 添加技术指标
+        # Add technical indicators
         for indicator in ['ma5', 'ma10', 'ma20', 'rsi', 'macd', 'macd_signal', 'macd_hist',
                          'volatility_5d', 'volatility_10d', 'volatility_20d']:
             dummy_df[indicator] = 0
         
-        # 创建环境
+        # Create environment
         self.rl_trader.env = StockTradingEnv(
             df=dummy_df,
             window_size=self.window_size
         )
         
-        # 初始化代理
+        # Initialize agent
         state_dim = self.rl_trader.env.observation_space.shape[0]
         action_dim = self.rl_trader.env.action_space.n
         
@@ -956,10 +956,10 @@ class RLTradingAgent:
             state_dim=state_dim,
             action_dim=action_dim,
             hidden_dim=self.rl_trader.hidden_dim,
-            device='cuda'  # 明确指定使用cuda
+            device='cuda'  # Explicitly specify using cuda
         )
         
-        # 加载模型
+        # Load model
         success = self.rl_trader.load_model(model_name)
         self.is_trained = success
         return success
@@ -967,69 +967,69 @@ class RLTradingAgent:
     def generate_signals(self, price_data: pd.DataFrame, 
                     tech_indicators: Dict[str, pd.Series] = None) -> Dict[str, Any]:
         """
-        生成交易信号
+        Generate trading signals
         
         Args:
-            price_data: 价格数据
-            tech_indicators: 技术指标
+            price_data: Price data
+            tech_indicators: Technical indicators
             
         Returns:
-            包含交易信号的字典
+            Dictionary containing trading signals
         """
         signals = {}
         
         try:
-            # 加载模型(如果尚未加载)
+            # Load model (if not yet loaded)
             if not self.is_trained:
                 loaded = self.load_model()
                 if not loaded:
-                    return {'signal': 'neutral', 'confidence': 0.5, 'error': '模型未加载成功'}
+                    return {'signal': 'neutral', 'confidence': 0.5, 'error': 'Model loading failed'}
             
-            # 准备数据
+            # Prepare data
             df = self._prepare_data(price_data, tech_indicators)
             
-            # 检查数据量是否足够
-            if len(df) < self.window_size + 5:  # 确保有足够的数据
+            # Check if data volume is sufficient
+            if len(df) < self.window_size + 5:  # Ensure sufficient data
                 return {
                     'signal': 'neutral', 
                     'confidence': 0.5, 
-                    'error': f'数据量不足，需要至少{self.window_size + 5}个数据点，但只有{len(df)}个'
+                    'error': f'Insufficient data, need at least {self.window_size + 5} data points, but only have {len(df)}'
                 }
             
-            # 创建环境
+            # Create environment
             env = StockTradingEnv(
                 df=df,
                 window_size=self.window_size,
-                max_steps=10  # 小步数
+                max_steps=10  # Small number of steps
             )
             
-            # 获取状态
+            # Get state
             state = env.reset()
 
-            logger.info(f"\n用于信号生成的状态shape: {state.shape}\n")
+            logger.info(f"\nState shape for signal generation: {state.shape}\n")
             
-            # 生成信号
+            # Generate signal
             signal_info = self.rl_trader.generate_trading_signal(state)
             
-            # 添加策略分析
+            # Add policy analysis
             signals['rl_signal'] = signal_info['signal']
             signals['rl_confidence'] = signal_info['confidence']
             
-            # 同时尝试两种键名
+            # Try both key names
             if 'action_probabilities' in signal_info:
                 signals['action_probabilities'] = signal_info['action_probabilities']
             if 'action_probs' in signal_info:
                 signals['action_probs'] = signal_info['action_probs']
             
-            # 添加推理分析
+            # Add reasoning analysis
             signals['reasoning'] = self._generate_reasoning(signal_info)
             
-            # 最终信号
+            # Final signal
             signals['signal'] = signal_info['signal']
             signals['confidence'] = signal_info['confidence']
             
         except Exception as e:
-            self.logger.error(f"生成交易信号时出错: {e}")
+            self.logger.error(f"Error generating trading signals: {e}")
             import traceback
             traceback.logger.info_exc()
             signals['signal'] = 'neutral'
@@ -1040,26 +1040,26 @@ class RLTradingAgent:
     
     def _prepare_data(self, price_data: pd.DataFrame, tech_indicators: Dict[str, pd.Series] = None) -> pd.DataFrame:
         """
-        准备模型输入数据
+        Prepare model input data
         
         Args:
-            price_data: 价格数据
-            tech_indicators: 技术指标
+            price_data: Price data
+            tech_indicators: Technical indicators
             
         Returns:
-            处理后的DataFrame
+            Processed DataFrame
         """
-        # 复制数据
+        # Copy data
         df = price_data.copy()
         
-        # 确保有必要的列
+        # Ensure necessary columns exist
         required_cols = ['open', 'high', 'low', 'close', 'volume']
         for col in required_cols:
             if col not in df.columns:
-                raise ValueError(f"价格数据缺少必要的列: {col}")
+                raise ValueError(f"Price data missing required column: {col}")
         
-        # 计算常用技术指标
-        # 移动平均线
+        # Calculate common technical indicators
+        # Moving averages
         df['ma5'] = df['close'].rolling(window=5).mean()
         df['ma10'] = df['close'].rolling(window=10).mean()
         df['ma20'] = df['close'].rolling(window=20).mean()
@@ -1080,36 +1080,36 @@ class RLTradingAgent:
         df['macd_signal'] = df['macd'].ewm(span=9, adjust=False).mean()
         df['macd_hist'] = df['macd'] - df['macd_signal']
         
-        # 波动率
+        # Volatility
         df['volatility_5d'] = df['close'].pct_change().rolling(window=5).std()
         df['volatility_10d'] = df['close'].pct_change().rolling(window=10).std()
         df['volatility_20d'] = df['close'].pct_change().rolling(window=20).std()
         
-        # 添加外部技术指标
+        # Add external technical indicators
         if tech_indicators:
             for name, indicator in tech_indicators.items():
                 if name not in df.columns:
                     df[name] = indicator
         
-        # 填充缺失值
+        # Fill missing values
         df = df.ffill().bfill()
         
         return df
     
     def _generate_reasoning(self, signal_info: Dict[str, Any]) -> str:
         """
-        根据信号生成决策理由
+        Generate decision reasoning based on signal
         
         Args:
-            signal_info: 信号信息字典
+            signal_info: Signal information dictionary
             
         Returns:
-            决策理由
+            Decision reasoning
         """
         signal = signal_info['signal']
         confidence = signal_info['confidence']
         
-        # 尝试两种可能的键名
+        # Try both possible key names
         action_probs = {}
         if 'action_probabilities' in signal_info:
             action_probs = signal_info['action_probabilities']
@@ -1118,25 +1118,25 @@ class RLTradingAgent:
         
         reasoning = []
         
-        # 分析信号
+        # Analyze signal
         if signal == 'bullish':
-            reasoning.append(f"强化学习模型预测看多信号，置信度: {confidence:.2%}")
+            reasoning.append(f"Reinforcement learning model predicts bullish signal, confidence: {confidence:.2%}")
             if 'bullish' in action_probs:
-                reasoning.append(f"买入概率: {action_probs.get('bullish', 0):.2%}")
+                reasoning.append(f"Buy probability: {action_probs.get('bullish', 0):.2%}")
         elif signal == 'bearish':
-            reasoning.append(f"强化学习模型预测看空信号，置信度: {confidence:.2%}")
+            reasoning.append(f"Reinforcement learning model predicts bearish signal, confidence: {confidence:.2%}")
             if 'bearish' in action_probs:
-                reasoning.append(f"卖出概率: {action_probs.get('bearish', 0):.2%}")
+                reasoning.append(f"Sell probability: {action_probs.get('bearish', 0):.2%}")
         else:
-            reasoning.append(f"强化学习模型预测中性信号，置信度: {confidence:.2%}")
+            reasoning.append(f"Reinforcement learning model predicts neutral signal, confidence: {confidence:.2%}")
             if 'neutral' in action_probs:
-                reasoning.append(f"持有概率: {action_probs.get('neutral', 0):.2%}")
+                reasoning.append(f"Hold probability: {action_probs.get('neutral', 0):.2%}")
         
-        # 分析行为概率分布
+        # Analyze action probability distribution
         if action_probs:
             probs_str = ", ".join([f"{k}: {v:.2%}" for k, v in action_probs.items()])
-            reasoning.append(f"行为概率分布: {probs_str}")
+            reasoning.append(f"Action probability distribution: {probs_str}")
         else:
-            reasoning.append("行为概率分布: 无有效数据")
+            reasoning.append("Action probability distribution: No valid data")
         
         return "; ".join(reasoning)

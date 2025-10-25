@@ -1,12 +1,12 @@
 """
-回测工具模块
+Backtesting utilities module
 
-提供数据处理、性能分析和统计分析等工具函数。
+Provides utility functions for data processing, performance analysis and statistical analysis.
 
-主要组件:
-- DataProcessor: 数据处理工具
-- PerformanceAnalyzer: 性能分析工具
-- StatisticalAnalyzer: 统计分析工具
+Main Components:
+- DataProcessor: Data processing tools
+- PerformanceAnalyzer: Performance analysis tools
+- StatisticalAnalyzer: Statistical analysis tools
 """
 
 from .data_utils import DataProcessor

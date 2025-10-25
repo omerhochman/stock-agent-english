@@ -5,25 +5,25 @@ import logging
 from contextlib import contextmanager
 from .data_source_interface import LoginError
 
-# --- 日志设置 ---
+# --- Logging setup ---
 def setup_logging(level=logging.INFO):
-    """配置应用程序的基本日志记录。"""
+    """Configure basic logging for the application."""
     logging.basicConfig(
         level=level,
         format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
         datefmt='%Y-%m-%d %H:%M:%S'
     )
-    # 如果依赖项的日志过于冗长，可以选择将其静音
+    # If dependency logs are too verbose, you can choose to silence them
     # logging.getLogger("mcp").setLevel(logging.WARNING)
 
-# 为此模块获取一个日志记录器实例（可选，但是良好实践）
+# Get a logger instance for this module (optional, but good practice)
 logger = logging.getLogger(__name__)
 
-# --- Baostock上下文管理器 ---
+# --- Baostock context manager ---
 @contextmanager
 def baostock_login_context():
-    """处理Baostock登录和登出的上下文管理器，抑制标准输出消息。"""
-    # 重定向标准输出以抑制登录/登出消息
+    """Context manager for handling Baostock login and logout, suppressing standard output messages."""
+    # Redirect standard output to suppress login/logout messages
     original_stdout_fd = sys.stdout.fileno()
     saved_stdout_fd = os.dup(original_stdout_fd)
     devnull_fd = os.open(os.devnull, os.O_WRONLY)
@@ -31,24 +31,24 @@ def baostock_login_context():
     os.dup2(devnull_fd, original_stdout_fd)
     os.close(devnull_fd)
 
-    logger.debug("尝试Baostock登录...")
+    logger.debug("Attempting Baostock login...")
     lg = bs.login()
-    logger.debug(f"登录结果: code={lg.error_code}, msg={lg.error_msg}")
+    logger.debug(f"Login result: code={lg.error_code}, msg={lg.error_msg}")
 
-    # 恢复标准输出
+    # Restore standard output
     os.dup2(saved_stdout_fd, original_stdout_fd)
     os.close(saved_stdout_fd)
 
     if lg.error_code != '0':
-        # 在抛出异常前记录错误
-        logger.error(f"Baostock登录失败: {lg.error_msg}")
-        raise LoginError(f"Baostock登录失败: {lg.error_msg}")
+        # Log error before throwing exception
+        logger.error(f"Baostock login failed: {lg.error_msg}")
+        raise LoginError(f"Baostock login failed: {lg.error_msg}")
 
-    logger.info("Baostock登录成功。")
+    logger.info("Baostock login successful.")
     try:
-        yield  # API调用发生在这里
+        yield  # API calls happen here
     finally:
-        # 再次重定向标准输出以进行登出
+        # Redirect standard output again for logout
         original_stdout_fd = sys.stdout.fileno()
         saved_stdout_fd = os.dup(original_stdout_fd)
         devnull_fd = os.open(os.devnull, os.O_WRONLY)
@@ -56,11 +56,11 @@ def baostock_login_context():
         os.dup2(devnull_fd, original_stdout_fd)
         os.close(devnull_fd)
 
-        logger.debug("尝试Baostock登出...")
+        logger.debug("Attempting Baostock logout...")
         bs.logout()
-        logger.debug("登出完成。")
+        logger.debug("Logout completed.")
 
-        # 恢复标准输出
+        # Restore standard output
         os.dup2(saved_stdout_fd, original_stdout_fd)
         os.close(saved_stdout_fd)
-        logger.info("Baostock登出成功。")
+        logger.info("Baostock logout successful.")

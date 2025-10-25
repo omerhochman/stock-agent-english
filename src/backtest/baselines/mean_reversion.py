@@ -3,9 +3,9 @@ from .base_strategy import BaseStrategy, Signal, Portfolio
 
 class MeanReversionStrategy(BaseStrategy):
     """
-    均值回归策略
-    基于价格向长期均值回归的投资策略
-    参考：De Bondt and Thaler (1985)
+    Mean Reversion Strategy
+    Investment strategy based on price reversion to long-term mean
+    Reference: De Bondt and Thaler (1985)
     """
     
     def __init__(self, lookback_period: int = 252, z_threshold: float = 2.0,
@@ -14,13 +14,13 @@ class MeanReversionStrategy(BaseStrategy):
         name = kwargs.pop('name', 'Mean-Reversion')
         super().__init__(name, **kwargs)
         self.lookback_period = lookback_period
-        self.z_threshold = z_threshold  # Z-score阈值
-        self.mean_period = mean_period  # 均值计算期
-        self.exit_threshold = exit_threshold  # 退出阈值
+        self.z_threshold = z_threshold  # Z-score threshold
+        self.mean_period = mean_period  # Mean calculation period
+        self.exit_threshold = exit_threshold  # Exit threshold
         self.position_entry_date = None
         
     def calculate_z_score(self, prices: pd.Series) -> float:
-        """计算价格的Z-score"""
+        """Calculate Z-score of prices"""
         if len(prices) < self.mean_period:
             return 0.0
             
@@ -37,7 +37,7 @@ class MeanReversionStrategy(BaseStrategy):
         return z_score
     
     def calculate_rsi(self, prices: pd.Series, period: int = 14) -> float:
-        """计算RSI指标"""
+        """Calculate RSI indicator"""
         if len(prices) < period + 1:
             return 50.0
             
@@ -56,16 +56,16 @@ class MeanReversionStrategy(BaseStrategy):
     def generate_signal(self, data: pd.DataFrame, portfolio: Portfolio, 
                        current_date: str, **kwargs) -> Signal:
         """
-        均值回归策略逻辑：
-        - 计算Z-score和RSI
-        - 价格严重偏离均值时进行反向操作
-        - 价格回归至均值附近时平仓
+        Mean reversion strategy logic:
+        - Calculate Z-score and RSI
+        - Take contrarian action when price deviates significantly from mean
+        - Close position when price returns near mean
         """
         prices = data['close']
         z_score = self.calculate_z_score(prices)
         rsi = self.calculate_rsi(prices)
         
-        # 计算布林带
+        # Calculate Bollinger Bands
         if len(prices) >= 20:
             bb_period = 20
             sma = prices.tail(bb_period).mean()
@@ -77,14 +77,14 @@ class MeanReversionStrategy(BaseStrategy):
         else:
             bb_position = 0.5
             
-        # 计算波动率
+        # Calculate volatility
         volatility = prices.pct_change().tail(21).std() if len(prices) > 21 else 0
         
         position_ratio = (portfolio.stock * prices.iloc[-1]) / (portfolio.cash + portfolio.stock * prices.iloc[-1])
         
-        # 超卖信号 - 买入
+        # Oversold signal - buy
         if (z_score < -self.z_threshold or rsi < 30 or bb_position < 0.1) and position_ratio < 0.7:
-            # 价格严重低于均值，超卖
+            # Price significantly below mean, oversold
             signal_strength = abs(z_score) / self.z_threshold
             max_investment = portfolio.cash * min(0.4, signal_strength * 0.3)
             quantity = int(max_investment / prices.iloc[-1])
@@ -104,9 +104,9 @@ class MeanReversionStrategy(BaseStrategy):
                     }
                 )
         
-        # 超买信号 - 卖出
+        # Overbought signal - sell
         elif (z_score > self.z_threshold or rsi > 70 or bb_position > 0.9) and portfolio.stock > 0:
-            # 价格严重高于均值，超买
+            # Price significantly above mean, overbought
             signal_strength = abs(z_score) / self.z_threshold
             quantity = min(portfolio.stock, int(portfolio.stock * min(0.6, signal_strength * 0.4)))
             
@@ -125,10 +125,10 @@ class MeanReversionStrategy(BaseStrategy):
                     }
                 )
         
-        # 回归信号 - 平仓
+        # Reversion signal - close position
         elif abs(z_score) < self.exit_threshold and 30 < rsi < 70 and 0.3 < bb_position < 0.7:
             if portfolio.stock > 0:
-                # 部分获利了结
+                # Partial profit taking
                 quantity = int(portfolio.stock * 0.3)
                 return Signal(
                     action='sell',
@@ -142,7 +142,7 @@ class MeanReversionStrategy(BaseStrategy):
                     }
                 )
         
-        # 持有信号
+        # Hold signal
         return Signal(
             action='hold',
             quantity=0,

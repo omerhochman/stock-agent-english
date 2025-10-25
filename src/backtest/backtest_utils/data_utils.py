@@ -4,8 +4,8 @@ from typing import List
 
 class DataProcessor:
     """
-    数据处理器
-    提供数据清理、转换和预处理功能
+    Data Processor
+    Provides data cleaning, transformation and preprocessing functions
     """
     
     def __init__(self):
@@ -13,39 +13,39 @@ class DataProcessor:
     
     def clean_price_data(self, data: pd.DataFrame) -> pd.DataFrame:
         """
-        清理价格数据
+        Clean price data
         
         Args:
-            data: 原始价格数据
+            data: Raw price data
             
         Returns:
-            pd.DataFrame: 清理后的数据
+            pd.DataFrame: Cleaned data
         """
         if data is None or data.empty:
             return pd.DataFrame()
         
-        # 删除重复行
+        # Remove duplicate rows
         data = data.drop_duplicates()
         
-        # 处理缺失值
+        # Handle missing values
         data = data.dropna()
         
-        # 确保价格列为数值类型
+        # Ensure price columns are numeric type
         price_columns = ['open', 'high', 'low', 'close', 'volume']
         for col in price_columns:
             if col in data.columns:
                 data[col] = pd.to_numeric(data[col], errors='coerce')
         
-        # 删除异常值（价格为0或负数）
+        # Remove outliers (prices that are 0 or negative)
         for col in ['open', 'high', 'low', 'close']:
             if col in data.columns:
                 data = data[data[col] > 0]
         
-        # 确保高价≥低价
+        # Ensure high price >= low price
         if 'high' in data.columns and 'low' in data.columns:
             data = data[data['high'] >= data['low']]
         
-        # 按日期排序
+        # Sort by date
         if data.index.name != 'date' and 'date' in data.columns:
             data = data.set_index('date')
         
@@ -55,14 +55,14 @@ class DataProcessor:
     
     def calculate_returns(self, prices: pd.Series, method: str = 'simple') -> pd.Series:
         """
-        计算收益率
+        Calculate returns
         
         Args:
-            prices: 价格序列
-            method: 计算方法 ('simple' 或 'log')
+            prices: Price series
+            method: Calculation method ('simple' or 'log')
             
         Returns:
-            pd.Series: 收益率序列
+            pd.Series: Returns series
         """
         if method == 'simple':
             returns = prices.pct_change()
@@ -75,23 +75,23 @@ class DataProcessor:
     
     def align_data(self, *dataframes: pd.DataFrame) -> List[pd.DataFrame]:
         """
-        对齐多个数据框的时间索引
+        Align time indices of multiple dataframes
         
         Args:
-            *dataframes: 要对齐的数据框
+            *dataframes: Dataframes to align
             
         Returns:
-            List[pd.DataFrame]: 对齐后的数据框列表
+            List[pd.DataFrame]: List of aligned dataframes
         """
         if len(dataframes) < 2:
             return list(dataframes)
         
-        # 找到共同的时间索引
+        # Find common time index
         common_index = dataframes[0].index
         for df in dataframes[1:]:
             common_index = common_index.intersection(df.index)
         
-        # 对齐所有数据框
+        # Align all dataframes
         aligned_dfs = []
         for df in dataframes:
             aligned_df = df.reindex(common_index)
@@ -101,19 +101,19 @@ class DataProcessor:
     
     def resample_data(self, data: pd.DataFrame, frequency: str) -> pd.DataFrame:
         """
-        重采样数据到指定频率
+        Resample data to specified frequency
         
         Args:
-            data: 原始数据
-            frequency: 目标频率 ('D', 'W', 'M' 等)
+            data: Original data
+            frequency: Target frequency ('D', 'W', 'M', etc.)
             
         Returns:
-            pd.DataFrame: 重采样后的数据
+            pd.DataFrame: Resampled data
         """
         if data.empty:
             return data
         
-        # 价格数据的聚合规则
+        # Aggregation rules for price data
         agg_rules = {
             'open': 'first',
             'high': 'max',
@@ -122,7 +122,7 @@ class DataProcessor:
             'volume': 'sum'
         }
         
-        # 只使用存在的列
+        # Only use existing columns
         available_rules = {col: rule for col, rule in agg_rules.items() 
                           if col in data.columns}
         

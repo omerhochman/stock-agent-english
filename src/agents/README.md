@@ -1,57 +1,57 @@
-# 投资分析系统代理模块 (src/agents)
+# Investment Analysis System Agent Module (src/agents)
 
-## 概述
+## Overview
 
-本模块是基于多代理系统的 AI 投资分析框架的核心组件，实现了一个完整的投资研究和决策流水线。该系统采用现代投资组合理论、行为金融学和机器学习技术，提供全面的股票分析和投资建议。
+This module is the core component of an AI investment analysis framework based on a multi-agent system, implementing a complete investment research and decision pipeline. The system adopts modern portfolio theory, behavioral finance, and machine learning technologies to provide comprehensive stock analysis and investment recommendations.
 
-## 系统架构
+## System Architecture
 
-系统采用分布式代理架构，每个代理专注于特定的分析领域，最终通过智能聚合形成投资决策：
+The system adopts a distributed agent architecture where each agent focuses on specific analysis areas, ultimately forming investment decisions through intelligent aggregation:
 
 ```
-数据收集 → 多维分析 → AI模型预测 → 辩论评估 → 风险管理 → 投资组合决策
+Data Collection → Multi-dimensional Analysis → AI Model Prediction → Debate Evaluation → Risk Management → Portfolio Decision
 ```
 
-## 核心代理模块
+## Core Agent Modules
 
-### 1. 市场数据代理 (market_data.py)
+### 1. Market Data Agent (market_data.py)
 
-**功能**: 负责收集和预处理所有市场相关数据
+**Function**: Responsible for collecting and preprocessing all market-related data
 
-- **核心特性**:
-  - 支持单一和多资产数据收集
-  - 获取股价历史、财务指标、市场数据
-  - 数据验证和清洗
-  - 统一数据格式化
+- **Core Features**:
+  - Supports single and multi-asset data collection
+  - Obtains stock price history, financial indicators, market data
+  - Data validation and cleaning
+  - Unified data formatting
 
-**主要方法**:
+**Main Methods**:
 
 ```python
-@agent_endpoint("market_data", "市场数据收集，负责获取股价历史、财务指标和市场信息")
+@agent_endpoint("market_data", "Market data collection, responsible for obtaining stock price history, financial indicators and market information")
 def market_data_agent(state: AgentState):
-    # 收集多个股票的完整市场数据
-    # 返回标准化的数据结构
+    # Collect complete market data for multiple stocks
+    # Return standardized data structure
 ```
 
-### 2. 技术分析代理 (technicals.py)
+### 2. Technical Analysis Agent (technicals.py)
 
-**功能**: 基于 2024-2025 年研究的区制感知技术分析系统
+**Function**: Regime-aware technical analysis system based on 2024-2025 research
 
-- **核心算法**:
-  - 趋势跟踪策略 (EMA、ADX、一目均衡)
-  - 均值回归策略 (RSI、布林带、KD 指标)
-  - 动量策略 (多周期动量、OBV)
-  - GARCH 波动率预测模型
-  - 统计套利信号
+- **Core Algorithms**:
+  - Trend following strategies (EMA, ADX, Ichimoku)
+  - Mean reversion strategies (RSI, Bollinger Bands, KD indicators)
+  - Momentum strategies (multi-period momentum, OBV)
+  - GARCH volatility prediction model
+  - Statistical arbitrage signals
 
-**高级特性**:
+**Advanced Features**:
 
-- **区制检测**: 使用高斯混合模型自动识别市场状态
-- **动态权重**: 根据市场区制调整策略权重
-- **信号增强**: 基于区制特性过滤和增强信号
+- **Regime Detection**: Uses Gaussian mixture models to automatically identify market states
+- **Dynamic Weights**: Adjusts strategy weights based on market regime
+- **Signal Enhancement**: Filters and enhances signals based on regime characteristics
 
 ```python
-# 核心信号组合逻辑
+# Core signal combination logic
 regime_adjusted_weights = _calculate_regime_adjusted_weights(current_regime)
 combined_signal = weighted_signal_combination({
     'trend': trend_signals,
@@ -61,39 +61,39 @@ combined_signal = weighted_signal_combination({
 }, regime_adjusted_weights)
 ```
 
-### 3. 基本面分析代理 (fundamentals.py)
+### 3. Fundamental Analysis Agent (fundamentals.py)
 
-**功能**: 全面的财务指标分析
+**Function**: Comprehensive financial indicator analysis
 
-- **分析维度**:
-  - 盈利能力分析 (ROE、净利润率、营业利润率)
-  - 增长性分析 (收入增长、盈利增长、账面价值增长)
-  - 财务健康度 (流动比率、负债率、现金流)
-  - 估值比率 (PE、PB、PS 比率)
+- **Analysis Dimensions**:
+  - Profitability analysis (ROE, net profit margin, operating margin)
+  - Growth analysis (revenue growth, profit growth, book value growth)
+  - Financial health (current ratio, debt ratio, cash flow)
+  - Valuation ratios (PE, PB, PS ratios)
 
-**决策逻辑**:
+**Decision Logic**:
 
 ```python
-# 多维度信号聚合
+# Multi-dimensional signal aggregation
 signals = [profitability_signal, growth_signal, health_signal, valuation_signal]
 overall_signal = determine_signal_by_majority(signals)
 confidence = calculate_weighted_confidence(signals)
 ```
 
-### 4. 估值分析代理 (valuation.py)
+### 4. Valuation Analysis Agent (valuation.py)
 
-**功能**: 使用多种估值模型评估内在价值
+**Function**: Evaluates intrinsic value using multiple valuation models
 
-- **估值方法**:
-  - **DCF 模型**: 三阶段现金流折现
-  - **所有者收益法**: 改进的巴菲特估值法
-  - **相对估值**: 行业比较分析
-  - **剩余收益模型**: 基于 ROE 的估值
+- **Valuation Methods**:
+  - **DCF Model**: Three-stage discounted cash flow
+  - **Owner Earnings Method**: Improved Buffett valuation method
+  - **Relative Valuation**: Industry comparison analysis
+  - **Residual Income Model**: ROE-based valuation
 
-**核心算法**:
+**Core Algorithm**:
 
 ```python
-# 加权估值组合
+# Weighted valuation combination
 all_valuations = [
     {"method": "DCF", "value": dcf_value, "weight": 0.35},
     {"method": "Owner Earnings", "value": owner_earnings_value, "weight": 0.35},
@@ -102,37 +102,37 @@ all_valuations = [
 ]
 ```
 
-### 5. 情感分析代理 (sentiment.py)
+### 5. Sentiment Analysis Agent (sentiment.py)
 
-**功能**: 基于新闻和市场情绪的分析
+**Function**: Analysis based on news and market sentiment
 
-- **数据源**: 7 天内的新闻数据
-- **分析方法**: NLP 情感分析
-- **信号生成**: 情感分数到交易信号的转换
+- **Data Source**: News data within 7 days
+- **Analysis Method**: NLP sentiment analysis
+- **Signal Generation**: Conversion from sentiment score to trading signal
 
-### 6. 宏观分析代理 (macro_analyst.py)
+### 6. Macro Analysis Agent (macro_analyst.py)
 
-**功能**: 宏观经济环境对个股影响分析
+**Function**: Analysis of macroeconomic environment impact on individual stocks
 
-- **分析因子**:
-  - 货币政策 (利率、准备金率)
-  - 财政政策 (政府支出、税收)
-  - 产业政策 (行业规划、监管)
-  - 国际环境 (全球经济、贸易关系)
+- **Analysis Factors**:
+  - Monetary policy (interest rates, reserve requirement ratio)
+  - Fiscal policy (government spending, taxation)
+  - Industrial policy (industry planning, regulation)
+  - International environment (global economy, trade relations)
 
-### 7. AI 模型分析代理 (ai_model_analyst.py)
+### 7. AI Model Analysis Agent (ai_model_analyst.py)
 
-**功能**: 集成深度学习、强化学习和遗传编程模型
+**Function**: Integrates deep learning, reinforcement learning, and genetic programming models
 
-- **模型类型**:
-  - **深度学习**: LSTM + 随机森林组合
-  - **强化学习**: PPO 算法优化交易策略
-  - **遗传编程**: 自动化因子挖掘
+- **Model Types**:
+  - **Deep Learning**: LSTM + Random Forest combination
+  - **Reinforcement Learning**: PPO algorithm for trading strategy optimization
+  - **Genetic Programming**: Automated factor mining
 
-**信号聚合**:
+**Signal Aggregation**:
 
 ```python
-# 多模型信号组合
+# Multi-model signal combination
 weights = {
     'deep_learning': 0.35,
     'reinforcement_learning': 0.35,
@@ -141,20 +141,20 @@ weights = {
 combined_signal = combine_ai_signals(ml_signals, rl_signals, factor_signals)
 ```
 
-### 8. 辩论室代理 (debate_room.py)
+### 8. Debate Room Agent (debate_room.py)
 
-**功能**: 基于 2024-2025 研究的自适应信号聚合系统
+**Function**: Adaptive signal aggregation system based on 2024-2025 research
 
-- **核心技术**:
-  - FLAG-Trader 框架的区制感知聚合
-  - FINSABER 权重优化
-  - Lopez-Lira 动态阈值
+- **Core Technologies**:
+  - FLAG-Trader framework's regime-aware aggregation
+  - FINSABER weight optimization
+  - Lopez-Lira dynamic thresholds
 
-**聚合算法**:
+**Aggregation Algorithm**:
 
 ```python
 def adaptive_signal_aggregation(signals: Dict, regime_info: Dict, confidence_threshold: float = 0.6):
-    # 根据市场区制动态调整信号权重
+    # Dynamically adjust signal weights based on market regime
     regime_adjustments = {
         "low_volatility_trending": {'technical': 1.3, 'ai_model': 1.2},
         "high_volatility_mean_reverting": {'fundamental': 1.4, 'valuation': 1.3},
@@ -162,72 +162,72 @@ def adaptive_signal_aggregation(signals: Dict, regime_info: Dict, confidence_thr
     }
 ```
 
-### 9. 风险管理代理 (risk_manager.py)
+### 9. Risk Management Agent (risk_manager.py)
 
-**功能**: 基于现代投资组合理论的综合风险评估
+**Function**: Comprehensive risk assessment based on modern portfolio theory
 
-- **风险指标**:
-  - VaR 和 CVaR 计算
-  - 最大回撤分析
-  - GARCH 波动率预测
-  - 压力测试
-  - 区制风险评估
+- **Risk Indicators**:
+  - VaR and CVaR calculation
+  - Maximum drawdown analysis
+  - GARCH volatility prediction
+  - Stress testing
+  - Regime risk assessment
 
-**头寸规模优化**:
+**Position Sizing Optimization**:
 
 ```python
-# 区制感知的凯利准则
+# Regime-aware Kelly criterion
 kelly_fraction = win_rate - ((1 - win_rate) / win_loss_ratio)
-# 根据市场区制调整保守系数
+# Adjust conservative factor based on market regime
 conservative_factor = 0.3 if regime_name == "crisis_regime" else 0.5
 ```
 
-### 10. 投资组合分析代理 (portfolio_analyzer.py)
+### 10. Portfolio Analysis Agent (portfolio_analyzer.py)
 
-**功能**: 多资产投资组合优化和风险评估
+**Function**: Multi-asset portfolio optimization and risk assessment
 
-- **分析功能**:
-  - 有效前沿生成
-  - 夏普比率优化
-  - 相关性分析
-  - Beta 系数计算
-  - 尾部风险测量
+- **Analysis Functions**:
+  - Efficient frontier generation
+  - Sharpe ratio optimization
+  - Correlation analysis
+  - Beta coefficient calculation
+  - Tail risk measurement
 
-### 11. 投资组合管理代理 (portfolio_manager.py)
+### 11. Portfolio Management Agent (portfolio_manager.py)
 
-**功能**: 最终交易决策和投资组合管理
+**Function**: Final trading decisions and portfolio management
 
-- **决策整合**: 综合所有分析师建议
-- **现代投资组合理论**: 使用 MPT 优化决策
-- **LLM 增强**: 使用大语言模型进行最终决策
+- **Decision Integration**: Synthesizes all analyst recommendations
+- **Modern Portfolio Theory**: Uses MPT to optimize decisions
+- **LLM Enhancement**: Uses large language models for final decisions
 
-**决策权重**:
+**Decision Weights**:
 
 ```python
-# 信号权重分配
+# Signal weight allocation
 weights = {
-    'ai_models': 0.15,      # AI模型预测
-    'valuation': 0.35,      # 估值分析 (主要驱动)
-    'fundamental': 0.30,    # 基本面分析
-    'technical': 0.25,      # 技术分析
-    'macro': 0.15,          # 宏观分析
-    'sentiment': 0.10       # 情感分析
+    'ai_models': 0.15,      # AI model predictions
+    'valuation': 0.35,      # Valuation analysis (main driver)
+    'fundamental': 0.30,    # Fundamental analysis
+    'technical': 0.25,      # Technical analysis
+    'macro': 0.15,          # Macro analysis
+    'sentiment': 0.10       # Sentiment analysis
 }
 ```
 
-### 12. 多方/空方研究员 (researcher_bull.py / researcher_bear.py)
+### 12. Bull/Bear Researchers (researcher_bull.py / researcher_bear.py)
 
-**功能**: 从不同角度分析市场，提供多元化观点
+**Function**: Analyze markets from different perspectives to provide diverse viewpoints
 
-- **多方研究员**: 寻找投资机会和积极因素
-- **空方研究员**: 识别风险和消极因素
-- **风险调整**: 基于市场整体环境调整置信度
+- **Bull Researcher**: Seeks investment opportunities and positive factors
+- **Bear Researcher**: Identifies risks and negative factors
+- **Risk Adjustment**: Adjusts confidence based on overall market environment
 
-## 高级特性
+## Advanced Features
 
-### 区制检测系统 (regime_detector.py)
+### Regime Detection System (regime_detector.py)
 
-基于 2024-2025 年研究的高级市场区制检测：
+Advanced market regime detection based on 2024-2025 research:
 
 ```python
 class AdvancedRegimeDetector:
@@ -239,17 +239,17 @@ class AdvancedRegimeDetector:
         }
 ```
 
-**特征工程**:
+**Feature Engineering**:
 
-- 多时间尺度波动率
-- 趋势强度指标
-- 动量特征
-- 市场微观结构
-- Hurst 指数 (长记忆性)
+- Multi-timeframe volatility
+- Trend strength indicators
+- Momentum features
+- Market microstructure
+- Hurst exponent (long memory)
 
-### 状态管理系统 (state.py)
+### State Management System (state.py)
 
-统一的代理状态管理：
+Unified agent state management:
 
 ```python
 class AgentState(TypedDict):
@@ -258,30 +258,30 @@ class AgentState(TypedDict):
     metadata: Annotated[Dict[str, Any], merge_dicts]
 ```
 
-## 数据流架构
+## Data Flow Architecture
 
-1. **数据收集阶段**: market_data_agent 收集原始数据
-2. **分析阶段**: 各专业代理并行分析
-3. **AI 预测阶段**: ai_model_analyst 生成机器学习预测
-4. **整合阶段**: debate_room_agent 智能聚合信号
-5. **风险评估**: risk_manager 评估风险并设置约束
-6. **决策阶段**: portfolio_manager 生成最终交易决策
+1. **Data Collection Stage**: market_data_agent collects raw data
+2. **Analysis Stage**: Professional agents perform parallel analysis
+3. **AI Prediction Stage**: ai_model_analyst generates machine learning predictions
+4. **Integration Stage**: debate_room_agent intelligently aggregates signals
+5. **Risk Assessment**: risk_manager evaluates risks and sets constraints
+6. **Decision Stage**: portfolio_manager generates final trading decisions
 
-## 性能优化
+## Performance Optimization
 
-- **缓存机制**: 宏观分析等耗时操作使用缓存
-- **并行处理**: 多代理可并行执行
-- **动态阈值**: 基于市场条件自适应调整
-- **错误处理**: 完整的异常处理和降级机制
+- **Caching Mechanism**: Time-consuming operations like macro analysis use caching
+- **Parallel Processing**: Multiple agents can execute in parallel
+- **Dynamic Thresholds**: Adaptive adjustment based on market conditions
+- **Error Handling**: Complete exception handling and fallback mechanisms
 
-## 配置和扩展
+## Configuration and Extension
 
-### 添加新代理
+### Adding New Agents
 
 ```python
-@agent_endpoint("new_agent", "新代理描述")
+@agent_endpoint("new_agent", "New agent description")
 def new_agent(state: AgentState):
-    # 实现代理逻辑
+    # Implement agent logic
     return {
         "messages": [message],
         "data": updated_data,
@@ -289,44 +289,44 @@ def new_agent(state: AgentState):
     }
 ```
 
-### 自定义权重
+### Custom Weights
 
-系统支持根据市场条件动态调整各代理权重，可通过配置文件或运行时参数调整。
+The system supports dynamic adjustment of agent weights based on market conditions, which can be adjusted through configuration files or runtime parameters.
 
-## 研究基础
+## Research Foundation
 
-本系统基于 2024-2025 年的最新金融 AI 研究：
+This system is based on the latest financial AI research from 2024-2025:
 
-- **FLAG-Trader**: 区制感知的信号聚合
-- **FINSABER**: 多因子信号整合框架
-- **Lopez-Lira**: 动态阈值和权重调整
-- **RLMF**: 强化学习在金融中的应用
+- **FLAG-Trader**: Regime-aware signal aggregation
+- **FINSABER**: Multi-factor signal integration framework
+- **Lopez-Lira**: Dynamic thresholds and weight adjustment
+- **RLMF**: Reinforcement learning in finance applications
 
-## 使用示例
+## Usage Examples
 
 ```python
-# 初始化系统状态
+# Initialize system state
 state = {
     "messages": [],
     "data": {"ticker": "000001", "tickers": ["000001", "000002"]},
     "metadata": {"show_reasoning": True}
 }
 
-# 执行分析流水线
+# Execute analysis pipeline
 result = market_data_agent(state)
 result = technical_analyst_agent(result)
 result = fundamentals_agent(result)
-# ... 其他代理
+# ... other agents
 final_decision = portfolio_management_agent(result)
 ```
 
-## 输出格式
+## Output Format
 
-每个代理返回标准化的 JSON 格式结果，包含：
+Each agent returns standardized JSON format results containing:
 
-- `signal`: 投资信号 (bullish/bearish/neutral)
-- `confidence`: 置信度 (0-1)
-- `reasoning`: 详细分析推理
-- `metrics`: 相关计算指标
+- `signal`: Investment signal (bullish/bearish/neutral)
+- `confidence`: Confidence level (0-1)
+- `reasoning`: Detailed analysis reasoning
+- `metrics`: Related calculation indicators
 
-最终的投资组合管理代理输出完整的交易决策，包括具体的买卖建议和仓位大小。
+The final portfolio management agent outputs complete trading decisions, including specific buy/sell recommendations and position sizes.

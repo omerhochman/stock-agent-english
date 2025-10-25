@@ -1,5 +1,5 @@
 """
-模型估计API - 提供各类金融模型的估计功能
+Model Estimation API - Provides estimation functionality for various financial models
 """
 
 import pandas as pd
@@ -17,47 +17,47 @@ def estimate_capm_for_stock(stock_symbol: str,
                            end_date: str = None,
                            freq: str = 'D') -> Dict[str, float]:
     """
-    为单个股票估计CAPM模型参数
+    Estimate CAPM model parameters for a single stock
     
     Args:
-        stock_symbol: 股票代码
-        start_date: 开始日期，格式：YYYY-MM-DD
-        end_date: 结束日期，格式：YYYY-MM-DD
-        freq: 数据频率，'D'为日度，'W'为周度，'M'为月度
+        stock_symbol: Stock code
+        start_date: Start date, format: YYYY-MM-DD
+        end_date: End date, format: YYYY-MM-DD
+        freq: Data frequency, 'D' for daily, 'W' for weekly, 'M' for monthly
         
     Returns:
-        CAPM模型参数字典
+        CAPM model parameters dictionary
     """
-    logger.info(f"为股票 {stock_symbol} 估计CAPM模型参数: {start_date} 至 {end_date}, 频率: {freq}")
+    logger.info(f"Estimating CAPM model parameters for stock {stock_symbol}: {start_date} to {end_date}, frequency: {freq}")
     
     try:
-        # 1. 获取股票收益率
+        # 1. Get stock returns
         stock_returns_dict = get_stock_returns(stock_symbol, start_date, end_date, freq)
         if not stock_returns_dict or stock_symbol not in stock_returns_dict:
-            logger.warning(f"无法获取股票 {stock_symbol} 收益率数据")
+            logger.warning(f"Unable to get stock {stock_symbol} return data")
             return {}
         
         stock_returns = stock_returns_dict[stock_symbol]
         
-        # 2. 获取市场收益率 (使用沪深300)
+        # 2. Get market returns (using CSI 300)
         market_returns = get_market_returns("000300", start_date, end_date, freq)
         
-        # 3. 获取无风险利率
+        # 3. Get risk-free rate
         risk_free_rate = get_risk_free_rate(start_date, end_date, freq)
         
-        # 4. 确保所有数据使用相同的日期索引
+        # 4. Ensure all data uses the same date index
         common_index = stock_returns.index.intersection(market_returns.index)
         if not risk_free_rate.empty:
             common_index = common_index.intersection(risk_free_rate.index)
         
         if len(common_index) < 20:
-            logger.warning(f"数据点太少，无法可靠估计CAPM模型: {len(common_index)} 条记录")
+            logger.warning(f"Too few data points to reliably estimate CAPM model: {len(common_index)} records")
             return {}
         
         stock_returns = stock_returns.loc[common_index]
         market_returns = market_returns.loc[common_index]
         
-        # 5. 估计CAPM模型
+        # 5. Estimate CAPM model
         from src.calc.factor_models import estimate_capm
         
         if risk_free_rate.empty:
@@ -66,11 +66,11 @@ def estimate_capm_for_stock(stock_symbol: str,
             risk_free_rate = risk_free_rate.loc[common_index]
             capm_results = estimate_capm(stock_returns, market_returns, risk_free_rate)
         
-        logger.info(f"成功为股票 {stock_symbol} 估计CAPM模型参数")
+        logger.info(f"Successfully estimated CAPM model parameters for stock {stock_symbol}")
         return capm_results
         
     except Exception as e:
-        logger.error(f"估计CAPM模型参数时出错: {e}")
+        logger.error(f"Error estimating CAPM model parameters: {e}")
         logger.error(traceback.format_exc())
         return {}
 
@@ -79,40 +79,40 @@ def estimate_fama_french_for_stock(stock_symbol: str,
                                  end_date: str = None,
                                  freq: str = 'D') -> Dict[str, float]:
     """
-    为单个股票估计Fama-French三因子模型参数
+    Estimate Fama-French three-factor model parameters for a single stock
     
     Args:
-        stock_symbol: 股票代码
-        start_date: 开始日期，格式：YYYY-MM-DD
-        end_date: 结束日期，格式：YYYY-MM-DD
-        freq: 数据频率，'D'为日度，'W'为周度，'M'为月度
+        stock_symbol: Stock code
+        start_date: Start date, format: YYYY-MM-DD
+        end_date: End date, format: YYYY-MM-DD
+        freq: Data frequency, 'D' for daily, 'W' for weekly, 'M' for monthly
         
     Returns:
-        Fama-French三因子模型参数字典
+        Fama-French three-factor model parameters dictionary
     """
-    logger.info(f"为股票 {stock_symbol} 估计Fama-French三因子模型参数: {start_date} 至 {end_date}, 频率: {freq}")
+    logger.info(f"Estimating Fama-French three-factor model parameters for stock {stock_symbol}: {start_date} to {end_date}, frequency: {freq}")
     
     try:
-        # 1. 获取股票收益率
+        # 1. Get stock returns
         stock_returns_dict = get_stock_returns(stock_symbol, start_date, end_date, freq)
         if not stock_returns_dict or stock_symbol not in stock_returns_dict:
-            logger.warning(f"无法获取股票 {stock_symbol} 收益率数据")
+            logger.warning(f"Unable to get stock {stock_symbol} return data")
             return {}
         
         stock_returns = stock_returns_dict[stock_symbol]
         
-        # 2. 获取Fama-French三因子
+        # 2. Get Fama-French three factors
         ff_factors = get_fama_french_factors(start_date, end_date, freq)
         
         if not ff_factors:
-            logger.warning("无法获取Fama-French三因子数据")
+            logger.warning("Unable to get Fama-French three-factor data")
             return {}
         
-        # 3. 确保所有数据使用相同的日期索引
+        # 3. Ensure all data uses the same date index
         common_index = stock_returns.index.intersection(ff_factors['market_returns'].index)
         
         if len(common_index) < 20:
-            logger.warning(f"数据点太少，无法可靠估计Fama-French模型: {len(common_index)} 条记录")
+            logger.warning(f"Too few data points to reliably estimate Fama-French model: {len(common_index)} records")
             return {}
         
         stock_returns = stock_returns.loc[common_index]
@@ -121,18 +121,18 @@ def estimate_fama_french_for_stock(stock_symbol: str,
         hml = ff_factors['hml'].loc[common_index]
         risk_free_rate = ff_factors['risk_free_rate'].loc[common_index]
         
-        # 4. 估计Fama-French模型
+        # 4. Estimate Fama-French model
         from src.calc.factor_models import estimate_fama_french
         
         ff_results = estimate_fama_french(
             stock_returns, market_returns, smb, hml, risk_free_rate
         )
         
-        logger.info(f"成功为股票 {stock_symbol} 估计Fama-French三因子模型参数")
+        logger.info(f"Successfully estimated Fama-French three-factor model parameters for stock {stock_symbol}")
         return ff_results
         
     except Exception as e:
-        logger.error(f"估计Fama-French模型参数时出错: {e}")
+        logger.error(f"Error estimating Fama-French model parameters: {e}")
         logger.error(traceback.format_exc())
         return {}
 
@@ -141,44 +141,44 @@ def estimate_beta_for_stocks(symbols: List[str],
                             end_date: str = None,
                             freq: str = 'D') -> pd.DataFrame:
     """
-    估计多个股票的贝塔系数
+    Estimate beta coefficients for multiple stocks
     
     Args:
-        symbols: 股票代码列表
-        start_date: 开始日期，格式：YYYY-MM-DD
-        end_date: 结束日期，格式：YYYY-MM-DD
-        freq: 数据频率，'D'为日度，'W'为周度，'M'为月度
+        symbols: List of stock codes
+        start_date: Start date, format: YYYY-MM-DD
+        end_date: End date, format: YYYY-MM-DD
+        freq: Data frequency, 'D' for daily, 'W' for weekly, 'M' for monthly
         
     Returns:
-        包含贝塔系数的DataFrame
+        DataFrame containing beta coefficients
     """
-    logger.info(f"估计多个股票的贝塔系数: {start_date} 至 {end_date}, 股票数量: {len(symbols)}, 频率: {freq}")
+    logger.info(f"Estimating beta coefficients for multiple stocks: {start_date} to {end_date}, stock count: {len(symbols)}, frequency: {freq}")
     
-    # 获取股票收益率数据
+    # Get stock returns data
     returns_df = get_multi_stock_returns(symbols, start_date, end_date, freq)
     
     if returns_df.empty:
-        logger.warning("无法获取股票收益率数据")
+        logger.warning("Unable to get stock return data")
         return pd.DataFrame()
     
-    # 获取市场收益率
+    # Get market returns
     market_returns = get_market_returns("000300", start_date, end_date, freq)
     
     if market_returns.empty:
-        logger.warning("无法获取市场收益率数据")
+        logger.warning("Unable to get market return data")
         return pd.DataFrame()
     
-    # 确保收益率和市场收益率使用相同的日期
+    # Ensure returns and market returns use the same dates
     common_index = returns_df.index.intersection(market_returns.index)
     returns_df = returns_df.loc[common_index]
     market_returns = market_returns.loc[common_index]
     
-    # 计算贝塔系数
+    # Calculate beta coefficients
     betas = {}
     r_squareds = {}
     
     for symbol in returns_df.columns:
-        # 使用线性回归计算贝塔系数
+        # Use linear regression to calculate beta coefficient
         import statsmodels.api as sm
         
         X = sm.add_constant(market_returns)
@@ -186,21 +186,21 @@ def estimate_beta_for_stocks(symbols: List[str],
         
         try:
             model = sm.OLS(y, X).fit()
-            betas[symbol] = model.params.iloc[1]  # 贝塔系数
-            r_squareds[symbol] = model.rsquared  # R平方
+            betas[symbol] = model.params.iloc[1]  # Beta coefficient
+            r_squareds[symbol] = model.rsquared  # R-squared
         except Exception as e:
-            logger.warning(f"计算股票 {symbol} 的贝塔系数时出错: {e}")
+            logger.warning(f"Error calculating beta coefficient for stock {symbol}: {e}")
             betas[symbol] = np.nan
             r_squareds[symbol] = np.nan
     
-    # 创建结果DataFrame
+    # Create result DataFrame
     result_df = pd.DataFrame({
         'symbol': list(betas.keys()),
         'beta': list(betas.values()),
         'r_squared': list(r_squareds.values())
     })
     
-    logger.info(f"成功估计 {len(result_df)} 只股票的贝塔系数")
+    logger.info(f"Successfully estimated beta coefficients for {len(result_df)} stocks")
     return result_df
 
 def calculate_rolling_beta(stock_symbol: str,
@@ -209,55 +209,55 @@ def calculate_rolling_beta(stock_symbol: str,
                           end_date: str = None,
                           freq: str = 'D') -> pd.Series:
     """
-    计算股票的滚动贝塔系数
+    Calculate rolling beta coefficient for a stock
     
     Args:
-        stock_symbol: 股票代码
-        window: 滚动窗口大小（交易日数量）
-        start_date: 开始日期，格式：YYYY-MM-DD
-        end_date: 结束日期，格式：YYYY-MM-DD
-        freq: 数据频率，'D'为日度，'W'为周度，'M'为月度
+        stock_symbol: Stock code
+        window: Rolling window size (number of trading days)
+        start_date: Start date, format: YYYY-MM-DD
+        end_date: End date, format: YYYY-MM-DD
+        freq: Data frequency, 'D' for daily, 'W' for weekly, 'M' for monthly
         
     Returns:
-        滚动贝塔系数Series
+        Rolling beta coefficient Series
     """
-    logger.info(f"计算股票 {stock_symbol} 的滚动贝塔系数: {start_date} 至 {end_date}, 窗口大小: {window}")
+    logger.info(f"Calculating rolling beta coefficient for stock {stock_symbol}: {start_date} to {end_date}, window size: {window}")
     
-    # 获取股票收益率数据
+    # Get stock returns data
     stock_returns_dict = get_stock_returns(stock_symbol, start_date, end_date, freq)
     
     if not stock_returns_dict or stock_symbol not in stock_returns_dict:
-        logger.warning(f"无法获取股票 {stock_symbol} 收益率数据")
+        logger.warning(f"Unable to get stock {stock_symbol} return data")
         return pd.Series()
     
     stock_returns = stock_returns_dict[stock_symbol]
     
-    # 获取市场收益率
+    # Get market returns
     market_returns = get_market_returns("000300", start_date, end_date, freq)
     
     if market_returns.empty:
-        logger.warning("无法获取市场收益率数据")
+        logger.warning("Unable to get market return data")
         return pd.Series()
     
-    # 确保收益率和市场收益率使用相同的日期
+    # Ensure returns and market returns use the same dates
     common_index = stock_returns.index.intersection(market_returns.index)
     stock_returns = stock_returns.loc[common_index]
     market_returns = market_returns.loc[common_index]
     
-    # 确保数据长度足够
+    # Ensure data length is sufficient
     if len(stock_returns) < window + 10:
-        logger.warning(f"数据长度不足，无法计算滚动贝塔: {len(stock_returns)} < {window + 10}")
+        logger.warning(f"Insufficient data length, cannot calculate rolling beta: {len(stock_returns)} < {window + 10}")
         return pd.Series()
     
-    # 计算滚动贝塔系数
+    # Calculate rolling beta coefficients
     rolling_betas = pd.Series(index=stock_returns.index[window-1:], dtype=float)
     
     for i in range(window-1, len(stock_returns)):
-        # 获取窗口内的数据
+        # Get data within the window
         stock_window = stock_returns.iloc[i-window+1:i+1]
         market_window = market_returns.iloc[i-window+1:i+1]
         
-        # 使用线性回归计算贝塔系数
+        # Use linear regression to calculate beta coefficient
         import statsmodels.api as sm
         
         X = sm.add_constant(market_window)
@@ -265,13 +265,13 @@ def calculate_rolling_beta(stock_symbol: str,
         
         try:
             model = sm.OLS(y, X).fit()
-            rolling_betas.loc[stock_returns.index[i]] = model.params.iloc[1]  # 贝塔系数
+            rolling_betas.loc[stock_returns.index[i]] = model.params.iloc[1]  # Beta coefficient
         except Exception as e:
-            logger.debug(f"计算 {stock_returns.index[i]} 的贝塔系数时出错: {e}")
+            logger.debug(f"Error calculating beta coefficient for {stock_returns.index[i]}: {e}")
             rolling_betas.loc[stock_returns.index[i]] = np.nan
     
-    # 去除缺失值
+    # Remove missing values
     rolling_betas = rolling_betas.dropna()
     
-    logger.info(f"成功计算股票 {stock_symbol} 的滚动贝塔系数: {len(rolling_betas)} 条记录")
+    logger.info(f"Successfully calculated rolling beta coefficient for stock {stock_symbol}: {len(rolling_betas)} records")
     return rolling_betas

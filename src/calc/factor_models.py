@@ -9,59 +9,59 @@ def estimate_capm(returns: pd.Series,
                  market_returns: pd.Series, 
                  risk_free_rate: Optional[pd.Series] = None) -> Dict[str, float]:
     """
-    估计CAPM模型参数
+    Estimate CAPM model parameters
     
-    CAPM方程: R_i - R_f = α + β(R_m - R_f) + ε
+    CAPM equation: R_i - R_f = α + β(R_m - R_f) + ε
     
     Args:
-        returns: 资产收益率序列
-        market_returns: 市场收益率序列
-        risk_free_rate: 无风险利率序列，如果为None则假设为0
+        returns: Asset return series
+        market_returns: Market return series
+        risk_free_rate: Risk-free rate series, if None then assumed to be 0
         
     Returns:
-        CAPM模型参数字典
+        CAPM model parameters dictionary
     """
-    # 准备数据
+    # Prepare data
     if risk_free_rate is None:
-        # 假设无风险利率为0
+        # Assume risk-free rate is 0
         excess_returns = returns
         excess_market = market_returns
     else:
-        # 计算超额收益
+        # Calculate excess returns
         excess_returns = returns - risk_free_rate
         excess_market = market_returns - risk_free_rate
     
-    # 创建DataFrame用于回归
+    # Create DataFrame for regression
     df = pd.DataFrame({
         'excess_returns': excess_returns,
         'excess_market': excess_market
     }).dropna()
     
-    # 添加常数项
+    # Add constant term
     X = sm.add_constant(df['excess_market'])
     
-    # 进行OLS回归
+    # Perform OLS regression
     model = sm.OLS(df['excess_returns'], X)
     results = model.fit()
     
-    # 提取参数
+    # Extract parameters
     alpha = results.params.iloc[0]
     beta = results.params.iloc[1]
     
-    # 计算预测值和残差
+    # Calculate predicted values and residuals
     df['predicted'] = alpha + beta * df['excess_market']
     df['residuals'] = df['excess_returns'] - df['predicted']
     
-    # 计算R方
+    # Calculate R-squared
     r_squared = results.rsquared
     
-    # 计算信息比率
-    information_ratio = alpha / np.std(df['residuals']) * np.sqrt(252)  # 年化
+    # Calculate information ratio
+    information_ratio = alpha / np.std(df['residuals']) * np.sqrt(252)  # Annualized
     
-    # 计算特雷诺比率
-    treynor_ratio = (df['excess_returns'].mean() * 252) / beta  # 年化
+    # Calculate Treynor ratio
+    treynor_ratio = (df['excess_returns'].mean() * 252) / beta  # Annualized
     
-    # 返回结果
+    # Return results
     return {
         'alpha': alpha,
         'beta': beta,
@@ -71,7 +71,7 @@ def estimate_capm(returns: pd.Series,
         'information_ratio': information_ratio,
         'treynor_ratio': treynor_ratio,
         'residual_std': np.std(df['residuals']),
-        'annualized_alpha': alpha * 252,  # 年化alpha
+        'annualized_alpha': alpha * 252,  # Annualized alpha
         'observations': len(df)
     }
 
@@ -81,31 +81,31 @@ def estimate_fama_french(returns: pd.Series,
                         hml: pd.Series,
                         risk_free_rate: Optional[pd.Series] = None) -> Dict[str, float]:
     """
-    估计Fama-French三因子模型参数
+    Estimate Fama-French three-factor model parameters
     
-    FF三因子方程: R_i - R_f = α + β1(R_m - R_f) + β2(SMB) + β3(HML) + ε
+    FF three-factor equation: R_i - R_f = α + β1(R_m - R_f) + β2(SMB) + β3(HML) + ε
     
     Args:
-        returns: 资产收益率序列
-        market_returns: 市场收益率序列
-        smb: 小市值减大市值(Small Minus Big)因子收益率序列
-        hml: 高价值减低价值(High Minus Low)因子收益率序列
-        risk_free_rate: 无风险利率序列，如果为None则假设为0
+        returns: Asset return series
+        market_returns: Market return series
+        smb: Small Minus Big factor return series
+        hml: High Minus Low factor return series
+        risk_free_rate: Risk-free rate series, if None then assumed to be 0
         
     Returns:
-        Fama-French三因子模型参数字典
+        Fama-French three-factor model parameters dictionary
     """
-    # 准备数据
+    # Prepare data
     if risk_free_rate is None:
-        # 假设无风险利率为0
+        # Assume risk-free rate is 0
         excess_returns = returns
         excess_market = market_returns
     else:
-        # 计算超额收益
+        # Calculate excess returns
         excess_returns = returns - risk_free_rate
         excess_market = market_returns - risk_free_rate
     
-    # 创建DataFrame用于回归
+    # Create DataFrame for regression
     df = pd.DataFrame({
         'excess_returns': excess_returns,
         'excess_market': excess_market,
@@ -113,27 +113,27 @@ def estimate_fama_french(returns: pd.Series,
         'hml': hml
     }).dropna()
     
-    # 添加常数项
+    # Add constant term
     X = sm.add_constant(df[['excess_market', 'smb', 'hml']])
     
-    # 进行OLS回归
+    # Perform OLS regression
     model = sm.OLS(df['excess_returns'], X)
     results = model.fit()
     
-    # 提取参数
+    # Extract parameters
     alpha = results.params.iloc[0]
     beta_market = results.params.iloc[1]
     beta_smb = results.params.iloc[2]
     beta_hml = results.params.iloc[3]
     
-    # 计算预测值和残差
+    # Calculate predicted values and residuals
     df['predicted'] = (alpha + 
                       beta_market * df['excess_market'] + 
                       beta_smb * df['smb'] + 
                       beta_hml * df['hml'])
     df['residuals'] = df['excess_returns'] - df['predicted']
     
-    # 返回结果
+    # Return results
     return {
         'alpha': alpha,
         'beta_market': beta_market,
@@ -145,7 +145,7 @@ def estimate_fama_french(returns: pd.Series,
         'p_value_smb': results.pvalues.iloc[2],  
         'p_value_hml': results.pvalues.iloc[3],
         'residual_std': np.std(df['residuals']),
-        'annualized_alpha': alpha * 252,  # 年化alpha
+        'annualized_alpha': alpha * 252,  # Annualized alpha
         'observations': len(df)
     }
 
@@ -153,33 +153,33 @@ def time_series_test(returns: pd.Series,
                     factors: pd.DataFrame, 
                     window: int = 60) -> pd.DataFrame:
     """
-    进行时间序列检验，计算滚动因子模型参数
+    Perform time series test, calculate rolling factor model parameters
     
     Args:
-        returns: 资产收益率序列
-        factors: 因子收益率DataFrame
-        window: 滚动窗口大小
+        returns: Asset return series
+        factors: Factor return DataFrame
+        window: Rolling window size
         
     Returns:
-        滚动系数DataFrame
+        Rolling coefficients DataFrame
     """
-    # 准备数据
+    # Prepare data
     data = pd.concat([returns, factors], axis=1).dropna()
-    y = data.iloc[:, 0]  # 第一列为资产收益率
-    X = sm.add_constant(data.iloc[:, 1:])  # 其余列为因子
+    y = data.iloc[:, 0]  # First column is asset returns
+    X = sm.add_constant(data.iloc[:, 1:])  # Remaining columns are factors
     
-    # 使用RollingOLS进行滚动回归
+    # Use RollingOLS for rolling regression
     rolling_reg = RollingOLS(y, X, window=window)
     rolling_results = rolling_reg.fit()
     
-    # 提取滚动系数
+    # Extract rolling coefficients
     params = rolling_results.params
     
-    # 计算滚动R方
+    # Calculate rolling R-squared
     r2 = pd.Series(index=params.index)
     tvalues = pd.DataFrame(index=params.index, columns=params.columns)
     
-    # 在每个窗口进行OLS回归，计算R方和t值
+    # Perform OLS regression in each window, calculate R-squared and t-values
     for i in range(window, len(data)):
         y_window = y.iloc[i-window:i]
         X_window = X.iloc[i-window:i]
@@ -191,7 +191,7 @@ def time_series_test(returns: pd.Series,
         for col in params.columns:
             tvalues.loc[params.index[i-window], col] = res.tvalues[col]
     
-    # 合并结果
+    # Combine results
     results = pd.concat([params, r2, tvalues], axis=1)
     results.columns = list(params.columns) + ['R2'] + [f't_{col}' for col in params.columns]
     
@@ -201,17 +201,17 @@ def cross_sectional_test(returns: pd.DataFrame,
                         factors: pd.DataFrame,
                         frequency: str = 'M') -> Dict[str, pd.DataFrame]:
     """
-    进行横截面检验，使用Fama-MacBeth回归方法
+    Perform cross-sectional test using Fama-MacBeth regression method
     
     Args:
-        returns: 资产收益率DataFrame，每列为一个资产
-        factors: 资产因子暴露DataFrame，索引与收益率相同，列为不同因子
-        frequency: 横截面回归频率，默认为月度('M')
+        returns: Asset returns DataFrame, each column is an asset
+        factors: Asset factor exposure DataFrame, same index as returns, columns are different factors
+        frequency: Cross-sectional regression frequency, default is monthly ('M')
         
     Returns:
-        Fama-MacBeth回归结果
+        Fama-MacBeth regression results
     """
-    # 将数据重采样到指定频率
+    # Resample data to specified frequency
     if frequency:
         returns_resampled = returns.resample(frequency).mean()
         factors_resampled = factors.resample(frequency).mean()
@@ -219,43 +219,43 @@ def cross_sectional_test(returns: pd.DataFrame,
         returns_resampled = returns
         factors_resampled = factors
     
-    # 对每个时间点进行横截面回归
+    # Perform cross-sectional regression for each time point
     time_points = returns_resampled.index
     cross_section_results = []
     
     for t in time_points:
         if t in factors_resampled.index:
-            # 获取当前时间点的收益率和因子
+            # Get returns and factors for current time point
             ret_t = returns_resampled.loc[t]
             fact_t = factors_resampled.loc[t]
             
-            # 合并数据
+            # Combine data
             data_t = pd.concat([ret_t, fact_t], axis=1).dropna()
             
-            if len(data_t) > len(factors_resampled.columns) + 2:  # 确保有足够的观测值
-                # 进行OLS回归
+            if len(data_t) > len(factors_resampled.columns) + 2:  # Ensure sufficient observations
+                # Perform OLS regression
                 y = data_t.iloc[:, 0]
                 X = sm.add_constant(data_t.iloc[:, 1:])
                 
                 model = sm.OLS(y, X)
                 results = model.fit()
                 
-                # 保存结果
+                # Save results
                 params = results.params
                 params.name = t
                 cross_section_results.append(params)
     
-    # 汇总所有时间点的回归系数
+    # Aggregate regression coefficients from all time points
     if cross_section_results:
         all_params = pd.concat(cross_section_results, axis=1).T
         
-        # 对每个因子系数进行t检验
+        # Perform t-test for each factor coefficient
         mean_params = all_params.mean()
         std_params = all_params.std() / np.sqrt(len(all_params))
         t_stats = mean_params / std_params
         p_values = 2 * (1 - stats.t.cdf(np.abs(t_stats), len(all_params) - 1))
         
-        # 创建汇总结果
+        # Create summary results
         summary = pd.DataFrame({
             'Coefficient': mean_params,
             'Std Error': std_params,

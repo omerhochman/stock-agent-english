@@ -14,11 +14,11 @@ from src.tools.api import prices_to_df
 
 
 ##### Technical Analyst #####
-@agent_endpoint("technical_analyst", "技术分析师，提供基于价格走势、指标和技术模式的交易信号")
+@agent_endpoint("technical_analyst", "Technical analyst, providing trading signals based on price trends, indicators and technical patterns")
 def technical_analyst_agent(state: AgentState):
     """
-    基于2024-2025研究的区制感知技术分析系统
-    集成FINSABER、FLAG-Trader等框架的先进技术分析策略
+    Regime-aware technical analysis system based on 2024-2025 research
+    Advanced technical analysis strategies integrating FINSABER, FLAG-Trader and other frameworks
     """
     show_workflow_status("Technical Analyst")
     show_reasoning = state["metadata"]["show_reasoning"]
@@ -26,33 +26,33 @@ def technical_analyst_agent(state: AgentState):
     prices = data["prices"]
     prices_df = prices_to_df(prices)
 
-    # 初始化区制检测器
+    # Initialize regime detector
     regime_detector = AdvancedRegimeDetector()
     
-    # 进行区制分析
+    # Perform regime analysis
     regime_features = regime_detector.extract_regime_features(prices_df)
     regime_model_results = regime_detector.fit_regime_model(regime_features)
     current_regime = regime_detector.predict_current_regime(regime_features)
 
-    # 1. 趋势跟踪策略
+    # 1. Trend following strategy
     trend_signals = calculate_trend_signals(prices_df)
 
-    # 2. 均值回归策略
+    # 2. Mean reversion strategy
     mean_reversion_signals = calculate_mean_reversion_signals(prices_df)
 
-    # 3. 动量策略
+    # 3. Momentum strategy
     momentum_signals = calculate_momentum_signals(prices_df)
 
-    # 4. 波动率策略 - 使用GARCH模型预测
+    # 4. Volatility strategy - using GARCH model prediction
     volatility_signals = calculate_volatility_signals_with_garch(prices_df)
 
-    # 5. 统计套利信号
+    # 5. Statistical arbitrage signals
     stat_arb_signals = calculate_stat_arb_signals(prices_df)
 
-    # 6. 基于区制的动态权重调整 (基于2024-2025研究)
+    # 6. Dynamic weight adjustment based on regime (based on 2024-2025 research)
     regime_adjusted_weights = _calculate_regime_adjusted_weights(current_regime)
 
-    # 使用区制感知的权重组合信号
+    # Use regime-aware weight combination for signals
     combined_signal = weighted_signal_combination({
         'trend': trend_signals,
         'mean_reversion': mean_reversion_signals,
@@ -61,12 +61,12 @@ def technical_analyst_agent(state: AgentState):
         'stat_arb': stat_arb_signals
     }, regime_adjusted_weights)
 
-    # 应用区制特定的信号过滤和增强
+    # Apply regime-specific signal filtering and enhancement
     enhanced_signal = _apply_regime_signal_enhancement(
         combined_signal, current_regime, prices_df
     )
 
-    # 生成详细分析报告
+    # Generate detailed analysis report
     analysis_report = {
         "signal": enhanced_signal['signal'],
         "confidence": enhanced_signal['confidence'],
@@ -102,7 +102,7 @@ def technical_analyst_agent(state: AgentState):
         }
     }
 
-    # 创建技术分析师消息
+    # Create technical analyst message
     message = HumanMessage(
         content=json.dumps(analysis_report),
         name="technical_analyst_agent",
@@ -110,7 +110,7 @@ def technical_analyst_agent(state: AgentState):
 
     if show_reasoning:
         show_agent_reasoning(analysis_report, "Technical Analyst")
-        # 保存推理信息到state的metadata供API使用
+        # Save reasoning information to state metadata for API use
         state["metadata"]["agent_reasoning"] = analysis_report
 
     show_workflow_status("Technical Analyst", "completed")
@@ -122,11 +122,11 @@ def technical_analyst_agent(state: AgentState):
 
 
 def _calculate_regime_adjusted_weights(current_regime):
-    """基于市场区制动态调整策略权重"""
+    """Dynamically adjust strategy weights based on market regime"""
     regime_name = current_regime.get("regime_name", "unknown")
     regime_confidence = current_regime.get("confidence", 0.5)
     
-    # 基础权重
+    # Base weights
     base_weights = {
         'trend': 0.30,
         'mean_reversion': 0.25, 
@@ -135,47 +135,47 @@ def _calculate_regime_adjusted_weights(current_regime):
         'stat_arb': 0.05
     }
     
-    # 区制特定调整 (基于FINSABER 2024和Lopez-Lira 2025研究)
+    # Regime-specific adjustments (based on FINSABER 2024 and Lopez-Lira 2025 research)
     if regime_name == "low_volatility_trending" and regime_confidence > 0.6:
-        # 趋势市场中增加趋势跟踪和动量权重
+        # In trending markets, increase trend following and momentum weights
         base_weights['trend'] = 0.40
         base_weights['momentum'] = 0.30
         base_weights['mean_reversion'] = 0.15
         base_weights['volatility'] = 0.10
         base_weights['stat_arb'] = 0.05
     elif regime_name == "high_volatility_mean_reverting" and regime_confidence > 0.6:
-        # 区间震荡市场增加均值回归权重
+        # In range-bound markets, increase mean reversion weights
         base_weights['trend'] = 0.20
         base_weights['momentum'] = 0.15
         base_weights['mean_reversion'] = 0.45
         base_weights['volatility'] = 0.15
         base_weights['stat_arb'] = 0.05
     elif regime_name == "crisis_regime" and regime_confidence > 0.6:
-        # 危机市场增加波动率和统计套利权重
+        # In crisis markets, increase volatility and statistical arbitrage weights
         base_weights['trend'] = 0.20
         base_weights['momentum'] = 0.20
         base_weights['mean_reversion'] = 0.20
         base_weights['volatility'] = 0.30
         base_weights['stat_arb'] = 0.10
 
-    # 规范化权重，确保总和为1
+    # Normalize weights to ensure sum equals 1
     total_weight = sum(base_weights.values())
     return {k: v/total_weight for k, v in base_weights.items()}
 
 
 def _apply_regime_signal_enhancement(combined_signal, current_regime, prices_df):
-    """应用区制特定的信号增强技术"""
+    """Apply regime-specific signal enhancement techniques"""
     regime_name = current_regime.get("regime_name", "unknown")
     regime_confidence = current_regime.get("confidence", 0.5)
     
-    # 转换信号为数值进行计算
+    # Convert signals to numerical values for calculation
     signal_values = {
         'bullish': 1.0,
         'neutral': 0.0,
         'bearish': -1.0
     }
     
-    # 反向映射
+    # Reverse mapping
     value_to_signal = {
         1.0: 'bullish',
         0.0: 'neutral', 
@@ -186,44 +186,44 @@ def _apply_regime_signal_enhancement(combined_signal, current_regime, prices_df)
     enhanced_confidence = combined_signal['confidence']
     enhancement_details = {}
     
-    # 基于区制的信号过滤和增强
+    # Regime-based signal filtering and enhancement
     if regime_name == "crisis_regime" and regime_confidence > 0.7:
-        # 危机期间：降低信号强度，增加保守性
+        # During crisis: reduce signal strength, increase conservatism
         enhanced_signal *= 0.7
         enhanced_confidence *= 0.8
         enhancement_details['crisis_dampening'] = "Applied crisis regime signal dampening"
         
     elif regime_name == "low_volatility_trending" and regime_confidence > 0.7:
-        # 低波动趋势期间：增强趋势信号
-        if abs(enhanced_signal) > 0.3:  # 只增强较强的信号
+        # During low volatility trending: enhance trend signals
+        if abs(enhanced_signal) > 0.3:  # Only enhance stronger signals
             enhanced_signal *= 1.2
             enhanced_confidence *= 1.1
             enhancement_details['trend_amplification'] = "Applied trend regime signal amplification"
     
     elif regime_name == "high_volatility_mean_reverting" and regime_confidence > 0.7:
-        # 高波动震荡期间：应用反转逻辑
+        # During high volatility mean-reverting period: apply reversal logic
         returns = prices_df['close'].pct_change().dropna()
         recent_return = returns.iloc[-1] if len(returns) > 0 else 0
         
-        if abs(recent_return) > 0.03:  # 显著价格移动
-            # 应用均值回归逻辑
+        if abs(recent_return) > 0.03:  # Significant price movement
+            # Apply mean reversion logic
             if recent_return > 0 and enhanced_signal > 0:
-                enhanced_signal *= 0.5  # 减弱追涨信号
+                enhanced_signal *= 0.5  # Weaken momentum buying signal
             elif recent_return < 0 and enhanced_signal < 0:
-                enhanced_signal *= 0.5  # 减弱杀跌信号
+                enhanced_signal *= 0.5  # Weaken momentum selling signal
             enhancement_details['mean_reversion_filter'] = "Applied mean reversion filter"
     
-    # 应用动态阈值 (基于RLMF 2024技术)
+    # Apply dynamic threshold (based on RLMF 2024 technology)
     dynamic_threshold = 0.15 if regime_name == "crisis_regime" else 0.1
     if abs(enhanced_signal) < dynamic_threshold:
-        enhanced_signal *= 0.5  # 弱信号进一步衰减
+        enhanced_signal *= 0.5  # Further dampen weak signals
         enhancement_details['weak_signal_dampening'] = f"Applied weak signal dampening (threshold: {dynamic_threshold})"
     
-    # 确保置信度在合理范围内
+    # Ensure confidence is within reasonable range
     enhanced_confidence = max(0.1, min(enhanced_confidence, 0.95))
     
-    # 将数值信号转换回字符串信号
-    # 使用阈值来确定最终信号
+    # Convert numeric signal back to string signal
+    # Use threshold to determine final signal
     if enhanced_signal > 0.2:
         final_signal = 'bullish'
     elif enhanced_signal < -0.2:
@@ -240,32 +240,32 @@ def _apply_regime_signal_enhancement(combined_signal, current_regime, prices_df)
 
 def calculate_volatility_signals_with_garch(prices_df: pd.DataFrame) -> Dict:
     """
-    使用GARCH模型高级波动率分析与预测
+    Advanced volatility analysis and prediction using GARCH model
     """
     returns = prices_df['close'].pct_change().dropna()
 
-    # 基础历史波动率计算
+    # Basic historical volatility calculation
     hist_vol = returns.rolling(21, min_periods=10).std() * math.sqrt(252)
     vol_ma = hist_vol.rolling(42, min_periods=21).mean()
     vol_regime = hist_vol / vol_ma
 
-    # ATR计算
+    # ATR calculation
     atr = calculate_atr(prices_df, period=14, min_periods=7)
     atr_ratio = atr / prices_df['close']
 
-    # GARCH模型预测未来波动率
+    # GARCH model prediction of future volatility
     garch_results = {}
-    forecast_quality = 0.5  # 默认中等质量
-    vol_trend = 0  # 默认无趋势
+    forecast_quality = 0.5  # Default medium quality
+    vol_trend = 0  # Default no trend
     
     try:
-        if len(returns) >= 100:  # 确保有足够的数据
-            # 使用calc模块中的GARCH函数拟合模型
+        if len(returns) >= 100:  # Ensure sufficient data
+            # Use GARCH functions from calc module to fit model
             garch_params, log_likelihood = fit_garch(returns.values)
             volatility_forecast = forecast_garch_volatility(returns.values, garch_params, 
                                                          forecast_horizon=10)
             
-            # 保存GARCH结果
+            # Save GARCH results
             garch_results = {
                 'model_type': 'GARCH(1,1)',
                 'parameters': {
@@ -279,49 +279,49 @@ def calculate_volatility_signals_with_garch(prices_df: pd.DataFrame) -> Dict:
                 'forecast_annualized': [float(v * np.sqrt(252)) for v in volatility_forecast]
             }
             
-            # 分析波动率趋势
+            # Analyze volatility trend
             avg_forecast = np.mean(volatility_forecast)
-            current_vol = hist_vol.iloc[-1] / np.sqrt(252)  # 转换为日度
+            current_vol = hist_vol.iloc[-1] / np.sqrt(252)  # Convert to daily
             vol_trend = avg_forecast / current_vol - 1 if current_vol != 0 else 0
             
-            # 模型质量评估
+            # Model quality assessment
             persistence = garch_params['persistence']
-            if 0.9 <= persistence <= 0.999:  # 合理的持续性范围
+            if 0.9 <= persistence <= 0.999:  # Reasonable persistence range
                 forecast_quality = 0.8
-            elif persistence > 0.999:  # 非平稳模型
+            elif persistence > 0.999:  # Non-stationary model
                 forecast_quality = 0.3
-            else:  # 持续性较低
+            else:  # Lower persistence
                 forecast_quality = 0.5
     except Exception as e:
         garch_results = {"error": str(e)}
 
-    # 决定信号
+    # Determine signal
     current_vol_regime = vol_regime.iloc[-1] if not pd.isna(vol_regime.iloc[-1]) else 1.0
     vol_z = (hist_vol.iloc[-1] - vol_ma.iloc[-1]) / vol_ma.iloc[-1] if vol_ma.iloc[-1] != 0 else 0
 
-    # 使用GARCH预测和基础波动率结合生成更精确的信号
+    # Use GARCH prediction combined with basic volatility to generate more accurate signals
     if vol_trend < -0.1 and current_vol_regime > 1.2:
-        # 波动率处于高位但预计下降：看多信号
+        # Volatility is high but expected to decline: bullish signal
         signal = 'bullish'
         confidence = min(0.7, 0.5 + abs(vol_trend) * forecast_quality)
     elif vol_trend > 0.1 and current_vol_regime < 0.8:
-        # 波动率处于低位但预计上升：看空信号
+        # Volatility is low but expected to rise: bearish signal
         signal = 'bearish'
         confidence = min(0.7, 0.5 + abs(vol_trend) * forecast_quality)
     elif vol_trend > 0.2:
-        # 波动率急剧上升：看空信号
+        # Volatility rising sharply: bearish signal
         signal = 'bearish'
         confidence = min(0.8, 0.6 + vol_trend * forecast_quality)
     elif current_vol_regime < 0.8 and vol_z < -1:
-        # 低波动率环境：轻微看多
+        # Low volatility environment: slightly bullish
         signal = 'bullish'
         confidence = 0.6
     elif current_vol_regime > 1.2 and vol_z > 1:
-        # 高波动率环境：轻微看空
+        # High volatility environment: slightly bearish
         signal = 'bearish'
         confidence = 0.6
     else:
-        # 正常波动率环境：中性
+        # Normal volatility environment: neutral
         signal = 'neutral'
         confidence = 0.5
 
@@ -342,54 +342,54 @@ def calculate_volatility_signals_with_garch(prices_df: pd.DataFrame) -> Dict:
 
 def analyze_market_regime(prices_df: pd.DataFrame) -> Dict:
     """
-    使用马尔科夫区制模型分析市场状态
+    Analyze market state using Markov regime model
     
-    识别市场是处于：
-    1. 趋势市场 (trending)
-    2. 区间震荡市场 (mean_reverting)
-    3. 高波动性市场 (volatile)
+    Identify whether the market is in:
+    1. Trending market (trending)
+    2. Range-bound market (mean_reverting)
+    3. High volatility market (volatile)
     """
     returns = prices_df['close'].pct_change().dropna()
     
-    # 区制检测逻辑
-    # 1. 趋势检测：使用连续方向的收益判断
+    # Regime detection logic
+    # 1. Trend detection: use consecutive directional returns
     rolling_sum = returns.rolling(window=20).sum()
     normalized_trend = abs(rolling_sum) / (returns.abs().rolling(window=20).sum())
     trend_strength = normalized_trend.iloc[-1] if not pd.isna(normalized_trend.iloc[-1]) else 0
     
-    # 2. 均值回归检测：使用自相关性
-    # 计算1-5天的自相关性，负相关性强表示均值回归特性
+    # 2. Mean reversion detection: use autocorrelation
+    # Calculate 1-5 day autocorrelation, strong negative correlation indicates mean reversion
     autocorr = []
     for i in range(1, 6):
         lag_corr = returns.autocorr(lag=i)
         autocorr.append(lag_corr)
     mean_autocorr = np.mean(autocorr)
     
-    # 3. 波动性检测：使用最近波动率与历史均值的比较
+    # 3. Volatility detection: compare recent volatility with historical average
     recent_vol = returns.iloc[-20:].std() if len(returns) >= 20 else returns.std()
     historical_vol = returns.std()
     vol_ratio = recent_vol / historical_vol if historical_vol != 0 else 1
     
-    # 决定市场状态
+    # Determine market state
     regime_scores = {
         "trending": trend_strength * 0.8 + (1 + mean_autocorr) * 0.2,
         "mean_reverting": (1 - trend_strength) * 0.5 + abs(min(0, mean_autocorr)) * 0.5,
         "volatile": vol_ratio - 1 if vol_ratio > 1 else 0
     }
     
-    # 标准化得分
+    # Normalize scores
     total_score = sum(max(0, score) for score in regime_scores.values())
     if total_score > 0:
         regime_scores = {k: max(0, v)/total_score for k, v in regime_scores.items()}
     
-    # 选择得分最高的区制
+    # Select regime with highest score
     current_regime = max(regime_scores.items(), key=lambda x: x[1])
     
-    # 计算区制的清晰度/置信度
+    # Calculate regime clarity/confidence
     if current_regime[1] > 0.5:
         confidence = current_regime[1]
     else:
-        confidence = 0.5  # 不明确的区制
+        confidence = 0.5  # Unclear regime
     
     return {
         "regime": current_regime[0],
@@ -447,113 +447,113 @@ def calculate_trend_signals(prices_df):
 
 def calculate_mean_reversion_signals(prices_df):
     """
-    均值回归策略，使用多种技术指标和统计方法
+    Mean reversion strategy using multiple technical indicators and statistical methods
     
     Args:
-        prices_df: 价格数据DataFrame
+        prices_df: Price data DataFrame
     
     Returns:
-        dict: 均值回归信号和指标
+        dict: Mean reversion signals and indicators
     """
-    # 计算价格相对移动平均的偏离度
+    # Calculate price deviation from moving average
     ma_50 = prices_df['close'].rolling(window=50).mean()
     std_50 = prices_df['close'].rolling(window=50).std()
     z_score = (prices_df['close'] - ma_50) / std_50
     
-    # 计算布林带
+    # Calculate Bollinger Bands
     bb_upper, bb_lower = calculate_bollinger_bands(prices_df, window=20)
     
-    # 计算多周期RSI
+    # Calculate multi-period RSI
     rsi_14 = calculate_rsi(prices_df, period=14)
     rsi_28 = calculate_rsi(prices_df, period=28)
     
-    # 计算价格离散度：衡量价格偏离多个周期移动平均的程度
+    # Calculate price dispersion: measure price deviation from multiple period moving averages
     ma_10 = prices_df['close'].rolling(window=10).mean()
     ma_20 = prices_df['close'].rolling(window=20).mean()
     ma_50 = prices_df['close'].rolling(window=50).mean()
     
-    # 计算相对于多个均线的偏离度
+    # Calculate deviation from multiple moving averages
     deviation_10 = (prices_df['close'] - ma_10) / ma_10
     deviation_20 = (prices_df['close'] - ma_20) / ma_20
     deviation_50 = (prices_df['close'] - ma_50) / ma_50
     
-    # 计算平均偏离度
+    # Calculate average deviation
     avg_deviation = (deviation_10 + deviation_20 + deviation_50) / 3
     
-    # 计算Stochastic Oscillator (KD指标)
+    # Calculate Stochastic Oscillator (KD indicator)
     high_14 = prices_df['high'].rolling(window=14).max()
     low_14 = prices_df['low'].rolling(window=14).min()
     k_percent = 100 * ((prices_df['close'] - low_14) / (high_14 - low_14))
     d_percent = k_percent.rolling(window=3).mean()
     
-    # 增强型均值回归信号
-    # 1. RSI超买超卖信号
+    # Enhanced mean reversion signals
+    # 1. RSI overbought/oversold signals
     rsi_signal = 0
     if rsi_14.iloc[-1] < 30:
-        rsi_signal = 1  # 超卖
+        rsi_signal = 1  # Oversold
     elif rsi_14.iloc[-1] > 70:
-        rsi_signal = -1  # 超买
+        rsi_signal = -1  # Overbought
         
-    # 2. 布林带信号
+    # 2. Bollinger Bands signals
     bb_signal = 0
     price_vs_bb = (prices_df['close'].iloc[-1] - bb_lower.iloc[-1]) / (bb_upper.iloc[-1] - bb_lower.iloc[-1])
-    if price_vs_bb < 0.1:  # 价格接近下轨
+    if price_vs_bb < 0.1:  # Price near lower band
         bb_signal = 1
-    elif price_vs_bb > 0.9:  # 价格接近上轨
+    elif price_vs_bb > 0.9:  # Price near upper band
         bb_signal = -1
         
-    # 3. KD指标信号
+    # 3. KD indicator signals
     kd_signal = 0
     if k_percent.iloc[-1] < 20 and d_percent.iloc[-1] < 20:
-        kd_signal = 1  # 超卖
+        kd_signal = 1  # Oversold
     elif k_percent.iloc[-1] > 80 and d_percent.iloc[-1] > 80:
-        kd_signal = -1  # 超买
+        kd_signal = -1  # Overbought
         
-    # 4. 价格偏离均值信号
+    # 4. Price deviation from mean signals
     deviation_signal = 0
     if avg_deviation.iloc[-1] < -0.05:
-        deviation_signal = 1  # 价格显著低于均值
+        deviation_signal = 1  # Price significantly below mean
     elif avg_deviation.iloc[-1] > 0.05:
-        deviation_signal = -1  # 价格显著高于均值
+        deviation_signal = -1  # Price significantly above mean
     
-    # 聚合信号评分 (-4到4，负表示超买，正表示超卖)
+    # Aggregate signal score (-4 to 4, negative means overbought, positive means oversold)
     signal_score = rsi_signal + bb_signal + kd_signal + deviation_signal
     
-    # 使用逻辑回归加权生成最终信号
-    # 不同指标在不同市场条件下有不同可靠性
-    if signal_score >= 2:  # 强烈超卖信号
+    # Use logistic regression weighting to generate final signal
+    # Different indicators have different reliability under different market conditions
+    if signal_score >= 2:  # Strong oversold signal
         signal = 'bullish'
-        confidence = min(0.3 + (signal_score - 2) * 0.1, 0.7)  # 最高70%置信度
-    elif signal_score <= -2:  # 强烈超买信号
+        confidence = min(0.3 + (signal_score - 2) * 0.1, 0.7)  # Maximum 70% confidence
+    elif signal_score <= -2:  # Strong overbought signal
         signal = 'bearish'
-        confidence = min(0.3 + (abs(signal_score) - 2) * 0.1, 0.7)  # 最高70%置信度
+        confidence = min(0.3 + (abs(signal_score) - 2) * 0.1, 0.7)  # Maximum 70% confidence
     else:
         signal = 'neutral'
-        confidence = 0.3  # 中性信号较低置信度
+        confidence = 0.3  # Lower confidence for neutral signals
     
-    # 根据市场波动调整置信度
+    # Adjust confidence based on market volatility
     volatility_adjustment = 1.0
     historical_volatility = prices_df['close'].pct_change().rolling(window=20).std()
     current_volatility = historical_volatility.iloc[-1] if not historical_volatility.empty else 0
     
-    # 高波动环境下降低均值回归策略置信度
-    if current_volatility > 0.02:  # 日波动率高于2%
+    # Reduce mean reversion strategy confidence in high volatility environment
+    if current_volatility > 0.02:  # Daily volatility above 2%
         volatility_adjustment = 0.8
     
     confidence = confidence * volatility_adjustment
     
-    # 计算信号的时间相关性(较新的信号权重更高)
-    time_relevance = 1.0  # 默认值
+    # Calculate signal time relevance (newer signals have higher weight)
+    time_relevance = 1.0  # Default value
     
-    # 检测是否为反转模式
-    if rsi_14.iloc[-2] < 30 and rsi_14.iloc[-1] > 30:  # RSI刚从超卖区域回升
+    # Detect reversal patterns
+    if rsi_14.iloc[-2] < 30 and rsi_14.iloc[-1] > 30:  # RSI just recovered from oversold zone
         signal = 'bullish'
-        confidence = min(confidence + 0.15, 0.85)  # 提高置信度
-        time_relevance = 1.2  # 提高时间相关性
-    elif rsi_14.iloc[-2] > 70 and rsi_14.iloc[-1] < 70:  # RSI刚从超买区域回落
+        confidence = min(confidence + 0.15, 0.85)  # Increase confidence
+        time_relevance = 1.2  # Increase time relevance
+    elif rsi_14.iloc[-2] > 70 and rsi_14.iloc[-1] < 70:  # RSI just fell from overbought zone
         signal = 'bearish'
-        confidence = min(confidence + 0.15, 0.85)  # 提高置信度
-        time_relevance = 1.2  # 提高时间相关性
+        confidence = min(confidence + 0.15, 0.85)  # Increase confidence
+        time_relevance = 1.2  # Increase time relevance
     
     return {
         'signal': signal,
@@ -573,48 +573,48 @@ def calculate_mean_reversion_signals(prices_df):
 
 def calculate_momentum_signals(prices_df):
     """
-    多因子动量策略，考虑价格趋势、成交量和相对强度
+    Multi-factor momentum strategy considering price trends, volume and relative strength
     
     Args:
-        prices_df: 价格数据DataFrame
+        prices_df: Price data DataFrame
     
     Returns:
-        dict: 动量信号和指标
+        dict: Momentum signals and indicators
     """
-    # 计算多周期价格动量
+    # Calculate multi-period price momentum
     returns = prices_df['close'].pct_change()
     
-    # 计算不同周期动量并进行缺失值处理
-    mom_1m = returns.rolling(21).sum().fillna(0)  # 1月
-    mom_3m = returns.rolling(63).sum().fillna(mom_1m)  # 3月
-    mom_6m = returns.rolling(126).sum().fillna(mom_3m)  # 6月
+    # Calculate different period momentum with missing value handling
+    mom_1m = returns.rolling(21).sum().fillna(0)  # 1 month
+    mom_3m = returns.rolling(63).sum().fillna(mom_1m)  # 3 months
+    mom_6m = returns.rolling(126).sum().fillna(mom_3m)  # 6 months
     
-    # 相对强度指标 - 与大盘/行业比较的相对强度
-    # 此处使用模拟值，实际应当用行业指数数据
+    # Relative strength indicator - relative strength compared to market/industry
+    # Using simulated values here, actual implementation should use industry index data
     relative_strength = np.random.normal(0, 0.05, len(returns)) + mom_3m * 0.7
     relative_strength = pd.Series(relative_strength, index=returns.index)
     
-    # 成交量趋势确认
+    # Volume trend confirmation
     volume_ma = prices_df['volume'].rolling(21).mean()
     volume_ratio = prices_df['volume'] / volume_ma
-    volume_trend = volume_ratio.rolling(10).mean()  # 成交量趋势
+    volume_trend = volume_ratio.rolling(10).mean()  # Volume trend
     
-    # 计算动量发散 - OBV与价格趋势比较
+    # Calculate momentum divergence - compare OBV with price trend
     obv = calculate_obv(prices_df)
     obv_ma = obv.rolling(window=20).mean()
     price_ma = prices_df['close'].rolling(window=20).mean()
     
-    # 归一化价格和OBV以便比较
+    # Normalize price and OBV for comparison
     norm_price = (prices_df['close'] - prices_df['close'].rolling(100).min()) / \
                 (prices_df['close'].rolling(100).max() - prices_df['close'].rolling(100).min())
     norm_obv = (obv - obv.rolling(100).min()) / (obv.rolling(100).max() - obv.rolling(100).min())
     
-    # 计算价格和OBV之间的发散
+    # Calculate divergence between price and OBV
     divergence = norm_obv - norm_price
     divergence_signal = divergence.rolling(5).mean()
     
-    # 使用加权组合计算动量分数
-    # 较近期动量权重更高，并且考虑相对强度
+    # Calculate momentum score using weighted combination
+    # More recent momentum has higher weight, and consider relative strength
     momentum_score = (
         0.2 * mom_1m +
         0.3 * mom_3m +
@@ -622,23 +622,23 @@ def calculate_momentum_signals(prices_df):
         0.2 * relative_strength
     ).iloc[-1]
     
-    # 成交量确认分数
-    volume_confirmation = 1.0  # 默认值
-    if volume_trend.iloc[-1] > 1.1:  # 成交量上升
-        volume_confirmation = 1.2  # 增强确认
-    elif volume_trend.iloc[-1] < 0.9:  # 成交量下降
-        volume_confirmation = 0.8  # 削弱确认
+    # Volume confirmation score
+    volume_confirmation = 1.0  # Default value
+    if volume_trend.iloc[-1] > 1.1:  # Volume rising
+        volume_confirmation = 1.2  # Enhanced confirmation
+    elif volume_trend.iloc[-1] < 0.9:  # Volume falling
+        volume_confirmation = 0.8  # Weakened confirmation
     
-    # 考虑发散信号
-    divergence_factor = 1.0  # 默认值
+    # Consider divergence signals
+    divergence_factor = 1.0  # Default value
     if divergence_signal.iloc[-1] > 0.1 and mom_3m.iloc[-1] < 0:
-        # 看涨背离：OBV上升而价格下跌
+        # Bullish divergence: OBV rising while price falling
         divergence_factor = 1.2
     elif divergence_signal.iloc[-1] < -0.1 and mom_3m.iloc[-1] > 0:
-        # 看跌背离：OBV下降而价格上升
+        # Bearish divergence: OBV falling while price rising
         divergence_factor = 0.8
     
-    # 生成最终信号
+    # Generate final signal
     if momentum_score > 0.05 and volume_confirmation >= 1.0:
         signal = 'bullish'
         base_confidence = min(abs(momentum_score) * 5, 0.8)
@@ -649,14 +649,14 @@ def calculate_momentum_signals(prices_df):
         signal = 'neutral'
         base_confidence = 0.3
     
-    # 应用调整系数
+    # Apply adjustment factors
     confidence = base_confidence * volume_confirmation * divergence_factor
-    confidence = min(max(confidence, 0.2), 0.9)  # 限定在0.2-0.9范围内
+    confidence = min(max(confidence, 0.2), 0.9)  # Limit to 0.2-0.9 range
     
-    # 市场条件相关性
+    # Market condition relevance
     market_condition_relevance = 1.0
     
-    # 在上升趋势中，动量信号更可靠
+    # In uptrend, momentum signals are more reliable
     if mom_3m.iloc[-1] > 0 and mom_6m.iloc[-1] > 0:
         market_condition_relevance = 1.2
     
@@ -681,18 +681,18 @@ def calculate_stat_arb_signals(prices_df):
     # Calculate price distribution statistics
     returns = prices_df['close'].pct_change()
 
-    # 使用更短的周期计算偏度和峰度
+    # Use shorter periods to calculate skewness and kurtosis
     skew = returns.rolling(42, min_periods=21).skew()
     kurt = returns.rolling(42, min_periods=21).kurt()
 
-    # 优化Hurst指数计算
+    # Optimize Hurst exponent calculation
     hurst = calculate_hurst_exponent(prices_df['close'], max_lag=10)
 
-    # 处理NaN值
+    # Handle NaN values
     if pd.isna(skew.iloc[-1]):
-        skew.iloc[-1] = 0.0  # 假设正态分布
+        skew.iloc[-1] = 0.0  # Assume normal distribution
     if pd.isna(kurt.iloc[-1]):
-        kurt.iloc[-1] = 3.0  # 假设正态分布
+        kurt.iloc[-1] = 3.0  # Assume normal distribution
 
     # Generate signal based on statistical properties
     if hurst < 0.4 and skew.iloc[-1] > 1:
@@ -718,78 +718,78 @@ def calculate_stat_arb_signals(prices_df):
 
 def weighted_signal_combination(signals, weights):
     """
-    使用自适应加权方法组合多种交易信号
+    Use adaptive weighting method to combine multiple trading signals
     
     Args:
-        signals: 各策略信号字典
-        weights: 各策略权重字典
+        signals: Dictionary of strategy signals
+        weights: Dictionary of strategy weights
     
     Returns:
-        dict: 包含最终信号和置信度的字典
+        dict: Dictionary containing final signal and confidence
     """
-    # 转换信号为数值
+    # Convert signals to numeric values
     signal_values = {
         'bullish': 1,
         'neutral': 0,
         'bearish': -1
     }
 
-    # 收集各策略结果
+    # Collect strategy results
     strategy_scores = []
     total_weight = 0
     
-    # 计算动态置信度调整因子
+    # Calculate dynamic confidence adjustment factor
     confidence_adjustment = 1.0
     
-    # 计算信号一致性
+    # Calculate signal consistency
     signal_counts = {'bullish': 0, 'neutral': 0, 'bearish': 0}
     for strategy, signal in signals.items():
         signal_counts[signal['signal']] += 1
     
-    # 一致性指标 (0-1，越高表示信号越一致)
+    # Consistency indicator (0-1, higher means more consistent signals)
     max_signal_count = max(signal_counts.values())
     consistency = max_signal_count / sum(signal_counts.values()) if sum(signal_counts.values()) > 0 else 0
     
-    # 调整置信度：一致性高时提高整体置信度
-    if consistency > 0.7:  # 超过70%策略给出相同信号
-        confidence_adjustment = 1.2  # 提高20%置信度
-    elif consistency < 0.4:  # 信号极度分散
-        confidence_adjustment = 0.8  # 降低20%置信度
+    # Adjust confidence: increase overall confidence when consistency is high
+    if consistency > 0.7:  # More than 70% of strategies give same signal
+        confidence_adjustment = 1.2  # Increase confidence by 20%
+    elif consistency < 0.4:  # Signals are extremely scattered
+        confidence_adjustment = 0.8  # Decrease confidence by 20%
     
-    # 自适应权重调整
+    # Adaptive weight adjustment
     for strategy, signal in signals.items():
         numeric_signal = signal_values[signal['signal']]
         base_weight = weights[strategy]
         confidence = signal['confidence']
         
-        # 计算时间相关性权重调整
+        # Calculate time relevance weight adjustment
         time_relevance = 1.0
         if 'time_relevance' in signal:
             time_relevance = signal['time_relevance']
         
-        # 计算市场条件相关性调整
+        # Calculate market condition relevance adjustment
         market_condition_factor = 1.0
         if 'market_condition_relevance' in signal:
             market_condition_factor = signal['market_condition_relevance']
         
-        # 调整后的权重
+        # Adjusted weight
         adjusted_weight = base_weight * time_relevance * market_condition_factor
         
-        # 添加加权分数
+        # Add weighted score
         weighted_score = numeric_signal * adjusted_weight * confidence
         strategy_scores.append(weighted_score)
         total_weight += adjusted_weight * confidence
     
-    # 计算最终得分
+    # Calculate final score
     if total_weight > 0:
         final_score = sum(strategy_scores) / total_weight
     else:
         final_score = 0
     
-    # 应用一致性调整
+    # Apply consistency adjustment
     final_confidence = min(abs(final_score) * confidence_adjustment, 1.0)
     
-    # 转换回信号
+    # Convert back to signal
     if final_score > 0.2:
         signal = 'bullish'
     elif final_score < -0.2:
@@ -970,30 +970,30 @@ def calculate_hurst_exponent(price_series: pd.Series, max_lag: int = 10) -> floa
         float: Hurst exponent
     """
     try:
-        # 使用对数收益率而不是价格
+        # Use log returns instead of prices
         returns = np.log(price_series / price_series.shift(1)).dropna()
 
-        # 如果数据不足，返回0.5（随机游走）
+        # If insufficient data, return 0.5 (random walk)
         if len(returns) < max_lag * 2:
             return 0.5
 
         lags = range(2, max_lag)
-        # 使用更稳定的计算方法
+        # Use more stable calculation method
         tau = [np.sqrt(np.std(np.subtract(returns[lag:], returns[:-lag])))
                for lag in lags]
 
-        # 添加小的常数避免log(0)
+        # Add small constant to avoid log(0)
         tau = [max(1e-8, t) for t in tau]
 
-        # 使用对数回归计算Hurst指数
+        # Use log regression to calculate Hurst exponent
         reg = np.polyfit(np.log(lags), np.log(tau), 1)
         h = reg[0]
 
-        # 限制Hurst指数在合理范围内
+        # Limit Hurst exponent to reasonable range
         return max(0.0, min(1.0, h))
 
     except (ValueError, RuntimeWarning, np.linalg.LinAlgError):
-        # 如果计算失败，返回0.5表示随机游走
+        # If calculation fails, return 0.5 indicating random walk
         return 0.5
 
 

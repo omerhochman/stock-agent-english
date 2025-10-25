@@ -6,7 +6,7 @@ from src.utils.logging_config import setup_logger
 logger = setup_logger('akshare_adapter')
 
 def get_akshare_price_data(akshare_code: str, start_date: str, end_date: str, adjust: str) -> pd.DataFrame:
-    """从AKShare获取价格数据"""
+    """Get price data from AKShare"""
     try:
         import akshare as ak
         logger.info(f"Fetching price history using AKShare for {akshare_code}")
@@ -19,23 +19,23 @@ def get_akshare_price_data(akshare_code: str, start_date: str, end_date: str, ad
         )
         
         if not df.empty:
-            # 转换AKShare数据格式
+            # Convert AKShare data format
             df = df.rename(columns={
-                "日期": "date",
-                "开盘": "open",
-                "最高": "high",
-                "最低": "low",
-                "收盘": "close",
-                "成交量": "volume",
-                "成交额": "amount",
-                "振幅": "amplitude",
-                "涨跌幅": "pct_change",
-                "涨跌额": "change_amount",
-                "换手率": "turnover"
+                "日期": "date",  # Date
+                "开盘": "open",  # Open
+                "最高": "high",  # High
+                "最低": "low",   # Low
+                "收盘": "close", # Close
+                "成交量": "volume",  # Volume
+                "成交额": "amount",  # Amount
+                "振幅": "amplitude", # Amplitude
+                "涨跌幅": "pct_change",  # Price change percentage
+                "涨跌额": "change_amount",  # Price change amount
+                "换手率": "turnover"  # Turnover rate
             })
             df["date"] = pd.to_datetime(df["date"])
             
-            # 确保所有数值列已转换为float类型
+            # Ensure all numeric columns are converted to float type
             for col in ['open', 'high', 'low', 'close', 'volume', 'amount', 'pct_change', 'change_amount', 'turnover']:
                 if col in df.columns:
                     df[col] = pd.to_numeric(df[col], errors='coerce')
@@ -48,22 +48,22 @@ def get_akshare_price_data(akshare_code: str, start_date: str, end_date: str, ad
         return pd.DataFrame()
 
 def get_akshare_financial_metrics(akshare_code: str, exchange_prefix: str) -> List[Dict[str, Any]]:
-    """从AKShare获取财务指标"""
+    """Get financial metrics from AKShare"""
     try:
         import akshare as ak
         logger.info(f"Fetching financial metrics using AKShare for {akshare_code}")
         
-        # 获取实时行情数据
+        # Get real-time market data
         realtime_data = ak.stock_zh_a_spot_em()
         if not realtime_data.empty:
-            stock_data = realtime_data[realtime_data['代码'] == akshare_code]
+            stock_data = realtime_data[realtime_data['代码'] == akshare_code]  # Code
             if not stock_data.empty:
                 stock_data = stock_data.iloc[0]
                 
-                # 获取财务指标
-                # 这里简化了部分代码，实际实现应根据具体的AKShare API进行调整
+                # Get financial metrics
+                # This simplifies some code, actual implementation should be adjusted based on specific AKShare API
                 agent_metrics = {
-                    "return_on_equity": 0.12,  # 示例值
+                    "return_on_equity": 0.12,  # Example value
                     "net_margin": 0.15,
                     "operating_margin": 0.18,
                     "revenue_growth": 0.1,
@@ -73,8 +73,8 @@ def get_akshare_financial_metrics(akshare_code: str, exchange_prefix: str) -> Li
                     "debt_to_equity": 0.4,
                     "free_cash_flow_per_share": 2.5,
                     "earnings_per_share": 1.2,
-                    "pe_ratio": float(stock_data.get("市盈率-动态", 0)),
-                    "price_to_book": float(stock_data.get("市净率", 0)),
+                    "pe_ratio": float(stock_data.get("市盈率-动态", 0)),  # Dynamic P/E ratio
+                    "price_to_book": float(stock_data.get("市净率", 0)),  # Price-to-book ratio
                     "price_to_sales": 3.0
                 }
                 
@@ -85,14 +85,14 @@ def get_akshare_financial_metrics(akshare_code: str, exchange_prefix: str) -> Li
         return [{}]
 
 def get_akshare_financial_statements(akshare_code: str, exchange_prefix: str) -> List[Dict[str, Any]]:
-    """从AKShare获取财务报表数据"""
+    """Get financial statements data from AKShare"""
     try:
         import akshare as ak
         logger.info(f"Fetching financial statements using AKShare for {akshare_code}")
         
-        # 获取资产负债表、利润表、现金流量表
-        # 由于实现较复杂，这里简化为返回模拟数据
-        # 实际实现应根据具体的AKShare API进行调整
+        # Get balance sheet, income statement, cash flow statement
+        # Due to complex implementation, simplified to return mock data
+        # Actual implementation should be adjusted based on specific AKShare API
         current_item = {
             "net_income": 5000000000,
             "operating_revenue": 20000000000,
@@ -119,28 +119,28 @@ def get_akshare_financial_statements(akshare_code: str, exchange_prefix: str) ->
         return [{}, {}]
 
 def get_akshare_market_data(akshare_code: str) -> Dict[str, Any]:
-    """从AKShare获取市场数据"""
+    """Get market data from AKShare"""
     try:
         import akshare as ak
         logger.info(f"Fetching market data using AKShare for {akshare_code}")
         
-        # 获取实时行情
+        # Get real-time market data
         realtime_data = ak.stock_zh_a_spot_em()
         stock_data = realtime_data[realtime_data['代码'] == akshare_code]
         
         if not stock_data.empty:
             stock_data = stock_data.iloc[0]
             
-            # 获取价格历史数据计算52周最高/最低价
+            # Get price history data to calculate 52-week high/low
             hist_data = ak.stock_zh_a_hist(symbol=akshare_code, period="daily", adjust="qfq")
             
-            week_high = hist_data["最高"].max() if not hist_data.empty else stock_data.get("最高", 0)
-            week_low = hist_data["最低"].min() if not hist_data.empty else stock_data.get("最低", 0)
-            avg_volume = hist_data.tail(30)["成交量"].mean() if not hist_data.empty else stock_data.get("成交量", 0)
+            week_high = hist_data["最高"].max() if not hist_data.empty else stock_data.get("最高", 0)  # High
+            week_low = hist_data["最低"].min() if not hist_data.empty else stock_data.get("最低", 0)  # Low
+            avg_volume = hist_data.tail(30)["成交量"].mean() if not hist_data.empty else stock_data.get("成交量", 0)  # Volume
             
             return {
-                "market_cap": float(stock_data.get("总市值", 0)),
-                "volume": float(stock_data.get("成交量", 0)),
+                "market_cap": float(stock_data.get("总市值", 0)),  # Total market cap
+                "volume": float(stock_data.get("成交量", 0)),  # Volume
                 "average_volume": float(avg_volume),
                 "fifty_two_week_high": float(week_high),
                 "fifty_two_week_low": float(week_low)

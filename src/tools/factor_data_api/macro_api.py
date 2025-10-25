@@ -1,5 +1,5 @@
 """
-宏观经济数据API - 提供宏观经济数据的获取和处理功能
+Macroeconomic Data API - Provides functionality for obtaining and processing macroeconomic data
 """
 
 import pandas as pd
@@ -14,42 +14,42 @@ def get_macro_economic_data(indicator_type: str = "gdp",
                            start_date: str = None, 
                            end_date: str = None) -> pd.DataFrame:
     """
-    获取宏观经济指标数据
+    Get macroeconomic indicator data
     
     Args:
-        indicator_type: 指标类型，如 "gdp", "cpi", "interest_rate", "m2"
-        start_date: 开始日期，格式：YYYY-MM-DD
-        end_date: 结束日期，格式：YYYY-MM-DD
+        indicator_type: Indicator type, such as "gdp", "cpi", "interest_rate", "m2"
+        start_date: Start date, format: YYYY-MM-DD
+        end_date: End date, format: YYYY-MM-DD
         
     Returns:
-        包含宏观经济数据的DataFrame
+        DataFrame containing macroeconomic data
     """
-    logger.info(f"获取宏观经济数据: {indicator_type}, {start_date} 至 {end_date}")
+    logger.info(f"Getting macroeconomic data: {indicator_type}, {start_date} to {end_date}")
     
     try:
-        # 尝试使用AKShare获取宏观经济数据
+        # Try using AKShare to get macroeconomic data
         try:
             import akshare as ak
             
-            # 处理日期格式
+            # Process date format
             if start_date and len(start_date) == 8:
                 start_date = f"{start_date[:4]}-{start_date[4:6]}-{start_date[6:]}"
             if end_date and len(end_date) == 8:
                 end_date = f"{end_date[:4]}-{end_date[4:6]}-{end_date[6:]}"
             
-            # 根据指标类型获取不同的数据
+            # Get different data based on indicator type
             if indicator_type == "gdp":
-                # 获取GDP数据
+                # Get GDP data
                 gdp_data = ak.macro_china_gdp()
                 
                 if not gdp_data.empty:
-                    # 处理数据
-                    gdp_data = gdp_data.rename(columns={"季度": "date"})
+                    # Process data
+                    gdp_data = gdp_data.rename(columns={"季度": "date"})  # 季度 = quarter
                     
-                    # 转换日期格式
+                    # Convert date format
                     gdp_data["date"] = pd.to_datetime(gdp_data["date"])
                     
-                    # 过滤日期范围
+                    # Filter date range
                     if start_date:
                         start_date = pd.to_datetime(start_date)
                         gdp_data = gdp_data[gdp_data["date"] >= start_date]
@@ -57,23 +57,23 @@ def get_macro_economic_data(indicator_type: str = "gdp",
                         end_date = pd.to_datetime(end_date)
                         gdp_data = gdp_data[gdp_data["date"] <= end_date]
                     
-                    logger.info(f"成功获取GDP数据: {len(gdp_data)} 条记录")
+                    logger.info(f"Successfully obtained GDP data: {len(gdp_data)} records")
                     return gdp_data
                 else:
-                    logger.warning("无法获取GDP数据")
+                    logger.warning("Unable to get GDP data")
                     
             elif indicator_type == "cpi":
-                # 获取CPI数据
+                # Get CPI data
                 cpi_data = ak.macro_china_cpi()
                 
                 if not cpi_data.empty:
-                    # 处理数据
-                    cpi_data = cpi_data.rename(columns={"月份": "date"})
+                    # Process data
+                    cpi_data = cpi_data.rename(columns={"月份": "date"})  # 月份 = month
                     
-                    # 转换日期格式
+                    # Convert date format
                     cpi_data["date"] = pd.to_datetime(cpi_data["date"])
                     
-                    # 过滤日期范围
+                    # Filter date range
                     if start_date:
                         start_date = pd.to_datetime(start_date)
                         cpi_data = cpi_data[cpi_data["date"] >= start_date]
@@ -81,31 +81,31 @@ def get_macro_economic_data(indicator_type: str = "gdp",
                         end_date = pd.to_datetime(end_date)
                         cpi_data = cpi_data[cpi_data["date"] <= end_date]
                     
-                    logger.info(f"成功获取CPI数据: {len(cpi_data)} 条记录")
+                    logger.info(f"Successfully obtained CPI data: {len(cpi_data)} records")
                     return cpi_data
                 else:
-                    logger.warning("无法获取CPI数据")
+                    logger.warning("Unable to get CPI data")
                     
             elif indicator_type == "interest_rate":
-                # 获取利率数据
+                # Get interest rate data
                 interest_data = get_risk_free_rate(start_date, end_date, freq='D').to_frame(name="interest_rate")
                 interest_data = interest_data.reset_index().rename(columns={"index": "date"})
                 
-                logger.info(f"成功获取利率数据: {len(interest_data)} 条记录")
+                logger.info(f"Successfully obtained interest rate data: {len(interest_data)} records")
                 return interest_data
                 
             elif indicator_type == "m2":
-                # 获取M2数据
+                # Get M2 data
                 m2_data = ak.macro_china_money_supply()
                 
                 if not m2_data.empty:
-                    # 处理数据
-                    m2_data = m2_data.rename(columns={"月份": "date"})
+                    # Process data
+                    m2_data = m2_data.rename(columns={"月份": "date"})  # 月份 = month
                     
-                    # 转换日期格式
+                    # Convert date format
                     m2_data["date"] = pd.to_datetime(m2_data["date"])
                     
-                    # 过滤日期范围
+                    # Filter date range
                     if start_date:
                         start_date = pd.to_datetime(start_date)
                         m2_data = m2_data[m2_data["date"] >= start_date]
@@ -113,128 +113,128 @@ def get_macro_economic_data(indicator_type: str = "gdp",
                         end_date = pd.to_datetime(end_date)
                         m2_data = m2_data[m2_data["date"] <= end_date]
                     
-                    logger.info(f"成功获取M2数据: {len(m2_data)} 条记录")
+                    logger.info(f"Successfully obtained M2 data: {len(m2_data)} records")
                     return m2_data
                 else:
-                    logger.warning("无法获取M2数据")
+                    logger.warning("Unable to get M2 data")
                     
             else:
-                logger.warning(f"不支持的指标类型: {indicator_type}")
+                logger.warning(f"Unsupported indicator type: {indicator_type}")
                 
         except ImportError:
-            logger.warning("未找到akshare库，无法获取宏观经济数据")
+            logger.warning("akshare library not found, unable to get macroeconomic data")
         except Exception as e:
-            logger.warning(f"使用AKShare获取宏观数据失败: {e}")
+            logger.warning(f"Failed to get macroeconomic data using AKShare: {e}")
     
     except Exception as e:
-        logger.error(f"获取宏观经济数据时出错: {e}")
+        logger.error(f"Error occurred while getting macroeconomic data: {e}")
         logger.error(traceback.format_exc())
     
-    # 如果所有尝试都失败，使用模拟数据
+    # If all attempts fail, use mock data
     return _generate_mock_macro_data(indicator_type, start_date, end_date)
 
 def _generate_mock_macro_data(indicator_type: str, start_date: str, end_date: str) -> pd.DataFrame:
     """
-    生成模拟的宏观经济数据
+    Generate mock macroeconomic data
     
     Args:
-        indicator_type: 指标类型
-        start_date: 开始日期
-        end_date: 结束日期
+        indicator_type: Indicator type
+        start_date: Start date
+        end_date: End date
         
     Returns:
-        模拟的宏观经济数据DataFrame
+        Mock macroeconomic data DataFrame
     """
-    logger.info(f"生成模拟{indicator_type}数据")
+    logger.info(f"Generating mock {indicator_type} data")
     
-    # 处理日期参数
+    # Process date parameters
     if not end_date:
         end_date = datetime.now().strftime("%Y-%m-%d")
     if not start_date:
-        # 默认生成五年的数据
+        # Default to generate five years of data
         start_date = (datetime.strptime(end_date, "%Y-%m-%d") - timedelta(days=365*5)).strftime("%Y-%m-%d")
     
-    # 确保日期格式一致
+    # Ensure date format consistency
     if isinstance(start_date, str) and len(start_date) == 8:
         start_date = f"{start_date[:4]}-{start_date[4:6]}-{start_date[6:]}"
     if isinstance(end_date, str) and len(end_date) == 8:
         end_date = f"{end_date[:4]}-{end_date[4:6]}-{end_date[6:]}"
     
-    # 根据指标类型生成不同频率的日期范围
+    # Generate different frequency date ranges based on indicator type
     if indicator_type == "gdp":
-        # GDP数据是季度数据
+        # GDP data is quarterly data
         date_range = pd.date_range(start=start_date, end=end_date, freq='QE')
     elif indicator_type in ["cpi", "m2"]:
-        # CPI和M2数据是月度数据
+        # CPI and M2 data are monthly data
         date_range = pd.date_range(start=start_date, end=end_date, freq='M')
     else:
-        # 其他数据默认为月度数据
+        # Other data defaults to monthly data
         date_range = pd.date_range(start=start_date, end=end_date, freq='M')
     
-    # 生成模拟数据
-    np.random.seed(42)  # 设置随机种子以保证可复现性
+    # Generate mock data
+    np.random.seed(42)  # Set random seed for reproducibility
     
     if indicator_type == "gdp":
-        # 创建GDP数据
-        # 基础GDP值（单位：亿元）
+        # Create GDP data
+        # Base GDP value (unit: 100 million yuan)
         base_gdp = 100000
-        # 增长率范围（6%-8%）
+        # Growth rate range (6%-8%)
         growth_rates = np.random.uniform(0.06, 0.08, len(date_range))
         
-        # 计算累积GDP
+        # Calculate cumulative GDP
         gdp_values = []
         current_gdp = base_gdp
         for rate in growth_rates:
             current_gdp *= (1 + rate)
             gdp_values.append(current_gdp)
         
-        # 创建DataFrame
+        # Create DataFrame
         mock_data = pd.DataFrame({
             "date": date_range,
-            "国内生产总值_当季值": gdp_values,
-            "国内生产总值_累计值": np.cumsum(gdp_values),
-            "国内生产总值_同比增长": growth_rates * 100
+            "GDP_Quarterly": gdp_values,
+            "GDP_Cumulative": np.cumsum(gdp_values),
+            "GDP_Year_Over_Year_Growth": growth_rates * 100
         })
         
     elif indicator_type == "cpi":
-        # 创建CPI数据
-        # CPI同比增长范围（1%-4%）
+        # Create CPI data
+        # CPI year-over-year growth range (1%-4%)
         cpi_yoy = np.random.uniform(0.01, 0.04, len(date_range)) * 100
         
-        # 创建DataFrame
+        # Create DataFrame
         mock_data = pd.DataFrame({
             "date": date_range,
-            "全国_同比": cpi_yoy,
-            "全国_环比": np.random.uniform(-0.5, 1.5, len(date_range)),
-            "城市_同比": cpi_yoy + np.random.uniform(-0.5, 0.5, len(date_range)),
-            "农村_同比": cpi_yoy + np.random.uniform(-0.5, 0.5, len(date_range))
+            "National_Year_Over_Year": cpi_yoy,
+            "National_Month_Over_Month": np.random.uniform(-0.5, 1.5, len(date_range)),
+            "Urban_Year_Over_Year": cpi_yoy + np.random.uniform(-0.5, 0.5, len(date_range)),
+            "Rural_Year_Over_Year": cpi_yoy + np.random.uniform(-0.5, 0.5, len(date_range))
         })
         
     elif indicator_type == "m2":
-        # 创建M2数据
-        # 基础M2值（单位：亿元）
+        # Create M2 data
+        # Base M2 value (unit: 100 million yuan)
         base_m2 = 2000000
-        # 增长率范围（8%-12%）
+        # Growth rate range (8%-12%)
         growth_rates = np.random.uniform(0.08, 0.12, len(date_range))
         
-        # 计算累积M2
+        # Calculate cumulative M2
         m2_values = []
         current_m2 = base_m2
         for rate in growth_rates:
-            current_m2 *= (1 + rate/12)  # 月度增长率
+            current_m2 *= (1 + rate/12)  # Monthly growth rate
             m2_values.append(current_m2)
         
-        # 创建DataFrame
+        # Create DataFrame
         mock_data = pd.DataFrame({
             "date": date_range,
-            "货币和准货币(M2)": m2_values,
-            "M2同比增长": growth_rates * 100,
-            "M1": np.array(m2_values) * 0.3,  # M1约为M2的30%
-            "M1同比增长": growth_rates * 100 + np.random.uniform(-2, 2, len(date_range))
+            "Money_and_Quasi_Money_M2": m2_values,
+            "M2_Year_Over_Year_Growth": growth_rates * 100,
+            "M1": np.array(m2_values) * 0.3,  # M1 is about 30% of M2
+            "M1_Year_Over_Year_Growth": growth_rates * 100 + np.random.uniform(-2, 2, len(date_range))
         })
         
     else:
-        # 创建默认模拟数据
+        # Create default mock data
         mock_data = pd.DataFrame({
             "date": date_range,
             "value": np.random.normal(100, 10, len(date_range)),

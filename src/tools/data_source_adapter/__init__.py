@@ -1,26 +1,26 @@
 """
-数据源适配器模块 - 提供统一的数据获取接口
+Data Source Adapter Module - Provides unified data access interface
 
-此模块封装了多个数据源的接口（包括AKShare、TuShare等），提供统一的数据获取入口，
-使上层应用能够无缝地从不同数据源获取数据。主要功能包括：
-1. 数据源适配：屏蔽不同数据源的接口差异
-2. 数据缓存：提高频繁请求的效率
-3. 错误处理和重试：增强数据获取的可靠性
-4. 数据转换：统一不同数据源的数据格式
+This module encapsulates interfaces for multiple data sources (including AKShare, TuShare, etc.), providing a unified data access entry point,
+enabling upper-level applications to seamlessly obtain data from different data sources. Main features include:
+1. Data source adaptation: Shield interface differences between different data sources
+2. Data caching: Improve efficiency of frequent requests
+3. Error handling and retry: Enhance reliability of data acquisition
+4. Data conversion: Unify data formats from different data sources
 
-使用示例:
+Usage Example:
 ```python
-# 使用DataAPI获取股票价格数据
+# Use DataAPI to get stock price data
 from src.tools.data_source_adapter import DataAPI
 
-# 创建数据API实例
+# Create data API instance
 data_api = DataAPI()
 
-# 获取股票价格数据
+# Get stock price data
 df = data_api.get_price_data("600519", "2022-01-01", "2022-12-31")
 print(df.head())
 
-# 获取财务指标数据
+# Get financial metrics data
 metrics = data_api.get_financial_metrics("600519")
 print(metrics)
 ```
@@ -33,24 +33,24 @@ from .data_api import DataAPI
 __all__ = ['DataSourceAdapter', 'get_cached_data', 'DataAPI']
 
 #----------------------------------------------------------------------------#
-# 数据源适配器API函数说明
+# Data Source Adapter API Function Documentation
 #----------------------------------------------------------------------------#
 
 # class DataSourceAdapter:
 #     """
-#     数据源适配器，支持从AKShare和TuShare获取数据
+#     Data source adapter supporting data acquisition from AKShare and TuShare
     
-#     此类负责转换和标准化来自不同数据源的数据，处理错误情况，
-#     并提供统一的接口来获取股票价格、财务指标和市场数据。
+#     This class is responsible for converting and standardizing data from different data sources, handling error conditions,
+#     and providing a unified interface to obtain stock prices, financial metrics and market data.
     
-#     主要方法:
-#         convert_stock_code: 转换股票代码格式
-#         get_price_history: 获取历史价格数据
-#         get_financial_metrics: 获取财务指标数据
-#         get_financial_statements: 获取财务报表数据
-#         get_market_data: 获取市场数据
+#     Main methods:
+#         convert_stock_code: Convert stock code format
+#         get_price_history: Get historical price data
+#         get_financial_metrics: Get financial metrics data
+#         get_financial_statements: Get financial statement data
+#         get_market_data: Get market data
     
-#     示例:
+#     Example:
 #         >>> adapter = DataSourceAdapter()
 #         >>> df = adapter.get_price_history("600519", "2022-01-01", "2022-12-31")
 #         >>> print(df.head())
@@ -62,15 +62,15 @@ __all__ = ['DataSourceAdapter', 'get_cached_data', 'DataAPI']
 #     @staticmethod
 #     def convert_stock_code(symbol):
 #         """
-#         转换股票代码格式，返回AKShare和TuShare对应的代码格式
+#         Convert stock code format, return AKShare and TuShare corresponding code formats
         
-#         参数:
-#             symbol (str): 股票代码，可以是带交易所前缀(如sh600519)或不带前缀的代码
+#         Args:
+#             symbol (str): Stock code, can be with exchange prefix (like sh600519) or without prefix
             
-#         返回:
-#             tuple: (akshare_code, tushare_code, exchange_prefix)，包含适用于不同数据源的代码格式
+#         Returns:
+#             tuple: (akshare_code, tushare_code, exchange_prefix), containing code formats suitable for different data sources
             
-#         示例:
+#         Example:
 #             >>> DataSourceAdapter.convert_stock_code("600519")
 #             ('600519', '600519.SH', 'sh')
 #             >>> DataSourceAdapter.convert_stock_code("sh600519")
@@ -80,26 +80,26 @@ __all__ = ['DataSourceAdapter', 'get_cached_data', 'DataAPI']
     
 #     def get_price_history(self, symbol, start_date=None, end_date=None, adjust="qfq"):
 #         """
-#         获取历史价格数据，优先使用AKShare，失败时切换到TuShare
+#         Get historical price data, prioritize AKShare, fallback to TuShare on failure
         
-#         参数:
-#             symbol (str): 股票代码
-#             start_date (str, 可选): 开始日期，格式：YYYY-MM-DD
-#             end_date (str, 可选): 结束日期，格式：YYYY-MM-DD
-#             adjust (str, 可选): 复权类型，"qfq": 前复权, "hfq": 后复权, "": 不复权，默认前复权
+#         Args:
+#             symbol (str): Stock code
+#             start_date (str, optional): Start date, format: YYYY-MM-DD
+#             end_date (str, optional): End date, format: YYYY-MM-DD
+#             adjust (str, optional): Adjustment type, "qfq": forward adjustment, "hfq": backward adjustment, "": no adjustment, default forward adjustment
             
-#         返回:
-#             pd.DataFrame: 包含价格数据的DataFrame，列包括:
-#                          - date: 日期
-#                          - open: 开盘价
-#                          - high: 最高价
-#                          - low: 最低价
-#                          - close: 收盘价
-#                          - volume: 成交量
-#                          - amount: 成交额
-#                          可能还有其他列，如涨跌幅、换手率等
+#         Returns:
+#             pd.DataFrame: DataFrame containing price data, columns include:
+#                          - date: Date
+#                          - open: Opening price
+#                          - high: Highest price
+#                          - low: Lowest price
+#                          - close: Closing price
+#                          - volume: Trading volume
+#                          - amount: Trading amount
+#                          May include other columns such as price change, turnover rate, etc.
             
-#         示例:
+#         Example:
 #             >>> adapter = DataSourceAdapter()
 #             >>> df = adapter.get_price_history("600519", "2022-01-01", "2022-01-10")
 #             >>> print(df)
@@ -112,28 +112,28 @@ __all__ = ['DataSourceAdapter', 'get_cached_data', 'DataAPI']
     
 #     def get_financial_metrics(self, symbol):
 #         """
-#         获取财务指标数据，优先使用AKShare，失败时切换到TuShare
+#         Get financial metrics data, prioritize AKShare, fallback to TuShare on failure
         
-#         参数:
-#             symbol (str): 股票代码
+#         Args:
+#             symbol (str): Stock code
             
-#         返回:
-#             list: 包含财务指标的字典列表(通常只有一个元素)，键包括:
-#                  - return_on_equity: 净资产收益率
-#                  - net_margin: 销售净利率
-#                  - operating_margin: 营业利润率
-#                  - revenue_growth: 收入增长率
-#                  - earnings_growth: 利润增长率
-#                  - book_value_growth: 净资产增长率
-#                  - current_ratio: 流动比率
-#                  - debt_to_equity: 资产负债率
-#                  - free_cash_flow_per_share: 每股自由现金流
-#                  - earnings_per_share: 每股收益
-#                  - pe_ratio: 市盈率
-#                  - price_to_book: 市净率
-#                  - price_to_sales: 市销率
+#         Returns:
+#             list: List of dictionaries containing financial metrics (usually one element), keys include:
+#                  - return_on_equity: Return on equity
+#                  - net_margin: Net profit margin
+#                  - operating_margin: Operating profit margin
+#                  - revenue_growth: Revenue growth rate
+#                  - earnings_growth: Earnings growth rate
+#                  - book_value_growth: Book value growth rate
+#                  - current_ratio: Current ratio
+#                  - debt_to_equity: Debt-to-equity ratio
+#                  - free_cash_flow_per_share: Free cash flow per share
+#                  - earnings_per_share: Earnings per share
+#                  - pe_ratio: Price-to-earnings ratio
+#                  - price_to_book: Price-to-book ratio
+#                  - price_to_sales: Price-to-sales ratio
             
-#         示例:
+#         Example:
 #             >>> adapter = DataSourceAdapter()
 #             >>> metrics = adapter.get_financial_metrics("600519")
 #             >>> print(metrics[0])
@@ -143,47 +143,47 @@ __all__ = ['DataSourceAdapter', 'get_cached_data', 'DataAPI']
     
 #     def get_financial_statements(self, symbol):
 #         """
-#         获取财务报表数据，优先使用AKShare，失败时切换到TuShare
+#         Get financial statements data, prioritize AKShare, fallback to TuShare on failure
         
-#         参数:
-#             symbol (str): 股票代码
+#         Args:
+#             symbol (str): Stock code
             
-#         返回:
-#             list: 包含财务报表数据的字典列表，通常包含最新两期数据，键包括:
-#                  - net_income: 净利润
-#                  - operating_revenue: 营业收入
-#                  - operating_profit: 营业利润
-#                  - working_capital: 营运资金
-#                  - depreciation_and_amortization: 折旧和摊销
-#                  - capital_expenditure: 资本支出
-#                  - free_cash_flow: 自由现金流
+#         Returns:
+#             list: List of dictionaries containing financial statements data, usually includes latest two periods, keys include:
+#                  - net_income: Net income
+#                  - operating_revenue: Operating revenue
+#                  - operating_profit: Operating profit
+#                  - working_capital: Working capital
+#                  - depreciation_and_amortization: Depreciation and amortization
+#                  - capital_expenditure: Capital expenditure
+#                  - free_cash_flow: Free cash flow
             
-#         示例:
+#         Example:
 #             >>> adapter = DataSourceAdapter()
 #             >>> statements = adapter.get_financial_statements("600519")
-#             >>> print(statements[0])  # 最新财务报表数据
+#             >>> print(statements[0])  # Latest financial statements data
 #             {'net_income': 5000000000, 'operating_revenue': 20000000000, ...}
-#             >>> print(statements[1])  # 上一期财务报表数据
+#             >>> print(statements[1])  # Previous period financial statements data
 #             {'net_income': 4500000000, 'operating_revenue': 18000000000, ...}
 #         """
 #         pass
     
 #     def get_market_data(self, symbol):
 #         """
-#         获取市场数据，优先使用AKShare，失败时切换到TuShare
+#         Get market data, prioritize AKShare, fallback to TuShare on failure
         
-#         参数:
-#             symbol (str): 股票代码
+#         Args:
+#             symbol (str): Stock code
             
-#         返回:
-#             dict: 包含市场数据的字典，键包括:
-#                  - market_cap: 市值
-#                  - volume: 成交量
-#                  - average_volume: 平均成交量（通常30日）
-#                  - fifty_two_week_high: 52周最高价
-#                  - fifty_two_week_low: 52周最低价
+#         Returns:
+#             dict: Dictionary containing market data, keys include:
+#                  - market_cap: Market capitalization
+#                  - volume: Trading volume
+#                  - average_volume: Average volume (usually 30-day)
+#                  - fifty_two_week_high: 52-week high price
+#                  - fifty_two_week_low: 52-week low price
             
-#         示例:
+#         Example:
 #             >>> adapter = DataSourceAdapter()
 #             >>> market_data = adapter.get_market_data("600519")
 #             >>> print(market_data)
@@ -193,31 +193,31 @@ __all__ = ['DataSourceAdapter', 'get_cached_data', 'DataAPI']
 
 
 #----------------------------------------------------------------------------#
-# 数据缓存函数说明
+# Data Cache Function Documentation
 #----------------------------------------------------------------------------#
 
 # def get_cached_data(key, fetch_func, *args, ttl_days=1, **kwargs):
 #     """
-#     从缓存获取数据，如果缓存过期或不存在则调用fetch_func获取
+#     Get data from cache, if cache is expired or doesn't exist, call fetch_func to get data
     
-#     此函数实现了一个简单的数据缓存机制，能够减少对数据源的重复请求，
-#     并提供了缓存过期和数据转换功能。
+#     This function implements a simple data caching mechanism that can reduce repeated requests to data sources,
+#     and provides cache expiration and data conversion functionality.
     
-#     参数:
-#         key (str): 缓存键，用于标识数据
-#         fetch_func (callable): 获取数据的函数，当缓存不可用时会调用此函数
-#         ttl_days (float, 可选): 缓存有效期（天数），默认1天
-#         *args, **kwargs: 传递给fetch_func的参数
+#     Args:
+#         key (str): Cache key, used to identify data
+#         fetch_func (callable): Function to fetch data, called when cache is unavailable
+#         ttl_days (float, optional): Cache validity period (days), default 1 day
+#         *args, **kwargs: Parameters passed to fetch_func
     
-#     返回:
-#         任意类型: fetch_func返回的数据，可能是DataFrame、字典、列表等
+#     Returns:
+#         Any type: Data returned by fetch_func, could be DataFrame, dict, list, etc.
             
-#     示例:
+#     Example:
 #         >>> def fetch_stock_data(symbol, start_date, end_date):
-#         ...     # 获取股票数据的函数
+#         ...     # Function to fetch stock data
 #         ...     return pd.DataFrame(...)
 #         >>> 
-#         >>> # 使用缓存获取数据，缓存有效期为7天
+#         >>> # Use cache to get data, cache validity period is 7 days
 #         >>> data = get_cached_data(
 #         ...     f"stock_data_600519_2022",
 #         ...     fetch_stock_data,
@@ -229,51 +229,51 @@ __all__ = ['DataSourceAdapter', 'get_cached_data', 'DataAPI']
 
 
 #----------------------------------------------------------------------------#
-# 统一数据API类说明
+# Unified Data API Class Documentation
 #----------------------------------------------------------------------------#
 
 # class DataAPI:
 #     """
-#     统一的数据API接口，封装内部数据源适配器实现
+#     Unified data API interface, encapsulates internal data source adapter implementation
     
-#     此类是供外部调用的主要接口，提供了获取股票价格、财务指标、
-#     财务报表和市场数据的简洁方法，内部使用DataSourceAdapter
-#     处理数据源切换和错误处理。
+#     This class is the main interface for external calls, providing simple methods to get stock prices, financial metrics,
+#     financial statements and market data, internally uses DataSourceAdapter
+#     to handle data source switching and error handling.
     
-#     主要方法:
-#         get_price_data: 获取股票价格数据
-#         get_financial_metrics: 获取财务指标数据
-#         get_financial_statements: 获取财务报表数据
-#         get_market_data: 获取市场数据
+#     Main methods:
+#         get_price_data: Get stock price data
+#         get_financial_metrics: Get financial metrics data
+#         get_financial_statements: Get financial statements data
+#         get_market_data: Get market data
     
-#     示例:
+#     Example:
 #         >>> data_api = DataAPI()
-#         >>> # 获取股票价格数据
+#         >>> # Get stock price data
 #         >>> df = data_api.get_price_data("600519", "2022-01-01", "2022-12-31")
 #         >>> print(df.head())
 #     """
     
 #     def get_price_data(self, ticker, start_date=None, end_date=None):
 #         """
-#         获取股票价格数据
+#         Get stock price data
         
-#         参数:
-#             ticker (str): 股票代码
-#             start_date (str, 可选): 开始日期，格式：YYYY-MM-DD
-#             end_date (str, 可选): 结束日期，格式：YYYY-MM-DD
+#         Args:
+#             ticker (str): Stock code
+#             start_date (str, optional): Start date, format: YYYY-MM-DD
+#             end_date (str, optional): End date, format: YYYY-MM-DD
             
-#         返回:
-#             pd.DataFrame: 包含价格数据的DataFrame，列包括:
-#                          - date: 日期
-#                          - open: 开盘价
-#                          - high: 最高价
-#                          - low: 最低价
-#                          - close: 收盘价
-#                          - volume: 成交量
-#                          - amount: 成交额
-#                          可能还有其他列，如涨跌幅、换手率等
+#         Returns:
+#             pd.DataFrame: DataFrame containing price data, columns include:
+#                          - date: Date
+#                          - open: Opening price
+#                          - high: Highest price
+#                          - low: Lowest price
+#                          - close: Closing price
+#                          - volume: Trading volume
+#                          - amount: Trading amount
+#                          May include other columns such as price change, turnover rate, etc.
             
-#         示例:
+#         Example:
 #             >>> data_api = DataAPI()
 #             >>> df = data_api.get_price_data("600519", "2022-01-01", "2022-01-10")
 #             >>> print(df.head())
@@ -285,19 +285,19 @@ __all__ = ['DataSourceAdapter', 'get_cached_data', 'DataAPI']
     
 #     def get_financial_metrics(self, ticker):
 #         """
-#         获取财务指标数据
+#         Get financial metrics data
         
-#         参数:
-#             ticker (str): 股票代码
+#         Args:
+#             ticker (str): Stock code
             
-#         返回:
-#             list: 包含财务指标的字典列表(通常只有一个元素)，键包括:
-#                  - return_on_equity: 净资产收益率
-#                  - net_margin: 销售净利率
-#                  - operating_margin: 营业利润率
-#                  等多种财务指标
+#         Returns:
+#             list: List of dictionaries containing financial metrics (usually one element), keys include:
+#                  - return_on_equity: Return on equity
+#                  - net_margin: Net profit margin
+#                  - operating_margin: Operating profit margin
+#                  - and other financial metrics
             
-#         示例:
+#         Example:
 #             >>> data_api = DataAPI()
 #             >>> metrics = data_api.get_financial_metrics("600519")
 #             >>> print(metrics[0])
@@ -307,33 +307,33 @@ __all__ = ['DataSourceAdapter', 'get_cached_data', 'DataAPI']
     
 #     def get_financial_statements(self, ticker):
 #         """
-#         获取财务报表数据
+#         Get financial statements data
         
-#         参数:
-#             ticker (str): 股票代码
+#         Args:
+#             ticker (str): Stock code
             
-#         返回:
-#             list: 包含财务报表数据的字典列表，通常包含最新两期数据
+#         Returns:
+#             list: List of dictionaries containing financial statements data, usually includes latest two periods
             
-#         示例:
+#         Example:
 #             >>> data_api = DataAPI()
 #             >>> statements = data_api.get_financial_statements("600519")
-#             >>> print(statements[0])  # 最新财务报表数据
+#             >>> print(statements[0])  # Latest financial statements data
 #             {'net_income': 5000000000, 'operating_revenue': 20000000000, ...}
 #         """
 #         pass
     
 #     def get_market_data(self, ticker):
 #         """
-#         获取市场数据
+#         Get market data
         
-#         参数:
-#             ticker (str): 股票代码
+#         Args:
+#             ticker (str): Stock code
             
-#         返回:
-#             dict: 包含市场数据的字典，包括市值、成交量、52周最高/最低价等
+#         Returns:
+#             dict: Dictionary containing market data, including market cap, volume, 52-week high/low prices, etc.
             
-#         示例:
+#         Example:
 #             >>> data_api = DataAPI()
 #             >>> market_data = data_api.get_market_data("600519")
 #             >>> print(market_data)
@@ -343,123 +343,123 @@ __all__ = ['DataSourceAdapter', 'get_cached_data', 'DataAPI']
 
 
 #----------------------------------------------------------------------------#
-# 完整使用示例
+# Complete Usage Examples
 #----------------------------------------------------------------------------#
 
 """
-以下是完整的使用示例，展示如何使用data_source_adapter模块获取和处理各类数据:
+The following are complete usage examples showing how to use the data_source_adapter module to fetch and process various types of data:
 
-1. 基本股票价格数据获取和处理
+1. Basic stock price data fetching and processing
 
 ```python
 import pandas as pd
 import matplotlib.pyplot as plt
 from src.tools.data_source_adapter import DataAPI
 
-# 创建数据API实例
+# Create data API instance
 data_api = DataAPI()
 
-# 获取股票价格数据
-ticker = "600519"  # 贵州茅台
+# Get stock price data
+ticker = "600519"  # Kweichow Moutai
 start_date = "2022-01-01"
 end_date = "2022-12-31"
 price_data = data_api.get_price_data(ticker, start_date, end_date)
 
-# 数据预处理
+# Data preprocessing
 price_data['date'] = pd.to_datetime(price_data['date'])
 price_data.set_index('date', inplace=True)
 
-# 计算简单技术指标
-price_data['ma20'] = price_data['close'].rolling(window=20).mean()  # 20日均线
-price_data['ma60'] = price_data['close'].rolling(window=60).mean()  # 60日均线
-price_data['daily_return'] = price_data['close'].pct_change()  # 日收益率
+# Calculate simple technical indicators
+price_data['ma20'] = price_data['close'].rolling(window=20).mean()  # 20-day moving average
+price_data['ma60'] = price_data['close'].rolling(window=60).mean()  # 60-day moving average
+price_data['daily_return'] = price_data['close'].pct_change()  # Daily return
 
-# 可视化股票价格和均线
+# Visualize stock price and moving averages
 plt.figure(figsize=(12, 6))
-plt.plot(price_data.index, price_data['close'], label='收盘价')
-plt.plot(price_data.index, price_data['ma20'], label='20日均线')
-plt.plot(price_data.index, price_data['ma60'], label='60日均线')
-plt.title(f"{ticker} 股价走势图")
-plt.xlabel('日期')
-plt.ylabel('价格')
+plt.plot(price_data.index, price_data['close'], label='Closing Price')
+plt.plot(price_data.index, price_data['ma20'], label='20-day MA')
+plt.plot(price_data.index, price_data['ma60'], label='60-day MA')
+plt.title(f"{ticker} Stock Price Chart")
+plt.xlabel('Date')
+plt.ylabel('Price')
 plt.legend()
 plt.grid(True, alpha=0.3)
 plt.show()
 
-# 打印基本统计信息
-print(f"\n{ticker} 统计数据:")
-print(f"期间最高价: {price_data['high'].max():.2f}")
-print(f"期间最低价: {price_data['low'].min():.2f}")
-print(f"平均成交量: {price_data['volume'].mean():.0f}")
-print(f"平均日收益率: {price_data['daily_return'].mean()*100:.4f}%")
-print(f"日收益率标准差: {price_data['daily_return'].std()*100:.4f}%")
+# Print basic statistics
+print(f"\n{ticker} Statistics:")
+print(f"Period High: {price_data['high'].max():.2f}")
+print(f"Period Low: {price_data['low'].min():.2f}")
+print(f"Average Volume: {price_data['volume'].mean():.0f}")
+print(f"Average Daily Return: {price_data['daily_return'].mean()*100:.4f}%")
+print(f"Daily Return Std: {price_data['daily_return'].std()*100:.4f}%")
 ```
 
-2. 多股票对比分析
+2. Multi-stock comparison analysis
 
 ```python
 import pandas as pd
 import matplotlib.pyplot as plt
 from src.tools.data_source_adapter import DataAPI
 
-# 创建数据API实例
+# Create data API instance
 data_api = DataAPI()
 
-# 获取多只股票的价格数据
-tickers = ["600519", "000858", "600036", "601318"]  # 茅台、五粮液、招商银行、平安保险
+# Get price data for multiple stocks
+tickers = ["600519", "000858", "600036", "601318"]  # Moutai, Wuliangye, China Merchants Bank, Ping An Insurance
 start_date = "2022-01-01"
 end_date = "2022-12-31"
 
-# 准备数据框存储收益率
+# Prepare DataFrame to store returns
 returns_df = pd.DataFrame()
 
-# 获取每只股票的数据并计算累积收益率
+# Get data for each stock and calculate cumulative returns
 for ticker in tickers:
     price_data = data_api.get_price_data(ticker, start_date, end_date)
     
-    # 确保日期列为日期类型并设为索引
+    # Ensure date column is datetime type and set as index
     price_data['date'] = pd.to_datetime(price_data['date'])
     price_data.set_index('date', inplace=True)
     
-    # 计算日收益率和累积收益率
+    # Calculate daily returns and cumulative returns
     daily_returns = price_data['close'].pct_change().fillna(0)
     cumulative_returns = (1 + daily_returns).cumprod() - 1
     
-    # 添加到数据框
+    # Add to DataFrame
     returns_df[ticker] = cumulative_returns
 
-# 可视化累积收益率对比
+# Visualize cumulative returns comparison
 plt.figure(figsize=(12, 6))
 for ticker in tickers:
     plt.plot(returns_df.index, returns_df[ticker] * 100, label=ticker)
-plt.title("多股票累积收益率对比")
-plt.xlabel("日期")
-plt.ylabel("累积收益率(%)")
+plt.title("Multi-stock Cumulative Returns Comparison")
+plt.xlabel("Date")
+plt.ylabel("Cumulative Returns (%)")
 plt.legend()
 plt.grid(True, alpha=0.3)
 plt.show()
 
-# 计算相关系数矩阵
+# Calculate correlation matrix
 correlation = returns_df.pct_change().corr()
-print("\n股票收益率相关系数矩阵:")
+print("\nStock Returns Correlation Matrix:")
 print(correlation)
 ```
 
-3. 股票财务指标分析
+3. Stock financial metrics analysis
 
 ```python
 import pandas as pd
 import matplotlib.pyplot as plt
 from src.tools.data_source_adapter import DataAPI
 
-# 创建数据API实例
+# Create data API instance
 data_api = DataAPI()
 
-# 获取多只股票的财务指标
+# Get financial metrics for multiple stocks
 tickers = ["600519", "000858", "600036", "601318"]
-names = ["贵州茅台", "五粮液", "招商银行", "中国平安"]
+names = ["Kweichow Moutai", "Wuliangye", "China Merchants Bank", "Ping An Insurance"]
 
-# 收集财务指标
+# Collect financial metrics
 metrics_list = []
 for ticker in tickers:
     metrics = data_api.get_financial_metrics(ticker)
@@ -467,23 +467,23 @@ for ticker in tickers:
         metrics[0]['ticker'] = ticker
         metrics_list.append(metrics[0])
 
-# 转换为DataFrame
+# Convert to DataFrame
 metrics_df = pd.DataFrame(metrics_list)
 
-# 设置索引为股票代码
+# Set index to stock code
 metrics_df.set_index('ticker', inplace=True)
 
-# 选择要对比的指标
+# Select metrics to compare
 key_metrics = ['return_on_equity', 'net_margin', 'debt_to_equity', 'pe_ratio', 'price_to_book']
 metrics_df = metrics_df[key_metrics]
 
-# 重命名列以便显示
-metrics_df.columns = ['净资产收益率', '销售净利率', '资产负债率', '市盈率', '市净率']
+# Rename columns for display
+metrics_df.columns = ['Return on Equity', 'Net Profit Margin', 'Debt-to-Equity Ratio', 'P/E Ratio', 'Price-to-Book Ratio']
 
-# 使用股票名称替换代码
+# Replace codes with stock names
 metrics_df.index = names
 
-# 可视化对比 - 使用条形图
+# Visualize comparison - using bar charts
 plt.figure(figsize=(14, 10))
 
 for i, metric in enumerate(metrics_df.columns):
@@ -496,106 +496,106 @@ for i, metric in enumerate(metrics_df.columns):
 plt.tight_layout()
 plt.show()
 
-# 打印财务指标表格
-print("\n财务指标对比:")
+# Print financial metrics table
+print("\nFinancial Metrics Comparison:")
 print(metrics_df)
 ```
 
-4. 财务报表数据处理
+4. Financial statements data processing
 
 ```python
 import pandas as pd
 from src.tools.data_source_adapter import DataAPI
 
-# 创建数据API实例
+# Create data API instance
 data_api = DataAPI()
 
-# 获取财务报表数据
-ticker = "600519"  # 贵州茅台
+# Get financial statements data
+ticker = "600519"  # Kweichow Moutai
 statements = data_api.get_financial_statements(ticker)
 
-# 转换为DataFrame以便比较
-current_period = pd.Series(statements[0], name="当期")
-previous_period = pd.Series(statements[1], name="上期")
+# Convert to DataFrame for comparison
+current_period = pd.Series(statements[0], name="Current Period")
+previous_period = pd.Series(statements[1], name="Previous Period")
 
 comparison_df = pd.DataFrame([current_period, previous_period])
 
-# 计算同比变化
+# Calculate year-over-year changes
 change = pd.Series({
     key: (statements[0][key] - statements[1][key]) / statements[1][key] * 100 if statements[1][key] != 0 else float('inf')
     for key in statements[0].keys()
-}, name="同比变化(%)")
+}, name="YoY Change (%)")
 
 comparison_df = comparison_df.append(change)
 
-# 美化显示
+# Beautify display
 pd.set_option('display.float_format', '{:.2f}'.format)
-print(f"\n{ticker} 财务报表同比对比:")
-print(comparison_df.T)  # 转置以便更好地显示
+print(f"\n{ticker} Financial Statements YoY Comparison:")
+print(comparison_df.T)  # Transpose for better display
 
-# 计算关键财务比率
-print("\n关键财务比率:")
+# Calculate key financial ratios
+print("\nKey Financial Ratios:")
 if statements[0]["operating_revenue"] > 0:
     profit_margin = statements[0]["net_income"] / statements[0]["operating_revenue"] * 100
-    print(f"净利润率: {profit_margin:.2f}%")
+    print(f"Net Profit Margin: {profit_margin:.2f}%")
 
 if statements[0]["capital_expenditure"] > 0:
     capex_to_revenue = statements[0]["capital_expenditure"] / statements[0]["operating_revenue"] * 100
-    print(f"资本支出占收入比例: {capex_to_revenue:.2f}%")
+    print(f"Capital Expenditure to Revenue Ratio: {capex_to_revenue:.2f}%")
 
 if statements[0]["operating_revenue"] > 0:
     fcf_to_revenue = statements[0]["free_cash_flow"] / statements[0]["operating_revenue"] * 100
-    print(f"自由现金流占收入比例: {fcf_to_revenue:.2f}%")
+    print(f"Free Cash Flow to Revenue Ratio: {fcf_to_revenue:.2f}%")
 ```
 
-5. 市场数据分析与估值
+5. Market data analysis and valuation
 
 ```python
 import pandas as pd
 import matplotlib.pyplot as plt
 from src.tools.data_source_adapter import DataAPI
 
-# 创建数据API实例
+# Create data API instance
 data_api = DataAPI()
 
-# 获取多只股票的市场数据和财务指标
+# Get market data and financial metrics for multiple stocks
 tickers = ["600519", "000858", "600036", "601318", "000651", "600276"]
-names = ["贵州茅台", "五粮液", "招商银行", "中国平安", "格力电器", "恒瑞医药"]
+names = ["Kweichow Moutai", "Wuliangye", "China Merchants Bank", "Ping An Insurance", "Gree Electric", "Jiangsu Hengrui Medicine"]
 
-# 收集数据
+# Collect data
 market_data_list = []
 for i, ticker in enumerate(tickers):
     market_data = data_api.get_market_data(ticker)
     financial_metrics = data_api.get_financial_metrics(ticker)
     
     if market_data and financial_metrics and len(financial_metrics) > 0:
-        # 组合数据
+        # Combine data
         combined_data = {
             'ticker': ticker,
             'name': names[i],
-            'market_cap': market_data.get('market_cap', 0) / 100000000,  # 转换为亿元
+            'market_cap': market_data.get('market_cap', 0) / 100000000,  # Convert to 100 million yuan
             'pe_ratio': financial_metrics[0].get('pe_ratio', 0),
             'price_to_book': financial_metrics[0].get('price_to_book', 0),
-            'return_on_equity': financial_metrics[0].get('return_on_equity', 0) * 100  # 转换为百分比
+            'return_on_equity': financial_metrics[0].get('return_on_equity', 0) * 100  # Convert to percentage
         }
         market_data_list.append(combined_data)
 
-# 转换为DataFrame
+# Convert to DataFrame
 market_df = pd.DataFrame(market_data_list)
 
-# 设置索引
+# Set index
 market_df.set_index('name', inplace=True)
 
-# 可视化市值与PE的关系 - 气泡图
+# Visualize relationship between market cap and PE - bubble chart
 plt.figure(figsize=(12, 8))
 plt.scatter(
     market_df['pe_ratio'], 
     market_df['return_on_equity'], 
-    s=market_df['market_cap'] * 5,  # 气泡大小由市值决定
+    s=market_df['market_cap'] * 5,  # Bubble size determined by market cap
     alpha=0.7
 )
 
-# 添加标签
+# Add labels
 for i, txt in enumerate(market_df.index):
     plt.annotate(
         txt, 
@@ -604,14 +604,14 @@ for i, txt in enumerate(market_df.index):
         textcoords='offset points'
     )
 
-plt.title('股票估值与回报率对比')
-plt.xlabel('市盈率(PE)')
-plt.ylabel('净资产收益率(%)')
+plt.title('Stock Valuation vs Return Rate Comparison')
+plt.xlabel('Price-to-Earnings Ratio (PE)')
+plt.ylabel('Return on Equity (%)')
 plt.grid(True, alpha=0.3)
 plt.show()
 
-# 打印市场数据表格
-print("\n市场数据与估值指标:")
+# Print market data table
+print("\nMarket Data and Valuation Metrics:")
 print(market_df)
 ```
 """

@@ -1,171 +1,171 @@
-# Model 模块
+# Model Module
 
-## 模块结构
+## Module Structure
 
 ```
 model/
-├── __init__.py              # 模块初始化，公开API
-├── dl.py                    # 深度学习模型（LSTM + 随机森林）
-├── rl.py                    # 强化学习模型（PPO算法）
-├── deap_factors.py          # 遗传编程因子挖掘
-├── evaluate.py              # 模型评估框架
-├── split_evaluate.py        # 数据划分与评估工具
+├── __init__.py              # Module initialization, public API
+├── dl.py                    # Deep learning models (LSTM + Random Forest)
+├── rl.py                    # Reinforcement learning models (PPO algorithm)
+├── deap_factors.py          # Genetic programming factor mining
+├── evaluate.py              # Model evaluation framework
+├── split_evaluate.py        # Data splitting and evaluation tools
 └── train/
-    ├── train.py            # 统一训练接口
-    └── readme.md           # 训练模块详细说明
+    ├── train.py            # Unified training interface
+    └── readme.md           # Detailed training module documentation
 ```
 
-## 核心模型介绍
+## Core Model Introduction
 
-### 1. 深度学习模型 (dl.py)
+### 1. Deep Learning Models (dl.py)
 
-深度学习模型结合 LSTM 神经网络和随机森林分类器，从时间序列和横截面两个维度进行预测。
+Deep learning models combine LSTM neural networks and Random Forest classifiers to make predictions from both time series and cross-sectional dimensions.
 
-**核心组件**：
+**Core Components**:
 
-- **LSTMModel**: 基于 PyTorch 的 LSTM 网络，用于价格序列预测
-- **RandomForestClassifier**: 基于 sklearn 的分类器，用于涨跌方向预测
-- **MLAgent**: 统一的模型管理接口
+- **LSTMModel**: PyTorch-based LSTM network for price sequence prediction
+- **RandomForestClassifier**: sklearn-based classifier for price direction prediction
+- **MLAgent**: Unified model management interface
 
-**主要功能**：
+**Main Functions**:
 
 ```python
 from model.dl import MLAgent
 
-# 初始化并训练模型
+# Initialize and train models
 ml_agent = MLAgent(model_dir='my_model')
 ml_agent.train_models(price_data, epochs=100, hidden_dim=128)
 
-# 生成交易信号
+# Generate trading signals
 signals = ml_agent.generate_signals(price_data)
-print(f"信号: {signals['signal']}, 置信度: {signals['confidence']}")
+print(f"Signal: {signals['signal']}, Confidence: {signals['confidence']}")
 ```
 
-**技术特点**：
+**Technical Features**:
 
-- 支持多特征输入（价格、技术指标）
-- 自动数据预处理和归一化
-- 多步预测和概率输出
-- 模型持久化和加载
+- Support for multi-feature input (prices, technical indicators)
+- Automatic data preprocessing and normalization
+- Multi-step prediction and probability output
+- Model persistence and loading
 
-### 2. 强化学习模型 (rl.py)
+### 2. Reinforcement Learning Models (rl.py)
 
-强化学习模型使用 PPO（Proximal Policy Optimization）算法训练智能交易代理。
+Reinforcement learning models use PPO (Proximal Policy Optimization) algorithm to train intelligent trading agents.
 
-**核心组件**：
+**Core Components**:
 
-- **StockTradingEnv**: OpenAI Gym 兼容的交易环境
-- **ActorCritic**: PPO 的策略-价值网络
-- **PPOAgent**: PPO 算法实现
-- **RLTradingAgent**: 统一的强化学习接口
+- **StockTradingEnv**: OpenAI Gym compatible trading environment
+- **ActorCritic**: PPO policy-value network
+- **PPOAgent**: PPO algorithm implementation
+- **RLTradingAgent**: Unified reinforcement learning interface
 
-**主要功能**：
+**Main Functions**:
 
 ```python
 from model.rl import RLTradingAgent
 
-# 训练强化学习模型
+# Train reinforcement learning model
 rl_agent = RLTradingAgent(model_dir='rl_model')
 training_history = rl_agent.train(price_data, n_episodes=500)
 
-# 生成交易信号
+# Generate trading signals
 signals = rl_agent.generate_signals(price_data)
-print(f"RL信号: {signals['signal']}, 行为概率: {signals['action_probabilities']}")
+print(f"RL Signal: {signals['signal']}, Action Probabilities: {signals['action_probabilities']}")
 ```
 
-**技术特点**：
+**Technical Features**:
 
-- 基于真实市场数据的模拟交易环境
-- 支持买入、卖出、持有三种动作
-- 考虑交易成本和滑点
-- GPU 加速训练
+- Simulation trading environment based on real market data
+- Support for buy, sell, hold actions
+- Consider transaction costs and slippage
+- GPU accelerated training
 
-### 3. 遗传编程因子模型 (deap_factors.py)
+### 3. Genetic Programming Factor Models (deap_factors.py)
 
-遗传编程模型通过进化算法自动发现和优化交易因子。
+Genetic programming models automatically discover and optimize trading factors through evolutionary algorithms.
 
-**核心组件**：
+**Core Components**:
 
-- **FactorMiningModule**: 遗传编程核心引擎
-- **FactorAgent**: 因子挖掘和信号生成接口
-- **进化算子**: 交叉、变异、选择等遗传操作
+- **FactorMiningModule**: Genetic programming core engine
+- **FactorAgent**: Factor mining and signal generation interface
+- **Evolution Operators**: Crossover, mutation, selection and other genetic operations
 
-**主要功能**：
+**Main Functions**:
 
 ```python
 from model.deap_factors import FactorAgent
 
-# 生成交易因子
+# Generate trading factors
 factor_agent = FactorAgent(model_dir='my_factors')
 factors = factor_agent.generate_factors(price_data, n_factors=5)
 
-# 查看生成的因子
+# View generated factors
 for factor in factors:
-    print(f"因子: {factor['name']}, 表达式: {factor['expression']}")
+    print(f"Factor: {factor['name']}, Expression: {factor['expression']}")
 
-# 生成交易信号
+# Generate trading signals
 signals = factor_agent.generate_signals(price_data)
 ```
 
-**技术特点**：
+**Technical Features**:
 
-- 自动因子发现和表达式生成
-- 多目标优化（IC、收益、夏普比等）
-- 因子复杂度控制
-- 安全的数学运算保护
+- Automatic factor discovery and expression generation
+- Multi-objective optimization (IC, return, Sharpe ratio, etc.)
+- Factor complexity control
+- Safe mathematical operation protection
 
-## 模型评估框架 (evaluate.py)
+## Model Evaluation Framework (evaluate.py)
 
-提供完整的模型性能评估和可视化功能。
+Provides complete model performance evaluation and visualization functionality.
 
-**核心功能**：
+**Core Functions**:
 
 ```python
 from model.evaluate import ModelEvaluator
 
 evaluator = ModelEvaluator(output_dir='evaluation')
 
-# 回归模型评估
+# Regression model evaluation
 metrics = evaluator.evaluate_regression_model(y_true, y_pred, 'LSTM', 'test')
 
-# 分类模型评估
+# Classification model evaluation
 metrics = evaluator.evaluate_classification_model(y_true, y_pred, 'RF', 'test')
 
-# 预测结果可视化
+# Prediction result visualization
 evaluator.visualize_predictions(y_true, y_pred, date_index, 'model', 'test')
 ```
 
-**评估指标**：
+**Evaluation Metrics**:
 
-- **回归**: MSE, RMSE, MAE, R²
-- **分类**: 准确率, 精确率, 召回率, F1 分数
-- **可视化**: 预测对比图, 误差分析, 混淆矩阵
+- **Regression**: MSE, RMSE, MAE, R²
+- **Classification**: Accuracy, Precision, Recall, F1 Score
+- **Visualization**: Prediction comparison charts, error analysis, confusion matrix
 
-## 统一训练接口
+## Unified Training Interface
 
-### 命令行训练工具
+### Command Line Training Tools
 
 ```bash
-# 训练深度学习模型
+# Train deep learning model
 python -m model.train.train --ticker 600519 --model dl
 
-# 训练所有模型
+# Train all models
 python -m model.train.train --ticker 600519 --model all
 
-# 数据划分评估
+# Data split evaluation
 python -m model.train.train --ticker 600519 --model dl --action evaluate
 
-# 自定义参数训练
+# Custom parameter training
 python -m model.train.train --ticker 600519 --model dl --params '{"epochs": 200, "hidden_dim": 256}'
 ```
 
-### 编程接口
+### Programming Interface
 
 ```python
-# 导入所有核心组件
+# Import all core components
 from model import MLAgent, RLTradingAgent, FactorAgent
 
-# 分别训练三种模型
+# Train three types of models separately
 ml_agent = MLAgent()
 ml_agent.train_models(price_data)
 
@@ -175,31 +175,31 @@ rl_agent.train(price_data)
 factor_agent = FactorAgent()
 factor_agent.generate_factors(price_data)
 
-# 获取综合信号
+# Get comprehensive signals
 ml_signals = ml_agent.generate_signals(price_data)
 rl_signals = rl_agent.generate_signals(price_data)
 factor_signals = factor_agent.generate_signals(price_data)
 ```
 
-## 信号生成与融合
+## Signal Generation and Fusion
 
-### 信号标准格式
+### Signal Standard Format
 
-所有模型生成的信号都遵循统一格式：
+All models generate signals following a unified format:
 
 ```python
 {
-    'signal': 'bullish',        # 信号类型: bullish/bearish/neutral
-    'confidence': 0.78,         # 置信度: 0-1
-    'reasoning': '...',         # 决策理由
-    'model_specific': {...}     # 模型特定信息
+    'signal': 'bullish',        # Signal type: bullish/bearish/neutral
+    'confidence': 0.78,         # Confidence: 0-1
+    'reasoning': '...',         # Decision reasoning
+    'model_specific': {...}     # Model-specific information
 }
 ```
 
-### 多模型信号融合
+### Multi-Model Signal Fusion
 
 ```python
-# 简单投票法
+# Simple voting method
 def combine_signals(ml_signals, rl_signals, factor_signals):
     signals = [ml_signals['signal'], rl_signals['signal'], factor_signals['signal']]
 
@@ -213,84 +213,84 @@ def combine_signals(ml_signals, rl_signals, factor_signals):
     else:
         return 'neutral'
 
-# 加权平均法
+# Weighted average method
 def weighted_combine(signals_list, weights):
     weighted_sum = sum(w * signal_to_score(s) for w, s in zip(weights, signals_list))
     return score_to_signal(weighted_sum)
 ```
 
-## 技术指标与特征工程
+## Technical Indicators and Feature Engineering
 
-### 自动技术指标计算
+### Automatic Technical Indicator Calculation
 
-模块自动计算常用技术指标：
+The module automatically calculates common technical indicators:
 
 ```python
-# 价格指标
-- 移动平均线 (MA5, MA10, MA20, MA60)
-- 价格变化率 (1日、5日、10日、20日)
-- 波动率 (5日、10日、20日)
+# Price indicators
+- Moving averages (MA5, MA10, MA20, MA60)
+- Price change rates (1-day, 5-day, 10-day, 20-day)
+- Volatility (5-day, 10-day, 20-day)
 
-# 技术指标
-- RSI (相对强弱指标)
-- MACD (移动平均收敛发散)
-- 布林带
-- 成交量指标
+# Technical indicators
+- RSI (Relative Strength Index)
+- MACD (Moving Average Convergence Divergence)
+- Bollinger Bands
+- Volume indicators
 
-# 因子工程
-- 滞后特征
-- 滚动统计
-- 价量关系
-- 市场微观结构
+# Feature engineering
+- Lag features
+- Rolling statistics
+- Price-volume relationships
+- Market microstructure
 ```
 
-### 数据预处理流程
+### Data Preprocessing Pipeline
 
 ```python
 def preprocess_stock_data(price_df, technical_indicators=None):
-    # 1. 数据清洗和格式化
+    # 1. Data cleaning and formatting
     df = price_df.copy()
     df['returns'] = df['close'].pct_change()
 
-    # 2. 技术指标计算
+    # 2. Technical indicator calculation
     df['ma5'] = df['close'].rolling(5).mean()
     df['rsi'] = calculate_rsi(df['close'])
     df['macd'] = calculate_macd(df['close'])
 
-    # 3. 滞后特征
+    # 3. Lag features
     for lag in [1, 2, 3, 5, 10]:
         df[f'close_lag_{lag}'] = df['close'].shift(lag)
 
-    # 4. 滚动统计
+    # 4. Rolling statistics
     for window in [5, 10, 20]:
         df[f'volatility_{window}d'] = df['returns'].rolling(window).std()
 
     return df.dropna()
 ```
 
-## 使用注意事项
+## Usage Notes
 
-### 数据要求
+### Data Requirements
 
-1. **最小数据量**: 建议至少 252 个交易日（1 年）的历史数据
-2. **数据质量**: 确保价格数据完整，无异常值
-3. **特征对齐**: 确保所有特征在时间上对齐
+1. **Minimum Data Volume**: Recommend at least 252 trading days (1 year) of historical data
+2. **Data Quality**: Ensure price data is complete with no outliers
+3. **Feature Alignment**: Ensure all features are aligned in time
 
-### 训练建议
+### Training Recommendations
 
-1. **深度学习**:
+1. **Deep Learning**:
 
-   - 使用较长的序列长度（10-20 天）
-   - 适当的隐藏层维度（64-256）
-   - 早停机制防止过拟合
+   - Use longer sequence lengths (10-20 days)
+   - Appropriate hidden layer dimensions (64-256)
+   - Early stopping mechanism to prevent overfitting
 
-2. **强化学习**:
+2. **Reinforcement Learning**:
 
-   - 足够的训练 episode（500-2000）
-   - 合理的奖励函数设计
-   - 适当的探索-利用平衡
+   - Sufficient training episodes (500-2000)
+   - Reasonable reward function design
+   - Appropriate exploration-exploitation balance
 
-3. **遗传编程**:
-   - 控制因子复杂度
-   - 设置合适的适应度阈值
-   - 避免过度拟合
+3. **Genetic Programming**:
+   - Control factor complexity
+   - Set appropriate fitness thresholds
+   - Avoid overfitting

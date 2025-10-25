@@ -3,25 +3,25 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-# 配置
-MAX_MARKDOWN_ROWS = 50  # Markdown输出中显示的最大行数
-MAX_MARKDOWN_COLS = 10  # 显示的最大列数
+# Configuration
+MAX_MARKDOWN_ROWS = 50  # Maximum number of rows to display in Markdown output
+MAX_MARKDOWN_COLS = 10  # Maximum number of columns to display
 
 
 def format_df_to_markdown(df: pd.DataFrame, max_rows: int = MAX_MARKDOWN_ROWS, max_cols: int = MAX_MARKDOWN_COLS) -> str:
-    """将Pandas DataFrame格式化为带有截断的Markdown字符串。
+    """Format Pandas DataFrame to Markdown string with truncation.
 
-    参数:
-        df: 要格式化的DataFrame
-        max_rows: 输出中包含的最大行数
-        max_cols: 输出中包含的最大列数
+    Args:
+        df: DataFrame to format
+        max_rows: Maximum number of rows to include in output
+        max_cols: Maximum number of columns to include in output
 
-    返回:
-        DataFrame的Markdown格式字符串表示
+    Returns:
+        Markdown format string representation of DataFrame
     """
     if df.empty:
-        logger.warning("尝试将空DataFrame格式化为Markdown。")
-        return "(没有可显示的数据)"
+        logger.warning("Attempting to format empty DataFrame to Markdown.")
+        return "(No data to display)"
 
     original_rows, original_cols = df.shape
     truncated = False
@@ -31,35 +31,35 @@ def format_df_to_markdown(df: pd.DataFrame, max_rows: int = MAX_MARKDOWN_ROWS, m
         df_display = pd.concat(
             [df.head(max_rows // 2), df.tail(max_rows - max_rows // 2)])
         truncation_notes.append(
-            f"行数已从{original_rows}截断为{max_rows}")
+            f"Row count truncated from {original_rows} to {max_rows}")
         truncated = True
     else:
         df_display = df
 
     if original_cols > max_cols:
-        # 选择首尾列进行显示
+        # Select first and last columns for display
         cols_to_show = df_display.columns[:max_cols // 2].tolist() + \
             df_display.columns[-(max_cols - max_cols // 2):].tolist()
-        # 确保在原始列数较小但大于max_cols时没有重复列
+        # Ensure no duplicate columns when original column count is small but greater than max_cols
         cols_to_show = sorted(list(set(cols_to_show)),
                               key=list(df_display.columns).index)
         df_display = df_display[cols_to_show]
         truncation_notes.append(
-            f"列数已从{original_cols}截断为{len(cols_to_show)}")
+            f"Column count truncated from {original_cols} to {len(cols_to_show)}")
         truncated = True
 
     try:
         markdown_table = df_display.to_markdown(index=False)
     except Exception as e:
         logger.error(
-            f"将DataFrame转换为Markdown时出错: {e}", exc_info=True)
-        return "错误：无法将数据格式化为Markdown表格。"
+            f"Error converting DataFrame to Markdown: {e}", exc_info=True)
+        return "Error: Unable to format data as Markdown table."
 
     if truncated:
         notes = "; ".join(truncation_notes)
         logger.debug(
-            f"已生成带有截断说明的Markdown表格: {notes}")
-        return f"注意：数据已被截断({notes})。\n\n{markdown_table}"
+            f"Generated Markdown table with truncation notes: {notes}")
+        return f"Note: Data has been truncated ({notes}).\n\n{markdown_table}"
     else:
-        logger.debug("已生成未截断的Markdown表格。")
+        logger.debug("Generated untruncated Markdown table.")
         return markdown_table

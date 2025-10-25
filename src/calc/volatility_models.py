@@ -5,67 +5,67 @@ from typing import Tuple, Dict
 
 def garch_likelihood(params, returns):
     """
-    GARCH(1,1)模型的负对数似然函数
+    Negative log-likelihood function for GARCH(1,1) model
     
-    模型: sigma_t^2 = omega + alpha * epsilon_{t-1}^2 + beta * sigma_{t-1}^2
+    Model: sigma_t^2 = omega + alpha * epsilon_{t-1}^2 + beta * sigma_{t-1}^2
     
     Args:
-        params: [omega, alpha, beta] 模型参数
-        returns: 收益率序列
+        params: [omega, alpha, beta] model parameters
+        returns: return series
         
     Returns:
-        负对数似然值
+        Negative log-likelihood value
     """
     omega, alpha, beta = params
     
-    # 参数约束条件
+    # Parameter constraints
     if omega <= 0 or alpha < 0 or beta < 0 or alpha + beta >= 1:
         return np.inf
     
-    # 初始化
+    # Initialize
     n = len(returns)
-    h = np.zeros(n)  # 条件方差
-    h[0] = np.var(returns)  # 初始条件方差设为样本方差
+    h = np.zeros(n)  # Conditional variance
+    h[0] = np.var(returns)  # Set initial conditional variance to sample variance
     
-    # 递归计算条件方差
+    # Recursively calculate conditional variance
     for t in range(1, n):
         h[t] = omega + alpha * returns[t-1]**2 + beta * h[t-1]
     
-    # 计算负对数似然
+    # Calculate negative log-likelihood
     logliks = -0.5 * (np.log(2 * np.pi) + np.log(h) + returns**2 / h)
     loglik = np.sum(logliks)
     
-    # 返回负对数似然（因为我们要最小化）
+    # Return negative log-likelihood (because we want to minimize)
     return -loglik
 
 def fit_garch(returns: np.ndarray, initial_guess=None) -> Tuple[Dict[str, float], float]:
     """
-    拟合GARCH(1,1)模型
+    Fit GARCH(1,1) model
     
     Args:
-        returns: 收益率序列
-        initial_guess: 初始参数猜测 [omega, alpha, beta]
+        returns: return series
+        initial_guess: initial parameter guess [omega, alpha, beta]
         
     Returns:
-        模型参数和对数似然值
+        Model parameters and log-likelihood value
     """
-    # 默认初始参数
+    # Default initial parameters
     if initial_guess is None:
         var_r = np.var(returns)
-        initial_guess = [0.1 * var_r, 0.1, 0.8]  # 常见的初始参数
+        initial_guess = [0.1 * var_r, 0.1, 0.8]  # Common initial parameters
     
-    # 优化负对数似然函数
+    # Optimize negative log-likelihood function
     result = optimize.minimize(garch_likelihood, initial_guess, args=(returns,), 
                               method='L-BFGS-B',
                               bounds=((1e-6, None), (0, 1), (0, 1)))
     
-    # 提取参数
+    # Extract parameters
     omega, alpha, beta = result.x
     
-    # 计算长期波动率
+    # Calculate long-run volatility
     long_run_var = omega / (1 - alpha - beta) if alpha + beta < 1 else None
     
-    # 返回参数与对数似然值
+    # Return parameters and log-likelihood value
     params = {
         'omega': omega,
         'alpha': alpha,
@@ -79,33 +79,33 @@ def fit_garch(returns: np.ndarray, initial_guess=None) -> Tuple[Dict[str, float]
 def forecast_garch_volatility(returns: np.ndarray, params: Dict[str, float], 
                              forecast_horizon: int = 10) -> np.ndarray:
     """
-    使用GARCH(1,1)模型预测未来波动率
+    Use GARCH(1,1) model to forecast future volatility
     
     Args:
-        returns: 历史收益率序列
-        params: GARCH模型参数
-        forecast_horizon: 预测期数
+        returns: historical return series
+        params: GARCH model parameters
+        forecast_horizon: forecast periods
         
     Returns:
-        预测的波动率序列
+        Forecasted volatility series
     """
     omega = params['omega']
     alpha = params['alpha']
     beta = params['beta']
     
-    # 初始化
+    # Initialize
     n = len(returns)
     h = np.zeros(n)
     h[0] = np.var(returns)
     
-    # 计算历史条件方差
+    # Calculate historical conditional variance
     for t in range(1, n):
         h[t] = omega + alpha * returns[t-1]**2 + beta * h[t-1]
     
-    # 最后一期的条件方差
+    # Last period's conditional variance
     last_var = h[-1]
     
-    # 预测未来波动率
+    # Forecast future volatility
     forecast_var = np.zeros(forecast_horizon)
     for t in range(forecast_horizon):
         if t == 0:
@@ -113,28 +113,28 @@ def forecast_garch_volatility(returns: np.ndarray, params: Dict[str, float],
         else:
             forecast_var[t] = omega + (alpha + beta) * forecast_var[t-1]
     
-    # 返回波动率（标准差）
+    # Return volatility (standard deviation)
     return np.sqrt(forecast_var)
 
 def calculate_realized_volatility(returns: pd.Series, window: int = 21,
                                   annualize: bool = True) -> pd.Series:
     """
-    计算已实现波动率（历史波动率）
+    Calculate realized volatility (historical volatility)
     
     Args:
-        returns: 收益率序列
-        window: 滑动窗口大小，通常用21表示月度波动率
-        annualize: 是否年化波动率
+        returns: return series
+        window: rolling window size, typically 21 for monthly volatility
+        annualize: whether to annualize volatility
         
     Returns:
-        已实现波动率序列
+        Realized volatility series
     """
-    # 计算滚动标准差
+    # Calculate rolling standard deviation
     realized_vol = returns.rolling(window=window).std()
     
-    # 年化处理
+    # Annualize
     if annualize:
-        # 假设252个交易日/年
+        # Assume 252 trading days per year
         realized_vol = realized_vol * np.sqrt(252)
     
     return realized_vol

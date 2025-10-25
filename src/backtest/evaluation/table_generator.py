@@ -1,6 +1,6 @@
 """
-回测结果表格生成器
-提供多种格式的对比表格生成和导出功能
+Backtest result table generator
+Provides multi-format comparison table generation and export functionality
 """
 
 import pandas as pd
@@ -15,14 +15,14 @@ logger = logging.getLogger(__name__)
 
 
 class BacktestTableGenerator:
-    """回测结果表格生成器"""
+    """Backtest result table generator"""
     
     def __init__(self, output_dir: str = "backtest_reports"):
         """
-        初始化表格生成器
+        Initialize table generator
         
         Args:
-            output_dir: 输出目录
+            output_dir: Output directory
         """
         self.output_dir = Path(output_dir)
         self.output_dir.mkdir(exist_ok=True)
@@ -34,47 +34,47 @@ class BacktestTableGenerator:
                                     config: Optional[Dict[str, Any]] = None,
                                     export_formats: List[str] = ['csv', 'excel', 'html']) -> Dict[str, str]:
         """
-        生成综合回测报告
+        Generate comprehensive backtest report
         
         Args:
-            results_summary: 策略结果摘要
-            comparison_results: 比较分析结果
-            config: 回测配置信息
-            export_formats: 导出格式列表
+            results_summary: Strategy results summary
+            comparison_results: Comparison analysis results
+            config: Backtest configuration information
+            export_formats: Export format list
             
         Returns:
-            Dict: 生成的文件路径
+            Dict: Generated file paths
         """
         if not results_summary:
-            logger.warning("没有结果数据，无法生成报告")
+            logger.warning("No result data, cannot generate report")
             return {}
         
         generated_files = {}
         
         try:
-            # 1. 生成性能对比表格
+            # 1. Generate performance comparison table
             performance_df = self._create_performance_table(results_summary)
             
-            # 2. 生成策略排名表格
+            # 2. Generate strategy ranking table
             ranking_df = self._create_ranking_table(results_summary)
             
-            # 3. 生成风险指标表格
+            # 3. Generate risk metrics table
             risk_df = self._create_risk_metrics_table(results_summary)
             
-            # 4. 生成交易统计表格
+            # 4. Generate trading statistics table
             trading_df = self._create_trading_statistics_table(results_summary)
             
-            # 5. 生成AI Agent专项分析表格
+            # 5. Generate AI Agent special analysis table
             ai_analysis_df = None
             if 'AI_Agent' in results_summary:
                 ai_analysis_df = self._create_ai_agent_analysis_table(results_summary)
             
-            # 6. 生成统计显著性表格
+            # 6. Generate statistical significance table
             significance_df = None
             if comparison_results:
                 significance_df = self._create_statistical_significance_table(comparison_results)
             
-            # 导出不同格式
+            # Export different formats
             for format_type in export_formats:
                 if format_type.lower() == 'csv':
                     csv_files = self._export_csv_tables(
@@ -99,137 +99,137 @@ class BacktestTableGenerator:
                     if html_file:
                         generated_files['html_report'] = html_file
             
-            logger.info(f"成功生成 {len(generated_files)} 个报告文件")
+            logger.info(f"Successfully generated {len(generated_files)} report files")
             return generated_files
             
         except Exception as e:
-            logger.error(f"生成综合报告失败: {e}")
+            logger.error(f"Failed to generate comprehensive report: {e}")
             return {}
     
     def _create_performance_table(self, results_summary: Dict[str, Dict[str, Any]]) -> pd.DataFrame:
-        """创建性能对比表格"""
+        """Create performance comparison table"""
         table_data = []
         
         for strategy_name, metrics in results_summary.items():
             row = {
-                '策略名称': strategy_name,
-                '总收益率(%)': round(metrics.get('total_return', 0), 2),
-                '年化收益率(%)': round(metrics.get('annual_return', 0), 2),
-                '夏普比率': round(metrics.get('sharpe_ratio', 0), 3),
-                '索提诺比率': round(metrics.get('sortino_ratio', 0), 3),
-                '卡玛比率': round(metrics.get('calmar_ratio', 0), 3),
-                '信息比率': round(metrics.get('information_ratio', 0), 3),
-                '最大回撤(%)': round(abs(metrics.get('max_drawdown', 0)), 2),
-                '年化波动率(%)': round(metrics.get('volatility', 0), 2),
-                'VaR_95(%)': round(abs(metrics.get('var_95', 0)) * 100, 2),
-                'CVaR_95(%)': round(abs(metrics.get('cvar_95', 0)) * 100, 2),
-                '胜率(%)': round(metrics.get('win_rate', 0) * 100, 2),
-                '盈亏比': round(metrics.get('profit_loss_ratio', 0), 2),
-                '交易次数': metrics.get('trade_count', 0),
-                '平均持仓天数': round(metrics.get('avg_holding_period', 0), 1),
-                '换手率(%)': round(metrics.get('turnover_rate', 0) * 100, 2)
+                'Strategy Name': strategy_name,
+                'Total Return (%)': round(metrics.get('total_return', 0), 2),
+                'Annual Return (%)': round(metrics.get('annual_return', 0), 2),
+                'Sharpe Ratio': round(metrics.get('sharpe_ratio', 0), 3),
+                'Sortino Ratio': round(metrics.get('sortino_ratio', 0), 3),
+                'Calmar Ratio': round(metrics.get('calmar_ratio', 0), 3),
+                'Information Ratio': round(metrics.get('information_ratio', 0), 3),
+                'Max Drawdown (%)': round(abs(metrics.get('max_drawdown', 0)), 2),
+                'Annual Volatility (%)': round(metrics.get('volatility', 0), 2),
+                'VaR 95% (%)': round(abs(metrics.get('var_95', 0)) * 100, 2),
+                'CVaR 95% (%)': round(abs(metrics.get('cvar_95', 0)) * 100, 2),
+                'Win Rate (%)': round(metrics.get('win_rate', 0) * 100, 2),
+                'Profit/Loss Ratio': round(metrics.get('profit_loss_ratio', 0), 2),
+                'Trade Count': metrics.get('trade_count', 0),
+                'Avg Holding Days': round(metrics.get('avg_holding_period', 0), 1),
+                'Turnover Rate (%)': round(metrics.get('turnover_rate', 0) * 100, 2)
             }
             table_data.append(row)
         
         df = pd.DataFrame(table_data)
-        df = df.sort_values('总收益率(%)', ascending=False).reset_index(drop=True)
-        df.insert(0, '排名', range(1, len(df) + 1))
+        df = df.sort_values('Total Return (%)', ascending=False).reset_index(drop=True)
+        df.insert(0, 'Rank', range(1, len(df) + 1))
         
         return df
     
     def _create_ranking_table(self, results_summary: Dict[str, Dict[str, Any]]) -> pd.DataFrame:
-        """创建策略排名表格"""
+        """Create strategy ranking table"""
         ranking_data = []
         
-        # 定义评估维度权重
+        # Define evaluation dimension weights
         weights = {
-            '收益表现': 0.30,
-            '风险控制': 0.25,
-            '风险调整收益': 0.25,
-            '交易效率': 0.20
+            'Return Performance': 0.30,
+            'Risk Control': 0.25,
+            'Risk-Adjusted Return': 0.25,
+            'Trading Efficiency': 0.20
         }
         
         for strategy_name, metrics in results_summary.items():
-            # 计算各维度得分
+            # Calculate dimension scores
             scores = self._calculate_dimension_scores(metrics)
             
-            # 计算综合得分
+            # Calculate composite score
             composite_score = sum(scores[dim] * weights[dim] for dim in scores)
             
             ranking_data.append({
-                '策略名称': strategy_name,
-                '收益表现': round(scores['收益表现'], 1),
-                '风险控制': round(scores['风险控制'], 1),
-                '风险调整收益': round(scores['风险调整收益'], 1),
-                '交易效率': round(scores['交易效率'], 1),
-                '综合得分': round(composite_score, 1)
+                'Strategy Name': strategy_name,
+                'Return Performance': round(scores['Return Performance'], 1),
+                'Risk Control': round(scores['Risk Control'], 1),
+                'Risk-Adjusted Return': round(scores['Risk-Adjusted Return'], 1),
+                'Trading Efficiency': round(scores['Trading Efficiency'], 1),
+                'Composite Score': round(composite_score, 1)
             })
         
         df = pd.DataFrame(ranking_data)
-        df = df.sort_values('综合得分', ascending=False).reset_index(drop=True)
-        df.insert(0, '排名', range(1, len(df) + 1))
+        df = df.sort_values('Composite Score', ascending=False).reset_index(drop=True)
+        df.insert(0, 'Rank', range(1, len(df) + 1))
         
         return df
     
     def _create_risk_metrics_table(self, results_summary: Dict[str, Dict[str, Any]]) -> pd.DataFrame:
-        """创建风险指标表格"""
+        """Create risk metrics table"""
         risk_data = []
         
         for strategy_name, metrics in results_summary.items():
             row = {
-                '策略名称': strategy_name,
-                '最大回撤(%)': round(abs(metrics.get('max_drawdown', 0)), 2),
-                '回撤持续天数': metrics.get('max_drawdown_duration', 0),
-                '年化波动率(%)': round(metrics.get('volatility', 0), 2),
-                '下行波动率(%)': round(metrics.get('downside_volatility', 0), 2),
+                'Strategy Name': strategy_name,
+                'Max Drawdown(%)': round(abs(metrics.get('max_drawdown', 0)), 2),
+                'Drawdown Duration (Days)': metrics.get('max_drawdown_duration', 0),
+                'Annualized Volatility(%)': round(metrics.get('volatility', 0), 2),
+                'Downside Volatility(%)': round(metrics.get('downside_volatility', 0), 2),
                 'VaR_95(%)': round(abs(metrics.get('var_95', 0)) * 100, 2),
                 'CVaR_95(%)': round(abs(metrics.get('cvar_95', 0)) * 100, 2),
-                '偏度': round(metrics.get('skewness', 0), 3),
-                '峰度': round(metrics.get('kurtosis', 0), 3),
-                '贝塔系数': round(metrics.get('beta', 0), 3),
-                '跟踪误差(%)': round(metrics.get('tracking_error', 0) * 100, 2),
-                '信息比率': round(metrics.get('information_ratio', 0), 3)
+                'Skewness': round(metrics.get('skewness', 0), 3),
+                'Kurtosis': round(metrics.get('kurtosis', 0), 3),
+                'Beta': round(metrics.get('beta', 0), 3),
+                'Tracking Error(%)': round(metrics.get('tracking_error', 0) * 100, 2),
+                'Information Ratio': round(metrics.get('information_ratio', 0), 3)
             }
             risk_data.append(row)
         
         df = pd.DataFrame(risk_data)
-        # 按最大回撤排序（越小越好）
-        df = df.sort_values('最大回撤(%)', ascending=True).reset_index(drop=True)
-        df.insert(0, '风险排名', range(1, len(df) + 1))
+        # Sort by maximum drawdown (lower is better)
+        df = df.sort_values('Max Drawdown(%)', ascending=True).reset_index(drop=True)
+        df.insert(0, 'Risk Rank', range(1, len(df) + 1))
         
         return df
     
     def _create_trading_statistics_table(self, results_summary: Dict[str, Dict[str, Any]]) -> pd.DataFrame:
-        """创建交易统计表格"""
+        """Create trading statistics table"""
         trading_data = []
         
         for strategy_name, metrics in results_summary.items():
             row = {
-                '策略名称': strategy_name,
-                '总交易次数': metrics.get('trade_count', 0),
-                '盈利交易次数': metrics.get('profitable_trades', 0),
-                '亏损交易次数': metrics.get('losing_trades', 0),
-                '胜率(%)': round(metrics.get('win_rate', 0) * 100, 2),
-                '平均盈利(%)': round(metrics.get('avg_profit', 0) * 100, 2),
-                '平均亏损(%)': round(metrics.get('avg_loss', 0) * 100, 2),
-                '盈亏比': round(metrics.get('profit_loss_ratio', 0), 2),
-                '最大单笔盈利(%)': round(metrics.get('max_profit', 0) * 100, 2),
-                '最大单笔亏损(%)': round(metrics.get('max_loss', 0) * 100, 2),
-                '平均持仓天数': round(metrics.get('avg_holding_period', 0), 1),
-                '换手率(%)': round(metrics.get('turnover_rate', 0) * 100, 2),
-                '交易成本(%)': round(metrics.get('total_costs', 0) * 100, 2)
+                'Strategy Name': strategy_name,
+                'Total Trades': metrics.get('trade_count', 0),
+                'Profitable Trades': metrics.get('profitable_trades', 0),
+                'Losing Trades': metrics.get('losing_trades', 0),
+                'Win Rate(%)': round(metrics.get('win_rate', 0) * 100, 2),
+                'Average Profit(%)': round(metrics.get('avg_profit', 0) * 100, 2),
+                'Average Loss(%)': round(metrics.get('avg_loss', 0) * 100, 2),
+                'Profit/Loss Ratio': round(metrics.get('profit_loss_ratio', 0), 2),
+                'Max Single Profit(%)': round(metrics.get('max_profit', 0) * 100, 2),
+                'Max Single Loss(%)': round(metrics.get('max_loss', 0) * 100, 2),
+                'Average Holding Days': round(metrics.get('avg_holding_period', 0), 1),
+                'Turnover Rate(%)': round(metrics.get('turnover_rate', 0) * 100, 2),
+                'Trading Costs(%)': round(metrics.get('total_costs', 0) * 100, 2)
             }
             trading_data.append(row)
         
         df = pd.DataFrame(trading_data)
-        # 按胜率排序
-        df = df.sort_values('胜率(%)', ascending=False).reset_index(drop=True)
-        df.insert(0, '交易排名', range(1, len(df) + 1))
+        # Sort by win rate
+        df = df.sort_values('Win Rate(%)', ascending=False).reset_index(drop=True)
+        df.insert(0, 'Trading Rank', range(1, len(df) + 1))
         
         return df
     
     def _create_ai_agent_analysis_table(self, results_summary: Dict[str, Dict[str, Any]]) -> pd.DataFrame:
-        """创建AI Agent专项分析表格"""
+        """Create AI Agent special analysis table"""
         if 'AI_Agent' not in results_summary:
             return pd.DataFrame()
         
@@ -241,66 +241,66 @@ class BacktestTableGenerator:
         
         analysis_data = []
         
-        # 关键指标对比
+        # Key metrics comparison
         key_metrics = [
-            ('总收益率(%)', 'total_return', False),
-            ('年化收益率(%)', 'annual_return', False),
-            ('夏普比率', 'sharpe_ratio', False),
-            ('最大回撤(%)', 'max_drawdown', True),
-            ('年化波动率(%)', 'volatility', True),
-            ('胜率(%)', 'win_rate', False),
-            ('盈亏比', 'profit_loss_ratio', False)
+            ('Total Return(%)', 'total_return', False),
+            ('Annual Return(%)', 'annual_return', False),
+            ('Sharpe Ratio', 'sharpe_ratio', False),
+            ('Max Drawdown(%)', 'max_drawdown', True),
+            ('Annual Volatility(%)', 'volatility', True),
+            ('Win Rate(%)', 'win_rate', False),
+            ('Profit/Loss Ratio', 'profit_loss_ratio', False)
         ]
         
         for metric_name, metric_key, lower_is_better in key_metrics:
             ai_value = ai_metrics.get(metric_key, 0)
-            if metric_name in ['总收益率(%)', '年化收益率(%)', '最大回撤(%)', '年化波动率(%)']:
+            if metric_name in ['Total Return(%)', 'Annual Return(%)', 'Max Drawdown(%)', 'Annual Volatility(%)']:
                 ai_value = ai_value if metric_key != 'max_drawdown' else abs(ai_value)
-            elif metric_name == '胜率(%)':
+            elif metric_name == 'Win Rate(%)':
                 ai_value = ai_value * 100
             
-            # 计算基准统计
+            # Calculate benchmark statistics
             other_values = [metrics.get(metric_key, 0) for metrics in other_strategies.values()]
-            if metric_name in ['总收益率(%)', '年化收益率(%)', '最大回撤(%)', '年化波动率(%)']:
+            if metric_name in ['Total Return(%)', 'Annual Return(%)', 'Max Drawdown(%)', 'Annual Volatility(%)']:
                 other_values = [v if metric_key != 'max_drawdown' else abs(v) for v in other_values]
-            elif metric_name == '胜率(%)':
+            elif metric_name == 'Win Rate(%)':
                 other_values = [v * 100 for v in other_values]
             
             avg_value = np.mean(other_values) if other_values else 0
             median_value = np.median(other_values) if other_values else 0
             best_value = min(other_values) if lower_is_better and other_values else max(other_values) if other_values else 0
             
-            # 计算排名
+            # Calculate ranking
             all_values = [ai_value] + other_values
             if lower_is_better:
                 rank = sorted(all_values).index(ai_value) + 1
             else:
                 rank = len(all_values) - sorted(all_values).index(ai_value)
             
-            # 判断表现
+            # Judge performance
             if lower_is_better:
-                performance = '优于平均' if ai_value < avg_value else '低于平均'
-                vs_best = '优于最佳' if ai_value < best_value else '低于最佳'
+                performance = 'Better than Average' if ai_value < avg_value else 'Below Average'
+                vs_best = 'Better than Best' if ai_value < best_value else 'Below Best'
             else:
-                performance = '优于平均' if ai_value > avg_value else '低于平均'
-                vs_best = '优于最佳' if ai_value > best_value else '低于最佳'
+                performance = 'Better than Average' if ai_value > avg_value else 'Below Average'
+                vs_best = 'Better than Best' if ai_value > best_value else 'Below Best'
             
             analysis_data.append({
-                '指标': metric_name,
+                'Metric': metric_name,
                 'AI Agent': round(ai_value, 3),
-                '基准平均': round(avg_value, 3),
-                '基准中位数': round(median_value, 3),
-                '基准最佳': round(best_value, 3),
-                '排名': f"{rank}/{len(results_summary)}",
-                '相对平均': performance,
-                '相对最佳': vs_best,
-                '百分位数': round((len(all_values) - rank + 1) / len(all_values) * 100, 1)
+                'Benchmark Average': round(avg_value, 3),
+                'Benchmark Median': round(median_value, 3),
+                'Benchmark Best': round(best_value, 3),
+                'Rank': f"{rank}/{len(results_summary)}",
+                'vs Average': performance,
+                'vs Best': vs_best,
+                'Percentile': round((len(all_values) - rank + 1) / len(all_values) * 100, 1)
             })
         
         return pd.DataFrame(analysis_data)
     
     def _create_statistical_significance_table(self, comparison_results: Dict[str, Any]) -> pd.DataFrame:
-        """创建统计显著性检验表格"""
+        """Create statistical significance test table"""
         if 'pairwise_comparisons' not in comparison_results:
             return pd.DataFrame()
         
@@ -314,33 +314,33 @@ class BacktestTableGenerator:
                 
                 summary = result['summary']
                 strategies = comparison_key.split(' vs ')
-                strategy1 = strategies[0] if len(strategies) > 0 else "未知"
-                strategy2 = strategies[1] if len(strategies) > 1 else "未知"
+                strategy1 = strategies[0] if len(strategies) > 0 else "Unknown"
+                strategy2 = strategies[1] if len(strategies) > 1 else "Unknown"
                 
-                # 提取检验结果
+                # Extract test results
                 paired_test = result.get('paired_test', {})
                 dm_test = result.get('diebold_mariano', {})
                 sharpe_test = result.get('sharpe_test', {})
                 
                 significance_data.append({
-                    '策略对比': comparison_key,
-                    '策略A': strategy1,
-                    '策略B': strategy2,
-                    '配对t检验': '显著' if paired_test.get('significant', False) else '不显著',
-                    't统计量': round(paired_test.get('statistic', 0), 3),
-                    'p值(配对)': round(paired_test.get('p_value', 1), 4),
-                    'DM检验': '显著' if dm_test.get('significant', False) else '不显著',
-                    'DM统计量': round(dm_test.get('statistic', 0), 3),
-                    'p值(DM)': round(dm_test.get('p_value', 1), 4),
-                    '夏普比率检验': '显著' if sharpe_test.get('significant', False) else '不显著',
-                    '夏普差异': round(sharpe_test.get('sharpe_diff', 0), 3),
-                    'p值(夏普)': round(sharpe_test.get('p_value', 1), 4),
-                    '统计功效': round(summary.get('statistical_power', 0), 3),
-                    '结论': summary.get('overall_conclusion', '无结论')
+                    'Strategy Comparison': comparison_key,
+                    'Strategy A': strategy1,
+                    'Strategy B': strategy2,
+                    'Paired t-test': 'Significant' if paired_test.get('significant', False) else 'Not Significant',
+                    't-statistic': round(paired_test.get('statistic', 0), 3),
+                    'p-value (Paired)': round(paired_test.get('p_value', 1), 4),
+                    'DM Test': 'Significant' if dm_test.get('significant', False) else 'Not Significant',
+                    'DM Statistic': round(dm_test.get('statistic', 0), 3),
+                    'p-value (DM)': round(dm_test.get('p_value', 1), 4),
+                    'Sharpe Ratio Test': 'Significant' if sharpe_test.get('significant', False) else 'Not Significant',
+                    'Sharpe Difference': round(sharpe_test.get('sharpe_diff', 0), 3),
+                    'p-value (Sharpe)': round(sharpe_test.get('p_value', 1), 4),
+                    'Statistical Power': round(summary.get('statistical_power', 0), 3),
+                    'Conclusion': summary.get('overall_conclusion', 'No Conclusion')
                 })
                 
             except (KeyError, TypeError, IndexError) as e:
-                logger.warning(f"处理比较结果 {comparison_key} 时出错: {e}")
+                logger.warning(f"Error processing comparison result {comparison_key}: {e}")
                 continue
         
         if not significance_data:
@@ -349,40 +349,40 @@ class BacktestTableGenerator:
         return pd.DataFrame(significance_data)
     
     def _calculate_dimension_scores(self, metrics: Dict[str, Any]) -> Dict[str, float]:
-        """计算各维度得分"""
+        """Calculate dimension scores"""
         scores = {}
         
-        # 收益表现得分 (0-100)
+        # Return performance score (0-100)
         total_return = metrics.get('total_return', 0)
         annual_return = metrics.get('annual_return', 0)
-        scores['收益表现'] = min(100, max(0, (total_return + annual_return) * 50))
+        scores['Return Performance'] = min(100, max(0, (total_return + annual_return) * 50))
         
-        # 风险控制得分 (0-100, 越小越好)
+        # Risk control score (0-100, lower is better)
         max_dd = abs(metrics.get('max_drawdown', 0))
         volatility = metrics.get('volatility', 0)
         var_95 = abs(metrics.get('var_95', 0))
         risk_penalty = (max_dd + volatility + var_95) * 100
-        scores['风险控制'] = max(0, 100 - risk_penalty)
+        scores['Risk Control'] = max(0, 100 - risk_penalty)
         
-        # 风险调整收益得分 (0-100)
+        # Risk-adjusted return score (0-100)
         sharpe = metrics.get('sharpe_ratio', 0)
         sortino = metrics.get('sortino_ratio', 0)
         calmar = metrics.get('calmar_ratio', 0)
-        scores['风险调整收益'] = min(100, max(0, (sharpe + sortino + calmar) * 20))
+        scores['Risk-Adjusted Return'] = min(100, max(0, (sharpe + sortino + calmar) * 20))
         
-        # 交易效率得分 (0-100)
+        # Trading efficiency score (0-100)
         win_rate = metrics.get('win_rate', 0)
         pl_ratio = metrics.get('profit_loss_ratio', 0)
         trade_count = metrics.get('trade_count', 0)
         efficiency_score = win_rate * 50 + min(50, pl_ratio * 25)
         if trade_count > 0:
             efficiency_score += min(20, trade_count / 10)
-        scores['交易效率'] = min(100, efficiency_score)
+        scores['Trading Efficiency'] = min(100, efficiency_score)
         
         return scores
     
     def _export_csv_tables(self, *tables) -> Dict[str, str]:
-        """导出CSV格式表格"""
+        """Export CSV format tables"""
         csv_files = {}
         table_names = [
             'performance_comparison',
@@ -401,42 +401,42 @@ class BacktestTableGenerator:
                 try:
                     table.to_csv(filepath, index=False, encoding='utf-8-sig')
                     csv_files[table_names[i]] = str(filepath)
-                    logger.info(f"CSV表格已保存: {filepath}")
+                    logger.info(f"CSV table saved: {filepath}")
                 except Exception as e:
-                    logger.error(f"保存CSV表格失败 {filename}: {e}")
+                    logger.error(f"Failed to save CSV table {filename}: {e}")
         
         return csv_files
     
     def _export_excel_workbook(self, *tables, config=None) -> Optional[str]:
-        """导出Excel工作簿"""
+        """Export Excel workbook"""
         try:
             filename = f"backtest_comprehensive_report_{self.timestamp}.xlsx"
             filepath = self.output_dir / filename
             
             with pd.ExcelWriter(filepath, engine='openpyxl') as writer:
                 sheet_names = [
-                    '性能对比', '策略排名', '风险指标', 
-                    '交易统计', 'AI专项分析', '统计显著性'
+                    'Performance Comparison', 'Strategy Ranking', 'Risk Metrics', 
+                    'Trading Statistics', 'AI Special Analysis', 'Statistical Significance'
                 ]
                 
                 for i, (table, sheet_name) in enumerate(zip(tables, sheet_names)):
                     if table is not None and not table.empty:
                         table.to_excel(writer, sheet_name=sheet_name, index=False)
                 
-                # 添加配置信息工作表
+                # Add configuration information worksheet
                 if config:
-                    config_df = pd.DataFrame(list(config.items()), columns=['配置项', '值'])
-                    config_df.to_excel(writer, sheet_name='回测配置', index=False)
+                    config_df = pd.DataFrame(list(config.items()), columns=['Configuration Item', 'Value'])
+                    config_df.to_excel(writer, sheet_name='Backtest Configuration', index=False)
             
-            logger.info(f"Excel报告已保存: {filepath}")
+            logger.info(f"Excel report saved: {filepath}")
             return str(filepath)
             
         except Exception as e:
-            logger.error(f"保存Excel报告失败: {e}")
+            logger.error(f"Failed to save Excel report: {e}")
             return None
     
     def _export_html_report(self, *tables, config=None) -> Optional[str]:
-        """导出HTML报告"""
+        """Export HTML report"""
         try:
             filename = f"backtest_report_{self.timestamp}.html"
             filepath = self.output_dir / filename
@@ -446,23 +446,23 @@ class BacktestTableGenerator:
             with open(filepath, 'w', encoding='utf-8') as f:
                 f.write(html_content)
             
-            logger.info(f"HTML报告已保存: {filepath}")
+            logger.info(f"HTML report saved: {filepath}")
             return str(filepath)
             
         except Exception as e:
-            logger.error(f"保存HTML报告失败: {e}")
+            logger.error(f"Failed to save HTML report: {e}")
             return None
     
     def _generate_html_content(self, tables, config=None) -> str:
-        """生成HTML报告内容"""
+        """Generate HTML report content"""
         html_parts = [
             """
             <!DOCTYPE html>
-            <html lang="zh-CN">
+            <html lang="en">
             <head>
                 <meta charset="UTF-8">
                 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-                <title>回测分析报告</title>
+                <title>Backtest Analysis Report</title>
                 <style>
                     body { font-family: 'Microsoft YaHei', Arial, sans-serif; margin: 20px; background-color: #f5f5f5; }
                     .container { max-width: 1200px; margin: 0 auto; background-color: white; padding: 20px; border-radius: 10px; box-shadow: 0 0 10px rgba(0,0,0,0.1); }
@@ -482,47 +482,47 @@ class BacktestTableGenerator:
             </head>
             <body>
                 <div class="container">
-                    <h1>🚀 A股投资Agent回测分析报告</h1>
+                    <h1>🚀 A-Share Investment Agent Backtest Analysis Report</h1>
             """
         ]
         
-        # 添加配置信息
+        # Add configuration information
         if config:
             html_parts.append('<div class="config-info">')
-            html_parts.append('<h3>📋 回测配置信息</h3>')
+            html_parts.append('<h3>📋 Backtest Configuration Information</h3>')
             for key, value in config.items():
                 html_parts.append(f'<p><strong>{key}:</strong> {value}</p>')
             html_parts.append('</div>')
         
-        # 添加表格
+        # Add tables
         table_titles = [
-            '📊 策略性能对比表',
-            '🏆 策略综合排名表', 
-            '⚠️ 风险指标对比表',
-            '📈 交易统计表',
-            '🤖 AI Agent专项分析',
-            '📉 统计显著性检验'
+            '📊 Strategy Performance Comparison Table',
+            '🏆 Strategy Comprehensive Ranking Table', 
+            '⚠️ Risk Metrics Comparison Table',
+            '📈 Trading Statistics Table',
+            '🤖 AI Agent Special Analysis',
+            '📉 Statistical Significance Test'
         ]
         
         for i, (table, title) in enumerate(zip(tables, table_titles)):
             if table is not None and not table.empty:
                 html_parts.append(f'<h2>{title}</h2>')
                 
-                # 为表格添加样式
+                # Add styles to table
                 table_html = table.to_html(index=False, escape=False, classes='table')
                 
-                # 添加颜色编码
-                if '排名' in table.columns:
-                    # 为排名添加颜色
+                # Add color coding
+                if 'Rank' in table.columns:
+                    # Add color for ranking
                     table_html = table_html.replace('<td>1</td>', '<td class="highlight">1</td>')
                 
                 html_parts.append(table_html)
         
-        # 添加页脚
+        # Add footer
         html_parts.append(f'''
                     <div class="timestamp">
-                        <p>报告生成时间: {datetime.now().strftime("%Y-%m-%d %H:%M:%S")}</p>
-                        <p>© A股投资Agent系统 - 回测分析报告</p>
+                        <p>Report Generated: {datetime.now().strftime("%Y-%m-%d %H:%M:%S")}</p>
+                        <p>© A-Share Investment Agent System - Backtest Analysis Report</p>
                     </div>
                 </div>
             </body>

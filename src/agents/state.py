@@ -5,7 +5,7 @@ from langchain_core.messages import BaseMessage
 import json
 from src.utils.logging_config import setup_logger
 
-# 设置日志记录
+# Setup logging
 logger = setup_logger('agent_state')
 
 

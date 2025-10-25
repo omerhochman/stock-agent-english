@@ -7,11 +7,11 @@ from src.utils.logging_config import setup_logger
 
 logger = setup_logger('tushare_adapter')
 
-# 获取TuShare API密钥
+# Get TuShare API key
 TUSHARE_TOKEN = os.environ.get('TUSHARE_TOKEN', '')
 
 def get_tushare_price_data(tushare_code: str, start_date: str, end_date: str, adjust: str) -> pd.DataFrame:
-    """从TuShare获取价格数据"""
+    """Get price data from TuShare"""
     try:
         import tushare as ts
         if not TUSHARE_TOKEN:
@@ -23,14 +23,14 @@ def get_tushare_price_data(tushare_code: str, start_date: str, end_date: str, ad
         
         logger.info(f"Fetching price history using TuShare for {tushare_code}")
         
-        # 转换调整类型
+        # Convert adjustment type
         adj = None
         if adjust == 'qfq':
             adj = 'qfq'
         elif adjust == 'hfq':
             adj = 'hfq'
         
-        # 尝试使用pro_bar获取复权数据
+        # Try using pro_bar to get adjusted data
         try:
             if adj:
                 df = ts.pro_bar(ts_code=tushare_code, adj=adj, start_date=start_date, end_date=end_date)
@@ -38,28 +38,28 @@ def get_tushare_price_data(tushare_code: str, start_date: str, end_date: str, ad
                 df = ts.pro_bar(ts_code=tushare_code, start_date=start_date, end_date=end_date)
         except Exception as e:
             logger.warning(f"TuShare pro_bar failed: {str(e)}, trying daily API...")
-            # 备选方法：获取日线数据
+            # Alternative method: get daily data
             df = pro.daily(ts_code=tushare_code, start_date=start_date, end_date=end_date)
             
-            # 如果需要复权
+            # If adjustment is needed
             if adj and not df.empty:
                 adj_factor = pro.adj_factor(ts_code=tushare_code, start_date=start_date, end_date=end_date)
                 if not adj_factor.empty:
                     df = df.merge(adj_factor, on=['ts_code', 'trade_date'])
                     
-                    # 前复权
+                    # Forward adjustment
                     if adj == 'qfq':
                         latest_factor = adj_factor['adj_factor'].iloc[0]
                         df['adj_factor'] = df['adj_factor'] / latest_factor
                         
-                    # 应用复权因子
+                    # Apply adjustment factor
                     for col in ['open', 'high', 'low', 'close']:
                         if col in df.columns:
                             df[col] = df[col] * df['adj_factor']
         
-        # 转换TuShare数据格式
+        # Convert TuShare data format
         if not df.empty:
-            # 创建统一的列名映射
+            # Create unified column name mapping
             column_mapping = {
                 "trade_date": "date",
                 "open": "open",
@@ -67,31 +67,31 @@ def get_tushare_price_data(tushare_code: str, start_date: str, end_date: str, ad
                 "low": "low",
                 "close": "close",
                 "vol": "volume",
-                "volume": "volume",  # pro_bar可能使用volume列名
+                "volume": "volume",  # pro_bar may use volume column name
                 "amount": "amount",
                 "pct_chg": "pct_change",
                 "change": "change_amount",
                 "turnover_rate": "turnover",
-                "turn": "turnover"    # pro_bar可能使用turn列名
+                "turn": "turnover"    # pro_bar may use turn column name
             }
             
-            # 只重命名存在的列
+            # Only rename existing columns
             rename_cols = {col: new_col for col, new_col in column_mapping.items() if col in df.columns}
             df = df.rename(columns=rename_cols)
             
-            # 确保日期格式统一
+            # Ensure date format is unified
             if "date" not in df.columns and "trade_date" in df.columns:
                 df["date"] = pd.to_datetime(df["trade_date"], format="%Y%m%d")
             elif "date" in df.columns:
-                if df["date"].dtype == object:  # 如果是字符串格式
+                if df["date"].dtype == object:  # If it's string format
                     df["date"] = pd.to_datetime(df["date"], format="%Y%m%d")
             
-            # 确保所有数值列已转换为float类型
+            # Ensure all numeric columns are converted to float type
             for col in ['open', 'high', 'low', 'close', 'volume', 'amount', 'pct_change', 'change_amount', 'turnover']:
                 if col in df.columns:
                     df[col] = pd.to_numeric(df[col], errors='coerce')
             
-            # 排序
+            # Sort
             df = df.sort_values("date", ascending=True)
             
             logger.info(f"Successfully retrieved data from TuShare: {len(df)} records")
@@ -102,7 +102,7 @@ def get_tushare_price_data(tushare_code: str, start_date: str, end_date: str, ad
         return pd.DataFrame()
 
 def get_tushare_financial_metrics(tushare_code: str) -> List[Dict[str, Any]]:
-    """从TuShare获取财务指标"""
+    """Get financial metrics from TuShare"""
     try:
         import tushare as ts
         if not TUSHARE_TOKEN:
@@ -114,22 +114,22 @@ def get_tushare_financial_metrics(tushare_code: str) -> List[Dict[str, Any]]:
         
         logger.info(f"Fetching financial metrics using TuShare for {tushare_code}")
         
-        # 获取基本信息
+        # Get basic information
         basic_info = pro.daily_basic(ts_code=tushare_code)
         
         if not basic_info.empty:
             basic_info = basic_info.iloc[0]
             
-            # 获取财务指标
+            # Get financial indicators
             fin_indicator = pro.fina_indicator(ts_code=tushare_code)
             latest_fin = fin_indicator.iloc[0] if not fin_indicator.empty else pd.Series()
             
-            # 获取利润表
+            # Get income statement
             income = pro.income(ts_code=tushare_code)
             latest_income = income.iloc[0] if not income.empty else pd.Series()
             prev_income = income.iloc[1] if len(income) > 1 else pd.Series()
             
-            # 计算增长率
+            # Calculate growth rates
             revenue_current = float(latest_income.get('revenue', 0))
             revenue_prev = float(prev_income.get('revenue', 0))
             revenue_growth = (revenue_current - revenue_prev) / revenue_prev if revenue_prev > 0 else 0
@@ -138,25 +138,25 @@ def get_tushare_financial_metrics(tushare_code: str) -> List[Dict[str, Any]]:
             net_profit_prev = float(prev_income.get('n_income', 0))
             earnings_growth = (net_profit_current - net_profit_prev) / net_profit_prev if net_profit_prev > 0 else 0
             
-            # 构建指标字典
+            # Build metrics dictionary
             agent_metrics = {
-                # 盈利能力指标
+                # Profitability indicators
                 "return_on_equity": float(latest_fin.get("roe", 0)),
                 "net_margin": float(latest_fin.get("netprofit_margin", 0)),
                 "operating_margin": float(latest_fin.get("profit_dedt", 0)) / float(latest_income.get("revenue", 1)) if float(latest_income.get("revenue", 0)) > 0 else 0,
                 
-                # 增长指标
+                # Growth indicators
                 "revenue_growth": revenue_growth,
                 "earnings_growth": earnings_growth,
                 "book_value_growth": float(latest_fin.get("equity_yoy", 0)),
                 
-                # 财务健康指标
+                # Financial health indicators
                 "current_ratio": float(latest_fin.get("current_ratio", 0)),
                 "debt_to_equity": float(latest_fin.get("debt_to_assets", 0)),
                 "free_cash_flow_per_share": float(latest_fin.get("fcff_ps", 0)),
                 "earnings_per_share": float(latest_fin.get("eps", 0)),
                 
-                # 估值比率
+                # Valuation ratios
                 "pe_ratio": float(basic_info.get("pe", 0)),
                 "price_to_book": float(basic_info.get("pb", 0)),
                 "price_to_sales": float(basic_info.get("ps", 0)),
@@ -169,7 +169,7 @@ def get_tushare_financial_metrics(tushare_code: str) -> List[Dict[str, Any]]:
         return [{}]
 
 def get_tushare_financial_statements(tushare_code: str) -> List[Dict[str, Any]]:
-    """从TuShare获取财务报表数据"""
+    """Get financial statements data from TuShare"""
     try:
         import tushare as ts
         if not TUSHARE_TOKEN:
@@ -181,23 +181,23 @@ def get_tushare_financial_statements(tushare_code: str) -> List[Dict[str, Any]]:
         
         logger.info(f"Fetching financial statements using TuShare for {tushare_code}")
         
-        # 获取资产负债表
+        # Get balance sheet
         balance = pro.balancesheet(ts_code=tushare_code)
         if not balance.empty:
             latest_balance = balance.iloc[0]
             previous_balance = balance.iloc[1] if len(balance) > 1 else balance.iloc[0]
             
-            # 获取利润表
+            # Get income statement
             income = pro.income(ts_code=tushare_code)
             latest_income = income.iloc[0] if not income.empty else pd.Series()
             previous_income = income.iloc[1] if len(income) > 1 else income.iloc[0]
             
-            # 获取现金流量表
+            # Get cash flow statement
             cashflow = pro.cashflow(ts_code=tushare_code)
             latest_cashflow = cashflow.iloc[0] if not cashflow.empty else pd.Series()
             previous_cashflow = cashflow.iloc[1] if len(cashflow) > 1 else cashflow.iloc[0]
             
-            # 构建财务数据项
+            # Build financial data items
             current_item = {
                 "net_income": float(latest_income.get("n_income", 0)),
                 "operating_revenue": float(latest_income.get("revenue", 0)),
@@ -225,7 +225,7 @@ def get_tushare_financial_statements(tushare_code: str) -> List[Dict[str, Any]]:
         return [{}, {}]
 
 def get_tushare_market_data(tushare_code: str) -> Dict[str, Any]:
-    """从TuShare获取市场数据"""
+    """Get market data from TuShare"""
     try:
         import tushare as ts
         if not TUSHARE_TOKEN:
@@ -237,12 +237,12 @@ def get_tushare_market_data(tushare_code: str) -> Dict[str, Any]:
         
         logger.info(f"Fetching market data using TuShare for {tushare_code}")
         
-        # 获取基本行情
+        # Get basic market data
         daily_basic = pro.daily_basic(ts_code=tushare_code)
         if not daily_basic.empty:
             latest_data = daily_basic.iloc[0]
             
-            # 获取历史数据计算52周最高最低
+            # Get historical data to calculate 52-week high and low
             today = datetime.now()
             start_date = (today - timedelta(days=365)).strftime('%Y%m%d')
             end_date = today.strftime('%Y%m%d')
@@ -259,11 +259,11 @@ def get_tushare_market_data(tushare_code: str) -> Dict[str, Any]:
                 avg_volume = latest_data.get("vol", 0)
             
             return {
-                "market_cap": float(latest_data.get("total_mv", 0)),  # 总市值
-                "volume": float(latest_data.get("vol", 0)),           # 成交量
-                "average_volume": float(avg_volume),                   # 平均成交量
-                "fifty_two_week_high": float(week_high),              # 52周最高
-                "fifty_two_week_low": float(week_low)                 # 52周最低
+                "market_cap": float(latest_data.get("total_mv", 0)),  # Total market cap
+                "volume": float(latest_data.get("vol", 0)),           # Volume
+                "average_volume": float(avg_volume),                   # Average volume
+                "fifty_two_week_high": float(week_high),              # 52-week high
+                "fifty_two_week_low": float(week_low)                 # 52-week low
             }
         return {}
     except (ImportError, Exception) as e:

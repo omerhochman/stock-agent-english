@@ -1,5 +1,5 @@
 """
-市场数据API - 提供市场相关数据的获取和处理功能
+Market Data API - Provides market-related data acquisition and processing functionality
 """
 
 import os
@@ -16,32 +16,32 @@ def get_market_returns(index_code: str = "000300",
                       end_date: str = None,
                       freq: str = 'D') -> pd.Series:
     """
-    获取市场收益率数据（默认使用沪深300指数）
+    Get market return data (default uses CSI 300 index)
     
     Args:
-        index_code: 指数代码，默认为沪深300
-        start_date: 开始日期，格式：YYYY-MM-DD
-        end_date: 结束日期，格式：YYYY-MM-DD
-        freq: 数据频率，'D'为日度，'W'为周度，'M'为月度
+        index_code: Index code, default is CSI 300
+        start_date: Start date, format: YYYY-MM-DD
+        end_date: End date, format: YYYY-MM-DD
+        freq: Data frequency, 'D' for daily, 'W' for weekly, 'M' for monthly
         
     Returns:
-        包含市场收益率的Series，索引为日期
+        Series containing market returns, indexed by date
     """
-    logger.info(f"获取市场收益率数据: {start_date} 至 {end_date}, 指数代码: {index_code}, 频率: {freq}")
+    logger.info(f"Getting market return data: {start_date} to {end_date}, index code: {index_code}, frequency: {freq}")
     
     try:
-        # 尝试使用TuShare API
+        # Try using TuShare API
         try:
             import tushare as ts
             token = os.environ.get('TUSHARE_TOKEN', '')
             if not token:
-                logger.warning("未找到TUSHARE_TOKEN环境变量")
-                raise ValueError("TuShare token不可用")
+                logger.warning("TUSHARE_TOKEN environment variable not found")
+                raise ValueError("TuShare token not available")
                 
             ts.set_token(token)
             pro = ts.pro_api()
             
-            # 处理日期格式
+            # Handle date format
             if not end_date:
                 end_date = datetime.now().strftime("%Y%m%d")
             else:
@@ -49,13 +49,13 @@ def get_market_returns(index_code: str = "000300",
                     end_date = end_date.replace('-', '')
             
             if not start_date:
-                # 默认获取一年的数据
+                # Default to get one year of data
                 start_date = (datetime.strptime(end_date, "%Y%m%d") - timedelta(days=365)).strftime("%Y%m%d")
             else:
                 if '-' in start_date:
                     start_date = start_date.replace('-', '')
             
-            # 处理指数代码
+            # Process index code
             if not index_code.endswith(('.SH', '.SZ', '.BJ')):
                 if index_code.startswith('0'):
                     index_code = f"{index_code}.SH"
@@ -64,33 +64,33 @@ def get_market_returns(index_code: str = "000300",
                 else:
                     index_code = f"{index_code}.SH"
             
-            # 获取指数数据
+            # Get index data
             index_data = None
             try:
                 if freq == 'W':
                     index_data = pro.index_weekly(ts_code=index_code, start_date=start_date, end_date=end_date)
                 elif freq == 'M':
                     index_data = pro.index_monthly(ts_code=index_code, start_date=start_date, end_date=end_date)
-                else:  # 日频率
+                else:  # Daily frequency
                     index_data = pro.index_daily(ts_code=index_code, start_date=start_date, end_date=end_date)
             except Exception as e:
-                logger.warning(f"使用TuShare获取指数数据失败: {e}")
+                logger.warning(f"Failed to get index data using TuShare: {e}")
                 
-            # 如果TuShare特定频率API调用失败，尝试获取日度数据然后重采样
+            # If TuShare specific frequency API call fails, try to get daily data and resample
             if index_data is None or index_data.empty:
                 try:
-                    logger.info("尝试获取日度数据然后重采样")
+                    logger.info("Trying to get daily data and resample")
                     index_data = pro.index_daily(ts_code=index_code, start_date=start_date, end_date=end_date)
                 except Exception as e:
-                    logger.warning(f"使用TuShare获取日度指数数据失败: {e}")
+                    logger.warning(f"Failed to get daily index data using TuShare: {e}")
             
             if index_data is not None and not index_data.empty:
-                # 处理数据
+                # Process data
                 index_data['trade_date'] = pd.to_datetime(index_data['trade_date'])
                 index_data = index_data.sort_values('trade_date')
                 index_data = index_data.set_index('trade_date')
                 
-                # 如果需要重采样
+                # If resampling is needed
                 if freq != 'D' and 'close' in index_data.columns:
                     if freq == 'W':
                         close_price = index_data['close'].resample('W-FRI').last()
@@ -101,26 +101,26 @@ def get_market_returns(index_code: str = "000300",
                 else:
                     close_price = index_data['close']
                 
-                # 计算收益率
+                # Calculate returns
                 market_returns = close_price.pct_change().dropna()
                 
-                logger.info(f"成功使用TuShare获取市场收益率数据: {len(market_returns)} 条记录")
+                logger.info(f"Successfully got market return data using TuShare: {len(market_returns)} records")
                 return market_returns
             else:
-                logger.warning("TuShare获取的指数数据为空，尝试使用AKShare")
+                logger.warning("TuShare returned empty index data, trying AKShare")
         except Exception as e:
-            logger.warning(f"使用TuShare获取市场收益率失败: {e}")
-            logger.warning("尝试使用AKShare")
+            logger.warning(f"Failed to get market returns using TuShare: {e}")
+            logger.warning("Trying AKShare")
         
-        # 尝试使用AKShare
+        # Try using AKShare
         try:
             import akshare as ak
             
-            # 处理指数代码
+            # Process index code
             if index_code.endswith(('.SH', '.SZ', '.BJ')):
                 index_code = index_code[:-3]
             
-            # 为指数代码添加前缀
+            # Add prefix to index code
             if not index_code.startswith(('sh', 'sz', 'bj')):
                 if index_code.startswith('0'):
                     ak_index_code = f"sh{index_code}"
@@ -131,19 +131,19 @@ def get_market_returns(index_code: str = "000300",
             else:
                 ak_index_code = index_code
             
-            # 处理日期格式
+            # Handle date format
             if not end_date:
                 end_date = datetime.now().strftime("%Y-%m-%d")
             if not start_date:
                 start_date = (datetime.strptime(end_date, "%Y-%m-%d") - timedelta(days=365)).strftime("%Y-%m-%d")
             
-            # 确保日期格式为YYYY-MM-DD
+            # Ensure date format is YYYY-MM-DD
             if len(start_date) == 8:
                 start_date = f"{start_date[:4]}-{start_date[4:6]}-{start_date[6:]}"
             if len(end_date) == 8:
                 end_date = f"{end_date[:4]}-{end_date[4:6]}-{end_date[6:]}"
             
-            # 获取指数数据
+            # Get index data
             if freq == 'W':
                 period = "weekly"
             elif freq == 'M':
@@ -154,83 +154,83 @@ def get_market_returns(index_code: str = "000300",
             index_data = ak.stock_zh_index_daily(symbol=ak_index_code, period=period)
             
             if not index_data.empty:
-                # 处理数据
+                # Process data
                 index_data['date'] = pd.to_datetime(index_data['date'])
                 index_data = index_data.sort_values('date')
                 index_data = index_data.set_index('date')
                 
-                # 过滤日期范围
+                # Filter date range
                 index_data = index_data[index_data.index >= pd.to_datetime(start_date)]
                 index_data = index_data[index_data.index <= pd.to_datetime(end_date)]
                 
-                # 计算收益率
+                # Calculate returns
                 market_returns = index_data['close'].pct_change().dropna()
                 
-                logger.info(f"成功使用AKShare获取市场收益率数据: {len(market_returns)} 条记录")
+                logger.info(f"Successfully got market return data using AKShare: {len(market_returns)} records")
                 return market_returns
             else:
-                logger.warning("AKShare获取的指数数据为空，使用模拟数据")
+                logger.warning("AKShare returned empty index data, using mock data")
                 return _generate_mock_market_returns(start_date, end_date, freq)
         except Exception as e:
-            logger.warning(f"使用AKShare获取市场收益率失败: {e}")
-            logger.warning("将使用模拟数据")
+            logger.warning(f"Failed to get market returns using AKShare: {e}")
+            logger.warning("Will use mock data")
     
     except Exception as e:
-        logger.error(f"获取市场收益率时出错: {e}")
+        logger.error(f"Error getting market returns: {e}")
         logger.error(traceback.format_exc())
     
-    # 如果所有尝试都失败，使用模拟数据
+    # If all attempts fail, use mock data
     return _generate_mock_market_returns(start_date, end_date, freq)
 
 def _generate_mock_market_returns(start_date: str, end_date: str, freq: str = 'D') -> pd.Series:
     """
-    生成模拟的市场收益率数据
+    Generate mock market return data
     
     Args:
-        start_date: 开始日期
-        end_date: 结束日期
-        freq: 数据频率，'D'为日度，'W'为周度，'M'为月度
+        start_date: Start date
+        end_date: End date
+        freq: Data frequency, 'D' for daily, 'W' for weekly, 'M' for monthly
         
     Returns:
-        模拟的市场收益率Series
+        Mock market return Series
     """
-    logger.info(f"生成模拟市场收益率数据, 频率: {freq}")
+    logger.info(f"Generating mock market return data, frequency: {freq}")
     
-    # 处理日期参数
+    # Handle date parameters
     if not end_date:
         end_date = datetime.now().strftime("%Y-%m-%d")
     if not start_date:
-        # 默认生成一年的数据
+        # Default to generate one year of data
         start_date = (datetime.strptime(end_date, "%Y-%m-%d") - timedelta(days=365)).strftime("%Y-%m-%d")
     
-    # 确保日期格式一致
+    # Ensure consistent date format
     if isinstance(start_date, str) and len(start_date) == 8:
         start_date = f"{start_date[:4]}-{start_date[4:6]}-{start_date[6:]}"
     if isinstance(end_date, str) and len(end_date) == 8:
         end_date = f"{end_date[:4]}-{end_date[4:6]}-{end_date[6:]}"
     
-    # 生成日期范围，根据频率
+    # Generate date range based on frequency
     if freq == 'W':
         date_range = pd.date_range(start=start_date, end=end_date, freq='W-FRI')
-        # 均值和标准差调整为周度
+        # Adjust mean and std for weekly
         mean_return = 0.002
         std_return = 0.02
     elif freq == 'M':
         date_range = pd.date_range(start=start_date, end=end_date, freq='M')
-        # 均值和标准差调整为月度
+        # Adjust mean and std for monthly
         mean_return = 0.008
         std_return = 0.04
-    else:  # 日频率
+    else:  # Daily frequency
         date_range = pd.date_range(start=start_date, end=end_date, freq='B')
-        # 均值和标准差调整为日度
+        # Adjust mean and std for daily
         mean_return = 0.0005
         std_return = 0.01
     
-    # 生成模拟的市场收益率
-    np.random.seed(42)  # 设置随机种子以保证可复现性
+    # Generate mock market returns
+    np.random.seed(42)  # Set random seed for reproducibility
     returns = np.random.normal(mean_return, std_return, len(date_range))
     
-    # 创建Series
+    # Create Series
     market_returns = pd.Series(returns, index=date_range)
     
     return market_returns
@@ -240,20 +240,20 @@ def get_stock_returns(symbols: Union[str, list],
                      end_date: str = None,
                      freq: str = 'D') -> Dict[str, pd.Series]:
     """
-    获取一个或多个股票的收益率数据
+    Get return data for one or more stocks
     
     Args:
-        symbols: 单个股票代码或股票代码列表
-        start_date: 开始日期，格式：YYYY-MM-DD
-        end_date: 结束日期，格式：YYYY-MM-DD
-        freq: 数据频率，'D'为日度，'W'为周度，'M'为月度
+        symbols: Single stock code or list of stock codes
+        start_date: Start date, format: YYYY-MM-DD
+        end_date: End date, format: YYYY-MM-DD
+        freq: Data frequency, 'D' for daily, 'W' for weekly, 'M' for monthly
         
     Returns:
-        包含股票收益率的字典，键为股票代码，值为收益率Series
+        Dictionary containing stock returns, key is stock code, value is return Series
     """
-    logger.info(f"获取股票收益率数据: {start_date} 至 {end_date}, 频率: {freq}")
+    logger.info(f"Getting stock return data: {start_date} to {end_date}, frequency: {freq}")
     
-    # 转换为列表类型
+    # Convert to list type
     if isinstance(symbols, str):
         symbols = [symbols]
     
@@ -261,7 +261,7 @@ def get_stock_returns(symbols: Union[str, list],
     
     for symbol in symbols:
         try:
-            # 尝试使用TuShare获取数据
+            # Try using TuShare to get data
             try:
                 import tushare as ts
                 token = os.environ.get('TUSHARE_TOKEN', '')
@@ -269,7 +269,7 @@ def get_stock_returns(symbols: Union[str, list],
                     ts.set_token(token)
                     pro = ts.pro_api()
                     
-                    # 处理日期格式
+                    # Handle date format
                     ts_start = start_date
                     ts_end = end_date
                     
@@ -279,7 +279,7 @@ def get_stock_returns(symbols: Union[str, list],
                     if ts_end and '-' in ts_end:
                         ts_end = ts_end.replace('-', '')
                     
-                    # 处理股票代码
+                    # Handle stock code
                     ts_code = symbol
                     if not ts_code.endswith(('.SH', '.SZ', '.BJ')):
                         if ts_code.startswith('6'):
@@ -291,7 +291,7 @@ def get_stock_returns(symbols: Union[str, list],
                         else:
                             ts_code = f"{ts_code}.SH"
                     
-                    # 根据频率获取不同周期的数据
+                    # Get data for different periods based on frequency
                     stock_data = None
                     
                     try:
@@ -299,26 +299,26 @@ def get_stock_returns(symbols: Union[str, list],
                             stock_data = pro.weekly(ts_code=ts_code, start_date=ts_start, end_date=ts_end)
                         elif freq == 'M':
                             stock_data = pro.monthly(ts_code=ts_code, start_date=ts_start, end_date=ts_end)
-                        else:  # 日频率
+                        else:  # Daily frequency
                             stock_data = pro.daily(ts_code=ts_code, start_date=ts_start, end_date=ts_end)
                     except Exception as e:
-                        logger.warning(f"使用TuShare获取股票 {symbol} 数据失败: {e}")
+                        logger.warning(f"Failed to get stock {symbol} data using TuShare: {e}")
                         
-                    # 如果特定频率API调用失败，尝试获取日度数据然后重采样
+                    # If specific frequency API call fails, try to get daily data and resample
                     if stock_data is None or stock_data.empty:
                         try:
-                            logger.info(f"尝试获取日度数据然后重采样: {ts_code}")
+                            logger.info(f"Trying to get daily data and resample: {ts_code}")
                             stock_data = pro.daily(ts_code=ts_code, start_date=ts_start, end_date=ts_end)
                         except Exception as e:
-                            logger.warning(f"使用TuShare获取日度股票数据失败: {e}")
+                            logger.warning(f"Failed to get daily stock data using TuShare: {e}")
                     
                     if stock_data is not None and not stock_data.empty:
-                        # 处理数据
+                        # Process data
                         stock_data['trade_date'] = pd.to_datetime(stock_data['trade_date'])
                         stock_data = stock_data.sort_values('trade_date')
                         stock_data = stock_data.set_index('trade_date')
                         
-                        # 如果需要重采样
+                        # If resampling is needed
                         if freq != 'D' and 'close' in stock_data.columns:
                             if freq == 'W':
                                 close_price = stock_data['close'].resample('W-FRI').last()
@@ -329,29 +329,29 @@ def get_stock_returns(symbols: Union[str, list],
                         else:
                             close_price = stock_data['close']
                         
-                        # 计算收益率
+                        # Calculate returns
                         returns = close_price.pct_change().dropna()
                         
                         if not returns.empty:
                             returns_dict[symbol] = returns
-                            logger.info(f"成功使用TuShare获取股票 {symbol} 收益率数据: {len(returns)} 条记录")
+                            logger.info(f"Successfully got stock {symbol} return data using TuShare: {len(returns)} records")
                             continue
             except ImportError:
-                logger.warning("未找到tushare库，尝试使用AKShare")
+                logger.warning("tushare library not found, trying AKShare")
             
-            # 使用数据API获取股票价格数据
+            # Use data API to get stock price data
             prices = data_api.get_price_data(symbol, start_date, end_date)
             
             if prices.empty:
-                logger.warning(f"无法获取股票 {symbol} 的价格数据")
+                logger.warning(f"Unable to get price data for stock {symbol}")
                 continue
             
-            # 确保日期列为日期类型
+            # Ensure date column is datetime type
             if 'date' in prices.columns:
                 prices['date'] = pd.to_datetime(prices['date'])
                 prices = prices.set_index('date')
             
-            # 根据频率重采样
+            # Resample based on frequency
             if freq == 'W' and 'close' in prices.columns:
                 close_price = prices['close'].resample('W-FRI').last()
             elif freq == 'M' and 'close' in prices.columns:
@@ -359,18 +359,18 @@ def get_stock_returns(symbols: Union[str, list],
             elif 'close' in prices.columns:
                 close_price = prices['close']
             else:
-                logger.warning(f"股票 {symbol} 价格数据中不包含close列")
+                logger.warning(f"Stock {symbol} price data does not contain close column")
                 continue
             
-            # 计算收益率
+            # Calculate returns
             returns = close_price.pct_change().dropna()
             
             if not returns.empty:
                 returns_dict[symbol] = returns
-                logger.info(f"成功获取股票 {symbol} 收益率数据: {len(returns)} 条记录")
+                logger.info(f"Successfully got stock {symbol} return data: {len(returns)} records")
                 
         except Exception as e:
-            logger.error(f"获取股票 {symbol} 收益率时出错: {e}")
+            logger.error(f"Error getting stock {symbol} returns: {e}")
             logger.error(traceback.format_exc())
     
     return returns_dict
@@ -380,28 +380,28 @@ def get_multi_stock_returns(symbols: list,
                            end_date: str = None,
                            freq: str = 'D') -> pd.DataFrame:
     """
-    获取多个股票的收益率数据并合并为DataFrame
+    Get return data for multiple stocks and merge into DataFrame
     
     Args:
-        symbols: 股票代码列表
-        start_date: 开始日期，格式：YYYY-MM-DD
-        end_date: 结束日期，格式：YYYY-MM-DD
-        freq: 数据频率，'D'为日度，'W'为周度，'M'为月度
+        symbols: List of stock codes
+        start_date: Start date, format: YYYY-MM-DD
+        end_date: End date, format: YYYY-MM-DD
+        freq: Data frequency, 'D' for daily, 'W' for weekly, 'M' for monthly
         
     Returns:
-        包含多个股票收益率的DataFrame，列为股票代码，索引为日期
+        DataFrame containing multiple stock returns, columns are stock codes, index is date
     """
-    logger.info(f"获取多股票收益率数据: {start_date} 至 {end_date}, 股票数量: {len(symbols)}, 频率: {freq}")
+    logger.info(f"Getting multi-stock return data: {start_date} to {end_date}, stock count: {len(symbols)}, frequency: {freq}")
     
-    # 获取各股票收益率
+    # Get returns for each stock
     returns_dict = get_stock_returns(symbols, start_date, end_date, freq)
     
-    # 如果没有获取到数据，返回空DataFrame
+    # If no data is obtained, return empty DataFrame
     if not returns_dict:
-        logger.warning("未获取到任何股票收益率数据")
+        logger.warning("No stock return data obtained")
         return pd.DataFrame()
     
-    # 合并为DataFrame
+    # Merge into DataFrame
     df = pd.DataFrame(returns_dict)
     
     return df
@@ -412,42 +412,42 @@ def get_stock_covariance_matrix(symbols: list,
                                method: str = "sample",
                                freq: str = 'D') -> tuple:
     """
-    计算多个股票收益率的协方差矩阵和平均收益率
+    Calculate covariance matrix and average returns for multiple stock returns
     
     Args:
-        symbols: 股票代码列表
-        start_date: 开始日期，格式：YYYY-MM-DD
-        end_date: 结束日期，格式：YYYY-MM-DD
-        method: 协方差矩阵估计方法，可选 "sample", "ewma"
-        freq: 数据频率，'D'为日度，'W'为周度，'M'为月度
+        symbols: List of stock codes
+        start_date: Start date, format: YYYY-MM-DD
+        end_date: End date, format: YYYY-MM-DD
+        method: Covariance matrix estimation method, options "sample", "ewma"
+        freq: Data frequency, 'D' for daily, 'W' for weekly, 'M' for monthly
         
     Returns:
-        (协方差矩阵DataFrame, 平均收益率Series)的元组
+        Tuple of (covariance matrix DataFrame, average returns Series)
     """
-    logger.info(f"计算股票协方差矩阵: {start_date} 至 {end_date}, 股票数量: {len(symbols)}, 方法: {method}")
+    logger.info(f"Calculating stock covariance matrix: {start_date} to {end_date}, stock count: {len(symbols)}, method: {method}")
     
-    # 获取多股票收益率数据
+    # Get multi-stock return data
     returns_df = get_multi_stock_returns(symbols, start_date, end_date, freq)
     
-    # 如果没有获取到数据，返回空DataFrame
+    # If no data is obtained, return empty DataFrame
     if returns_df.empty:
-        logger.warning("未获取到股票收益率数据，无法计算协方差矩阵")
+        logger.warning("No stock return data obtained, cannot calculate covariance matrix")
         return pd.DataFrame(), pd.Series()
     
     try:
-        # 计算协方差矩阵
+        # Calculate covariance matrix
         if method == "ewma":
-            # 导入EWMA协方差矩阵估计函数
+            # Import EWMA covariance matrix estimation function
             from src.calc.covariance_estimation import estimate_covariance_ewma
             cov_matrix = estimate_covariance_ewma(returns_df)
         else:
-            # 使用样本协方差矩阵
+            # Use sample covariance matrix
             cov_matrix = returns_df.cov()
         
-        # 计算平均收益率
+        # Calculate average returns
         expected_returns = returns_df.mean()
         
-        # 年化处理（根据频率）
+        # Annualization (based on frequency)
         if freq == 'D':
             annualization_factor = 252
         elif freq == 'W':
@@ -462,7 +462,7 @@ def get_stock_covariance_matrix(symbols: list,
         
         return cov_matrix, expected_returns
     except Exception as e:
-        logger.error(f"计算协方差矩阵时出错: {e}")
+        logger.error(f"Error calculating covariance matrix: {e}")
         logger.error(traceback.format_exc())
         return pd.DataFrame(), pd.Series()
 
@@ -472,22 +472,22 @@ def get_index_data(index_symbol: str = "000300",
                   end_date: str = None,
                   freq: str = 'D') -> pd.DataFrame:
     """
-    获取指数数据
+    Get index data
     
     Args:
-        index_symbol: 指数代码，默认为沪深300
-        fields: 要获取的字段列表，为None则获取所有可用字段
-        start_date: 开始日期，格式：YYYY-MM-DD
-        end_date: 结束日期，格式：YYYY-MM-DD
-        freq: 数据频率，'D'为日度，'W'为周度，'M'为月度
+        index_symbol: Index code, default is CSI 300
+        fields: List of fields to get, if None then get all available fields
+        start_date: Start date, format: YYYY-MM-DD
+        end_date: End date, format: YYYY-MM-DD
+        freq: Data frequency, 'D' for daily, 'W' for weekly, 'M' for monthly
         
     Returns:
-        包含指数数据的DataFrame
+        DataFrame containing index data
     """
-    logger.info(f"获取指数数据: {index_symbol}, {start_date} 至 {end_date}, 频率: {freq}")
+    logger.info(f"Getting index data: {index_symbol}, {start_date} to {end_date}, frequency: {freq}")
     
     try:
-        # 尝试使用TuShare API
+        # Try using TuShare API
         try:
             import tushare as ts
             token = os.environ.get('TUSHARE_TOKEN', '')
@@ -495,7 +495,7 @@ def get_index_data(index_symbol: str = "000300",
                 ts.set_token(token)
                 pro = ts.pro_api()
                 
-                # 处理日期格式
+                # Handle date format
                 ts_start = start_date
                 ts_end = end_date
                 
@@ -505,7 +505,7 @@ def get_index_data(index_symbol: str = "000300",
                 if ts_end and '-' in ts_end:
                     ts_end = ts_end.replace('-', '')
                 
-                # 处理指数代码
+                # Process index code
                 ts_code = index_symbol
                 if not ts_code.endswith(('.SH', '.SZ', '.BJ')):
                     if ts_code.startswith('0'):
@@ -515,7 +515,7 @@ def get_index_data(index_symbol: str = "000300",
                     else:
                         ts_code = f"{ts_code}.SH"
                 
-                # 获取指数数据
+                # Get index data
                 index_data = None
                 
                 try:
@@ -523,30 +523,30 @@ def get_index_data(index_symbol: str = "000300",
                         index_data = pro.index_weekly(ts_code=ts_code, start_date=ts_start, end_date=ts_end)
                     elif freq == 'M':
                         index_data = pro.index_monthly(ts_code=ts_code, start_date=ts_start, end_date=ts_end)
-                    else:  # 日频率
+                    else:  # Daily frequency
                         index_data = pro.index_daily(ts_code=ts_code, start_date=ts_start, end_date=ts_end)
                 except Exception as e:
-                    logger.warning(f"使用TuShare获取指数数据失败: {e}")
+                    logger.warning(f"Failed to get index data using TuShare: {e}")
                     
-                # 如果特定频率API调用失败，尝试获取日度数据然后重采样
+                # If specific frequency API call fails, try to get daily data and resample
                 if index_data is None or index_data.empty:
                     try:
-                        logger.info("尝试获取日度数据然后重采样")
+                        logger.info("Trying to get daily data and resample")
                         index_data = pro.index_daily(ts_code=ts_code, start_date=ts_start, end_date=ts_end)
                     except Exception as e:
-                        logger.warning(f"使用TuShare获取日度指数数据失败: {e}")
+                        logger.warning(f"Failed to get daily index data using TuShare: {e}")
                 
                 if index_data is not None and not index_data.empty:
-                    # 处理数据
+                    # Process data
                     index_data['trade_date'] = pd.to_datetime(index_data['trade_date'])
                     index_data = index_data.sort_values('trade_date')
                     
-                    # 如果需要重采样
+                    # If resampling is needed
                     if freq != 'D' and index_data['trade_date'].dt.freq != freq:
                         index_data = index_data.set_index('trade_date')
                         
                         if freq == 'W':
-                            # 对于OHLC列使用特定重采样方法
+                            # Use specific resampling methods for OHLC columns
                             resampled_data = pd.DataFrame()
                             if 'open' in index_data.columns:
                                 resampled_data['open'] = index_data['open'].resample('W-FRI').first()
@@ -561,7 +561,7 @@ def get_index_data(index_symbol: str = "000300",
                             if 'amount' in index_data.columns:
                                 resampled_data['amount'] = index_data['amount'].resample('W-FRI').sum()
                             
-                            # 添加其他字段
+                            # Add other fields
                             for col in index_data.columns:
                                 if col not in ['open', 'high', 'low', 'close', 'vol', 'amount']:
                                     resampled_data[col] = index_data[col].resample('W-FRI').last()
@@ -569,7 +569,7 @@ def get_index_data(index_symbol: str = "000300",
                             index_data = resampled_data.reset_index()
                             
                         elif freq == 'M':
-                            # 对于OHLC列使用特定重采样方法
+                            # Use specific resampling methods for OHLC columns
                             resampled_data = pd.DataFrame()
                             if 'open' in index_data.columns:
                                 resampled_data['open'] = index_data['open'].resample('M').first()
@@ -584,45 +584,45 @@ def get_index_data(index_symbol: str = "000300",
                             if 'amount' in index_data.columns:
                                 resampled_data['amount'] = index_data['amount'].resample('M').sum()
                             
-                            # 添加其他字段
+                            # Add other fields
                             for col in index_data.columns:
                                 if col not in ['open', 'high', 'low', 'close', 'vol', 'amount']:
                                     resampled_data[col] = index_data[col].resample('M').last()
                             
                             index_data = resampled_data.reset_index()
                     
-                    # 如果指定了字段，只返回指定字段
+                    # If fields are specified, only return specified fields
                     if fields:
                         available_fields = set(index_data.columns)
                         requested_fields = set(fields)
                         missing_fields = requested_fields - available_fields
                         
                         if missing_fields:
-                            logger.warning(f"请求的字段不可用: {missing_fields}")
+                            logger.warning(f"Requested fields not available: {missing_fields}")
                         
                         selected_fields = list(requested_fields & available_fields)
                         if not selected_fields:
-                            logger.warning("没有可用的请求字段")
+                            logger.warning("No available requested fields")
                             return pd.DataFrame()
                         
                         return index_data[selected_fields]
                     
-                    logger.info(f"成功使用TuShare获取指数数据: {len(index_data)} 条记录")
+                    logger.info(f"Successfully got index data using TuShare: {len(index_data)} records")
                     return index_data
                 else:
-                    logger.warning("TuShare获取的指数数据为空，尝试使用AKShare")
+                    logger.warning("TuShare returned empty index data, trying AKShare")
         except ImportError:
-            logger.warning("未找到tushare库，尝试使用AKShare")
+            logger.warning("tushare library not found, trying AKShare")
         
-        # 尝试使用AKShare
+        # Try using AKShare
         try:
             import akshare as ak
             
-            # 处理指数代码
+            # Process index code
             if index_symbol.endswith(('.SH', '.SZ', '.BJ')):
                 index_symbol = index_symbol[:-3]
             
-            # 为指数代码添加前缀
+            # Add prefix to index code
             if not index_symbol.startswith(('sh', 'sz', 'bj')):
                 if index_symbol.startswith('0'):
                     ak_index_code = f"sh{index_symbol}"
@@ -633,19 +633,19 @@ def get_index_data(index_symbol: str = "000300",
             else:
                 ak_index_code = index_symbol
             
-            # 处理日期格式
+            # Handle date format
             if not end_date:
                 end_date = datetime.now().strftime("%Y-%m-%d")
             if not start_date:
                 start_date = (datetime.strptime(end_date, "%Y-%m-%d") - timedelta(days=365)).strftime("%Y-%m-%d")
             
-            # 确保日期格式为YYYY-MM-DD
+            # Ensure date format is YYYY-MM-DD
             if len(start_date) == 8:
                 start_date = f"{start_date[:4]}-{start_date[4:6]}-{start_date[6:]}"
             if len(end_date) == 8:
                 end_date = f"{end_date[:4]}-{end_date[4:6]}-{end_date[6:]}"
             
-            # 获取指数数据
+            # Get index data
             if freq == 'W':
                 period = "weekly"
             elif freq == 'M':
@@ -656,16 +656,16 @@ def get_index_data(index_symbol: str = "000300",
             index_data = ak.stock_zh_index_daily(symbol=ak_index_code, period=period)
             
             if not index_data.empty:
-                # 处理日期
+                # Process date
                 index_data['date'] = pd.to_datetime(index_data['date'])
                 
-                # 过滤日期范围
+                # Filter date range
                 index_data = index_data[(index_data['date'] >= pd.to_datetime(start_date)) & 
                                       (index_data['date'] <= pd.to_datetime(end_date))]
                 
-                # 如果指定了字段，只返回指定字段
+                # If fields are specified, only return specified fields
                 if fields:
-                    # 映射字段名
+                    # Map field names
                     field_mapping = {
                         'open': 'open',
                         'high': 'high',
@@ -677,7 +677,7 @@ def get_index_data(index_symbol: str = "000300",
                         'pct_chg': 'pct_change'
                     }
                     
-                    # 转换字段名
+                    # Convert field names
                     converted_fields = []
                     for field in fields:
                         if field in field_mapping and field_mapping[field] in index_data.columns:
@@ -686,7 +686,7 @@ def get_index_data(index_symbol: str = "000300",
                             converted_fields.append(field)
                     
                     if not converted_fields:
-                        logger.warning("没有可用的请求字段")
+                        logger.warning("No available requested fields")
                         return pd.DataFrame()
                     
                     if 'date' not in converted_fields:
@@ -694,22 +694,22 @@ def get_index_data(index_symbol: str = "000300",
                     
                     return index_data[converted_fields]
                 
-                logger.info(f"成功使用AKShare获取指数数据: {len(index_data)} 条记录")
+                logger.info(f"Successfully got index data using AKShare: {len(index_data)} records")
                 return index_data
             else:
-                logger.warning("AKShare获取的指数数据为空")
+                logger.warning("AKShare returned empty index data")
                 return pd.DataFrame()
         except ImportError:
-            logger.warning("未找到akshare库")
+            logger.warning("akshare library not found")
         except Exception as e:
-            logger.warning(f"使用AKShare获取指数数据失败: {e}")
+            logger.warning(f"Failed to get index data using AKShare: {e}")
     
     except Exception as e:
-        logger.error(f"获取指数数据时出错: {e}")
+        logger.error(f"Error getting index data: {e}")
         logger.error(traceback.format_exc())
     
-    # 如果所有尝试都失败，返回空DataFrame
-    logger.warning("所有尝试获取指数数据都失败")
+    # If all attempts fail, return empty DataFrame
+    logger.warning("All attempts to get index data failed")
     return pd.DataFrame()
 
 def get_multiple_index_data(index_symbols: List[str],
@@ -717,18 +717,18 @@ def get_multiple_index_data(index_symbols: List[str],
                            end_date: str = None,
                            freq: str = 'D') -> Dict[str, pd.DataFrame]:
     """
-    获取多个指数的数据
+    Get data for multiple indices
     
     Args:
-        index_symbols: 指数代码列表
-        start_date: 开始日期，格式：YYYY-MM-DD
-        end_date: 结束日期，格式：YYYY-MM-DD
-        freq: 数据频率，'D'为日度，'W'为周度，'M'为月度
+        index_symbols: List of index codes
+        start_date: Start date, format: YYYY-MM-DD
+        end_date: End date, format: YYYY-MM-DD
+        freq: Data frequency, 'D' for daily, 'W' for weekly, 'M' for monthly
         
     Returns:
-        包含多个指数数据的字典，键为指数代码，值为指数数据DataFrame
+        Dictionary containing multiple index data, key is index code, value is index data DataFrame
     """
-    logger.info(f"获取多指数数据: {start_date} 至 {end_date}, 指数数量: {len(index_symbols)}, 频率: {freq}")
+    logger.info(f"Getting multiple index data: {start_date} to {end_date}, index count: {len(index_symbols)}, frequency: {freq}")
     
     index_data_dict = {}
     
@@ -738,12 +738,12 @@ def get_multiple_index_data(index_symbols: List[str],
             
             if not index_data.empty:
                 index_data_dict[symbol] = index_data
-                logger.info(f"成功获取指数 {symbol} 数据: {len(index_data)} 条记录")
+                logger.info(f"Successfully got index {symbol} data: {len(index_data)} records")
             else:
-                logger.warning(f"无法获取指数 {symbol} 数据")
+                logger.warning(f"Unable to get index {symbol} data")
                 
         except Exception as e:
-            logger.error(f"获取指数 {symbol} 数据时出错: {e}")
+            logger.error(f"Error getting index {symbol} data: {e}")
             logger.error(traceback.format_exc())
     
     return index_data_dict

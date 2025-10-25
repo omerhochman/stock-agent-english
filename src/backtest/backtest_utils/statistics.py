@@ -4,8 +4,8 @@ from typing import Dict, Any
 
 class StatisticalAnalyzer:
     """
-    统计分析器
-    提供各种统计检验和分析功能
+    Statistical Analyzer
+    Provides various statistical tests and analysis functions
     """
     
     def __init__(self):
@@ -13,21 +13,21 @@ class StatisticalAnalyzer:
     
     def normality_test(self, data: np.ndarray) -> Dict[str, Any]:
         """
-        正态性检验
+        Normality test
         
         Args:
-            data: 数据序列
+            data: Data series
             
         Returns:
-            Dict: 检验结果
+            Dict: Test results
         """
-        # Shapiro-Wilk检验
+        # Shapiro-Wilk test
         shapiro_stat, shapiro_p = stats.shapiro(data)
         
-        # Jarque-Bera检验
+        # Jarque-Bera test
         jb_stat, jb_p = stats.jarque_bera(data)
         
-        # Kolmogorov-Smirnov检验
+        # Kolmogorov-Smirnov test
         ks_stat, ks_p = stats.kstest(data, 'norm')
         
         return {
@@ -51,18 +51,18 @@ class StatisticalAnalyzer:
     
     def autocorrelation_test(self, data: np.ndarray, lags: int = 10) -> Dict[str, Any]:
         """
-        自相关检验
+        Autocorrelation test
         
         Args:
-            data: 数据序列
-            lags: 滞后期数
+            data: Data series
+            lags: Number of lags
             
         Returns:
-            Dict: 检验结果
+            Dict: Test results
         """
         from statsmodels.stats.diagnostic import acorr_ljungbox
         
-        # Ljung-Box检验
+        # Ljung-Box test
         lb_result = acorr_ljungbox(data, lags=lags, return_df=True)
         
         return {
@@ -73,20 +73,20 @@ class StatisticalAnalyzer:
     
     def stationarity_test(self, data: np.ndarray) -> Dict[str, Any]:
         """
-        平稳性检验
+        Stationarity test
         
         Args:
-            data: 数据序列
+            data: Data series
             
         Returns:
-            Dict: 检验结果
+            Dict: Test results
         """
         from statsmodels.tsa.stattools import adfuller, kpss
         
-        # ADF检验
+        # ADF test
         adf_result = adfuller(data)
         
-        # KPSS检验
+        # KPSS test
         kpss_result = kpss(data)
         
         return {
@@ -106,14 +106,14 @@ class StatisticalAnalyzer:
     
     def outlier_detection(self, data: np.ndarray, method: str = 'iqr') -> Dict[str, Any]:
         """
-        异常值检测
+        Outlier detection
         
         Args:
-            data: 数据序列
-            method: 检测方法 ('iqr', 'zscore', 'modified_zscore')
+            data: Data series
+            method: Detection method ('iqr', 'zscore', 'modified_zscore')
             
         Returns:
-            Dict: 检测结果
+            Dict: Detection results
         """
         outliers_mask = np.zeros(len(data), dtype=bool)
         

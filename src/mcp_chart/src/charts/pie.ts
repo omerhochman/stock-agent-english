@@ -13,7 +13,7 @@ const schema = z.object({
   data: z
     .array(data)
     .describe(
-      "Data for pie chart, such as, [{ category: '分类一', value: 27 }].",
+      "Data for pie chart, such as, [{ category: 'Category 1', value: 27 }].",
     )
     .nonempty({ message: "Pie chart data cannot be empty." }),
   innerRadius: z

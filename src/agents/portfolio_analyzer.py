@@ -16,37 +16,37 @@ from src.tools.factor_data_api import (
 )
 from src.utils.logging_config import setup_logger
 
-# 设置日志记录器
+# Setup logger
 logger = setup_logger('portfolio_analyzer_agent')
 
-@agent_endpoint("portfolio_analyzer", "投资组合分析师，分析多资产组合表现、进行组合优化和风险评估")
+@agent_endpoint("portfolio_analyzer", "Portfolio analyst, analyzing multi-asset portfolio performance, conducting portfolio optimization and risk assessment")
 def portfolio_analyzer_agent(state: AgentState):
-    """负责多资产投资组合分析、优化和风险评估"""
+    """Responsible for multi-asset portfolio analysis, optimization and risk assessment"""
     show_workflow_status("Portfolio Analyzer")
     show_reasoning = state["metadata"]["show_reasoning"]
     data = state["data"]
     
-    # 从数据中获取资产列表
+    # Get asset list from data
     tickers = data.get("tickers", [])
     if isinstance(tickers, str):
         tickers = [ticker.strip() for ticker in tickers.split(',')]
     
-    # 如果只有一个资产或没有资产，静默跳过投资组合分析
+    # If only one asset or no assets, silently skip portfolio analysis
     if not tickers or len(tickers) < 2:
-        # 对于单资产分析，不显示警告，直接返回简单的分析结果
+        # For single asset analysis, don't show warning, directly return simple analysis result
         if len(tickers) == 1:
-            logger.info(f"单资产分析模式: {tickers[0]}")
+            logger.info(f"Single asset analysis mode: {tickers[0]}")
             message_content = {
                 "analysis_type": "single_asset",
                 "ticker": tickers[0],
-                "note": "单资产分析，跳过投资组合优化",
+                "note": "Single asset analysis, skipping portfolio optimization",
                 "portfolio_analysis": None
             }
         else:
-            logger.info("未提供资产代码，跳过投资组合分析")
+            logger.info("No asset codes provided, skipping portfolio analysis")
             message_content = {
                 "analysis_type": "no_assets",
-                "note": "未提供资产代码，跳过投资组合分析",
+                "note": "No asset codes provided, skipping portfolio analysis",
                 "portfolio_analysis": None
             }
         
@@ -60,38 +60,38 @@ def portfolio_analyzer_agent(state: AgentState):
             "metadata": state["metadata"],
         }
     
-    # 获取时间范围
+    # Get time range
     start_date = data.get("start_date")
     end_date = data.get("end_date")
     
-    # 调用factor_data_api获取多个股票的收益率
+    # Call factor_data_api to get returns for multiple stocks
     try:
-        logger.info(f"获取多个股票收益率: {tickers}")
+        logger.info(f"Getting returns for multiple stocks: {tickers}")
         returns_df = get_multi_stock_returns(tickers, start_date, end_date)
         
         if returns_df.empty:
-            raise ValueError("无法获取股票收益率数据")
+            raise ValueError("Unable to get stock returns data")
             
-        # 计算协方差矩阵和预期收益率
-        logger.info("计算协方差矩阵和预期收益率")
+        # Calculate covariance matrix and expected returns
+        logger.info("Calculating covariance matrix and expected returns")
         cov_matrix, expected_returns = get_stock_covariance_matrix(tickers, start_date, end_date)
         
-        # 当前市场情况下的无风险利率
-        risk_free_rate = 0.03  # 可以根据实际情况调整
+        # Risk-free rate under current market conditions
+        risk_free_rate = 0.03  # Can be adjusted based on actual situation
         
-        # 投资组合优化分析
+        # Portfolio optimization analysis
         portfolio_analysis = analyze_portfolio(tickers, returns_df, cov_matrix, expected_returns, risk_free_rate)
         
-        # 风险分析
+        # Risk analysis
         risk_analysis = analyze_portfolio_risk(returns_df)
         
-        # 滚动Beta分析
+        # Rolling Beta analysis
         beta_analysis = analyze_rolling_betas(tickers, start_date, end_date)
         
-        # 生成有效前沿
+        # Generate efficient frontier
         ef_results = generate_efficient_frontier(expected_returns, cov_matrix, risk_free_rate)
         
-        # 组合分析结果
+        # Portfolio analysis results
         message_content = {
             "tickers": tickers,
             "portfolio_analysis": portfolio_analysis,
@@ -102,22 +102,22 @@ def portfolio_analyzer_agent(state: AgentState):
         }
         
     except Exception as e:
-        logger.error(f"投资组合分析失败: {str(e)}")
+        logger.error(f"Portfolio analysis failed: {str(e)}")
         message_content = {
-            "error": f"投资组合分析过程中发生错误: {str(e)}",
+            "error": f"Error occurred during portfolio analysis: {str(e)}",
             "tickers": tickers
         }
     
-    # 创建消息
+    # Create message
     message = HumanMessage(
         content=json.dumps(message_content),
         name="portfolio_analyzer_agent",
     )
     
-    # 显示推理过程
+    # Show reasoning process
     if show_reasoning:
         show_agent_reasoning(message_content, "Portfolio Analyzer Agent")
-        # 保存推理信息到metadata供API使用
+        # Save reasoning information to metadata for API use
         state["metadata"]["agent_reasoning"] = message_content
     
     show_workflow_status("Portfolio Analyzer", "completed")
@@ -132,15 +132,15 @@ def portfolio_analyzer_agent(state: AgentState):
 
 def analyze_portfolio(tickers, returns_df, cov_matrix, expected_returns, risk_free_rate=0.03):
     """
-    分析投资组合的各种组合情况
+    Analyze various portfolio combinations
     """
-    # 计算等权重投资组合
+    # Calculate equal weight portfolio
     equal_weights = pd.Series(1/len(tickers), index=tickers)
     equal_return = portfolio_return(equal_weights.values, expected_returns.values)
     equal_volatility = portfolio_volatility(equal_weights.values, cov_matrix.values)
     equal_sharpe = portfolio_sharpe_ratio(equal_weights.values, expected_returns.values, cov_matrix.values, risk_free_rate)
     
-    # 最大夏普比率投资组合
+    # Maximum Sharpe ratio portfolio
     try:
         max_sharpe_portfolio = optimize_portfolio(
             expected_returns=expected_returns,
@@ -149,7 +149,7 @@ def analyze_portfolio(tickers, returns_df, cov_matrix, expected_returns, risk_fr
             objective='sharpe'
         )
         
-        # 最小风险投资组合
+        # Minimum risk portfolio
         min_risk_portfolio = optimize_portfolio(
             expected_returns=expected_returns,
             cov_matrix=cov_matrix,
@@ -157,14 +157,14 @@ def analyze_portfolio(tickers, returns_df, cov_matrix, expected_returns, risk_fr
             objective='min_risk'
         )
     except Exception as e:
-        logger.error(f"投资组合优化失败: {e}")
+        logger.error(f"Portfolio optimization failed: {e}")
         max_sharpe_portfolio = {'weights': equal_weights, 'return': equal_return, 'risk': equal_volatility, 'sharpe_ratio': equal_sharpe}
         min_risk_portfolio = {'weights': equal_weights, 'return': equal_return, 'risk': equal_volatility, 'sharpe_ratio': equal_sharpe}
     
-    # 计算相关系数矩阵
+    # Calculate correlation matrix
     correlation = returns_df.corr()
     
-    # 返回分析结果
+    # Return analysis results
     return {
         "equal_weight": {
             "weights": equal_weights.to_dict(),
@@ -190,26 +190,26 @@ def analyze_portfolio(tickers, returns_df, cov_matrix, expected_returns, risk_fr
 
 def analyze_portfolio_risk(returns_df):
     """
-    分析投资组合的风险指标
+    Analyze portfolio risk metrics
     """
-    # 计算等权重投资组合收益率
+    # Calculate equal weight portfolio returns
     portfolio_returns = returns_df.mean(axis=1)
     
-    # 计算风险指标
+    # Calculate risk metrics
     var_95 = calculate_historical_var(portfolio_returns, confidence_level=0.95)
     cvar_95 = calculate_conditional_var(portfolio_returns, confidence_level=0.95)
     
-    # 计算最大回撤
+    # Calculate maximum drawdown
     cum_returns = (1 + portfolio_returns).cumprod()
     running_max = cum_returns.cummax()
     drawdown = (cum_returns / running_max - 1)
     max_drawdown = drawdown.min()
     
-    # 计算偏度和峰度
+    # Calculate skewness and kurtosis
     skewness = portfolio_returns.skew()
     kurtosis = portfolio_returns.kurt()
     
-    # 计算投资组合范围内的最佳和最差资产
+    # Calculate best and worst assets in the portfolio
     mean_returns = returns_df.mean()
     best_asset = mean_returns.idxmax()
     worst_asset = mean_returns.idxmin()
@@ -232,16 +232,16 @@ def analyze_portfolio_risk(returns_df):
 
 def analyze_rolling_betas(tickers, start_date, end_date, window=60):
     """
-    计算资产对应市场的滚动Beta系数
+    Calculate rolling Beta coefficients for assets relative to market
     """
     beta_results = {}
     for ticker in tickers:
         try:
-            # 使用factor_data_api计算滚动Beta
+            # Use factor_data_api to calculate rolling Beta
             rolling_beta = calculate_rolling_beta(ticker, window, start_date, end_date)
             
             if not rolling_beta.empty:
-                # 计算Beta的统计数据
+                # Calculate Beta statistics
                 beta_avg = rolling_beta.mean()
                 beta_std = rolling_beta.std()
                 beta_min = rolling_beta.min()
@@ -255,14 +255,14 @@ def analyze_rolling_betas(tickers, start_date, end_date, window=60):
                     "latest_beta": float(rolling_beta.iloc[-1]) if len(rolling_beta) > 0 else float(beta_avg)
                 }
         except Exception as e:
-            logger.error(f"计算{ticker}滚动Beta失败: {e}")
+            logger.error(f"Failed to calculate rolling Beta for {ticker}: {e}")
             beta_results[ticker] = {"error": str(e)}
     
     return beta_results
 
 def generate_efficient_frontier(expected_returns, cov_matrix, risk_free_rate=0.03, points=20):
     """
-    生成有效前沿
+    Generate efficient frontier
     """
     try:
         ef = efficient_frontier(
@@ -272,7 +272,7 @@ def generate_efficient_frontier(expected_returns, cov_matrix, risk_free_rate=0.0
             points=points
         )
         
-        # 转换为可序列化的字典
+        # Convert to serializable dictionary
         ef_dict = {
             "returns": ef['return'].tolist(),
             "risks": ef['risk'].tolist(),
@@ -281,37 +281,37 @@ def generate_efficient_frontier(expected_returns, cov_matrix, risk_free_rate=0.0
         
         return ef_dict
     except Exception as e:
-        logger.error(f"生成有效前沿失败: {e}")
+        logger.error(f"Failed to generate efficient frontier: {e}")
         return {"error": str(e)}
 
 def generate_summary(portfolio_analysis, risk_analysis, beta_analysis):
     """
-    生成投资组合分析总结
+    Generate portfolio analysis summary
     """
-    # 最佳投资组合
+    # Best portfolio
     max_sharpe = portfolio_analysis["max_sharpe"]
     
-    # 风险度量
+    # Risk metrics
     var_95 = risk_analysis["var_95"]
     max_drawdown = risk_analysis["max_drawdown"]
     
-    # 构建总结
+    # Build summary
     summary = []
     
-    # 最优配置建议
-    summary.append("最优投资组合配置 (最大夏普比率):")
+    # Optimal allocation recommendation
+    summary.append("Optimal Portfolio Allocation (Maximum Sharpe Ratio):")
     for ticker, weight in max_sharpe["weights"].items():
         summary.append(f"- {ticker}: {weight*100:.2f}%")
     
-    summary.append(f"该配置的预期年化收益率为 {max_sharpe['return']*100:.2f}%，波动率为 {max_sharpe['risk']*100:.2f}%，夏普比率为 {max_sharpe['sharpe_ratio']:.2f}")
+    summary.append(f"This allocation has expected annualized return of {max_sharpe['return']*100:.2f}%, volatility of {max_sharpe['risk']*100:.2f}%, and Sharpe ratio of {max_sharpe['sharpe_ratio']:.2f}")
     
-    # 风险评估
-    summary.append(f"风险评估: 95%置信水平下的VaR为 {var_95*100:.2f}%，最大回撤为 {max_drawdown*100:.2f}%")
+    # Risk assessment
+    summary.append(f"Risk Assessment: 95% confidence level VaR is {var_95*100:.2f}%, maximum drawdown is {max_drawdown*100:.2f}%")
     
-    # Beta分析
-    summary.append("各资产对市场的Beta系数:")
+    # Beta analysis
+    summary.append("Beta coefficients of each asset relative to market:")
     for ticker, beta_data in beta_analysis.items():
         if "average_beta" in beta_data:
-            summary.append(f"- {ticker}: {beta_data['average_beta']:.2f} (最近: {beta_data['latest_beta']:.2f})")
+            summary.append(f"- {ticker}: {beta_data['average_beta']:.2f} (latest: {beta_data['latest_beta']:.2f})")
     
     return "\n".join(summary)

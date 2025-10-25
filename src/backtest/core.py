@@ -28,23 +28,23 @@ from src.utils.logging_config import setup_logger
 
 @dataclass
 class BacktestConfig:
-    """回测配置类"""
+    """Backtest configuration class"""
     initial_capital: float = 100000
     start_date: str = ""
     end_date: str = ""
-    benchmark_ticker: str = "000300"  # 沪深300作为基准
-    trading_cost: float = 0.001  # 0.1%交易成本
-    slippage: float = 0.001      # 0.1%滑点
+    benchmark_ticker: str = "000300"  # CSI 300 as benchmark
+    trading_cost: float = 0.001  # 0.1% trading cost
+    slippage: float = 0.001      # 0.1% slippage
     num_of_news: int = 5
     rebalance_frequency: str = "day"
     risk_free_rate: float = 0.03
     confidence_level: float = 0.05
-    use_cache: bool = True  # 是否使用数据缓存
-    cache_ttl_days: int = 3  # 缓存有效期（天）
+    use_cache: bool = True  # Whether to use data cache
+    cache_ttl_days: int = 3  # Cache validity period (days)
     
 @dataclass 
 class BacktestResult:
-    """回测结果类"""
+    """Backtest result class"""
     strategy_name: str
     portfolio_values: List[Dict[str, Any]] = field(default_factory=list)
     trade_history: List[Dict[str, Any]] = field(default_factory=list)
@@ -54,24 +54,24 @@ class BacktestResult:
 
 class Backtester:
     """
-    回测引擎主类
-    支持多策略比较和统计显著性检验
+    Main backtest engine class
+    Supports multi-strategy comparison and statistical significance testing
     """
     
     def __init__(self, agent_function: Optional[Callable] = None, 
                  ticker: str = "", tickers: Optional[List[str]] = None,
                  config: Optional[BacktestConfig] = None, seed: int = 42):
         """
-        初始化回测器
+        Initialize backtester
         
         Args:
-            agent_function: 智能体函数
-            ticker: 主要股票代码
-            tickers: 多个股票代码列表
-            config: 回测配置
-            seed: 随机种子，确保结果可重现
+            agent_function: Agent function
+            ticker: Main stock ticker
+            tickers: List of multiple stock tickers
+            config: Backtest configuration
+            seed: Random seed to ensure reproducible results
         """
-        # 设置全局随机种子，确保结果可重现
+        # Set global random seed to ensure reproducible results
         np.random.seed(seed)
         
         self.agent_function = agent_function
@@ -79,7 +79,7 @@ class Backtester:
         self.tickers = tickers or ([ticker] if ticker else [])
         self.config = config or BacktestConfig()
         
-        # 初始化组件
+        # Initialize components
         self.logger = setup_logger('Backtester')
         self.data_processor = DataProcessor()
         self.trade_executor = TradeExecutor()
@@ -92,46 +92,46 @@ class Backtester:
         self.strategy_comparator = StrategyComparator()
         self.visualizer = BacktestVisualizer()
         
-        # API调用管理
+        # API call management
         self._api_call_count = 0
         self._api_window_start = time.time()
         self._last_api_call = 0
         
-        # 结果存储
+        # Result storage
         self.results: Dict[str, BacktestResult] = {}
         self.baseline_strategies: List[BaseStrategy] = []
         self.comparison_results: Dict[str, Any] = {}
         
-        # 验证配置
+        # Validate configuration
         self._validate_config()
         
-        # 初始化基准策略
+        # Initialize baseline strategies
         self.initialize_baseline_strategies()
         
     def _validate_config(self):
-        """验证配置参数"""
+        """Validate configuration parameters"""
         try:
             start = datetime.strptime(self.config.start_date, "%Y-%m-%d")
             end = datetime.strptime(self.config.end_date, "%Y-%m-%d")
             if start >= end:
-                raise ValueError("开始日期必须早于结束日期")
+                raise ValueError("Start date must be earlier than end date")
             if self.config.initial_capital <= 0:
-                raise ValueError("初始资金必须大于0")
-            self.logger.info("配置参数验证通过")
+                raise ValueError("Initial capital must be greater than 0")
+            self.logger.info("Configuration parameters validated successfully")
         except Exception as e:
-            self.logger.error(f"配置参数验证失败: {str(e)}")
+            self.logger.error(f"Configuration parameter validation failed: {str(e)}")
             raise
     
     def initialize_baseline_strategies(self) -> List[BaseStrategy]:
         """
-        初始化baseline策略
-        基于学术研究的经典策略集合
+        Initialize baseline strategies
+        Classic strategy collection based on academic research
         """
         strategies = [
-            # 1. 买入持有策略
+            # 1. Buy and hold strategy
             BuyHoldStrategy(allocation_ratio=1.0),
             
-            # 2. 动量策略（多参数组合）
+            # 2. Momentum strategy (multi-parameter combination)
             MomentumStrategy(
                 lookback_period=252, 
                 formation_period=63, 
@@ -146,7 +146,7 @@ class Backtester:
                 name="Momentum-Long"
             ),
             
-            # 3. 均值回归策略（多参数组合）
+            # 3. Mean reversion strategy (multi-parameter combination)
             MeanReversionStrategy(
                 lookback_period=252,
                 z_threshold=2.0,
@@ -161,7 +161,7 @@ class Backtester:
                 name="Mean-Reversion-Short"
             ),
             
-            # 4. 移动平均策略（优化参数）
+            # 4. Moving average strategy (optimized parameters)
             MovingAverageStrategy(
                 short_window=20,
                 long_window=60,
@@ -174,7 +174,7 @@ class Backtester:
                 name="Moving-Average-Short"
             ),
             
-            # 5. RSI策略（多参数组合）
+            # 5. RSI strategy (multi-parameter combination)
             RSIStrategy(
                 rsi_period=14,
                 overbought=70,
@@ -182,7 +182,7 @@ class Backtester:
                 name="RSI-Standard"
             ),
             
-            # 6. 布林带策略（均值回归和突破模式）
+            # 6. Bollinger Bands strategy (mean reversion and breakout modes)
             BollingerStrategy(
                 period=20,
                 std_dev=2.0,
@@ -196,7 +196,7 @@ class Backtester:
                 name="Bollinger-Breakout"
             ),
             
-            # 7. MACD策略（多参数组合）
+            # 7. MACD strategy (multi-parameter combination)
             MACDStrategy(
                 fast_period=12,
                 slow_period=26,
@@ -210,37 +210,37 @@ class Backtester:
                 name="MACD-Fast"
             ),
             
-            # 8. 随机游走策略（控制组）- 真正的随机性
+            # 8. Random walk strategy (control group) - true randomness
             RandomWalkStrategy(
                 trade_probability=0.1,
                 max_position_ratio=0.5,
-                truly_random=True  # 使用真随机，每次运行结果不同
+                truly_random=True  # Use true randomness, different results each run
             )
         ]
         
-        # 初始化策略
+        # Initialize strategies
         for strategy in strategies:
             strategy.initialize(self.config.initial_capital)
             
         self.baseline_strategies = strategies
-        self.logger.info(f"初始化了{len(strategies)}个baseline策略")
+        self.logger.info(f"Initialized {len(strategies)} baseline strategies")
         
         return strategies
     
     def run_agent_backtest(self) -> BacktestResult:
-        """运行智能体回测"""
+        """Run agent backtest"""
         if not self.agent_function:
-            raise ValueError("未提供智能体函数")
+            raise ValueError("Agent function not provided")
             
-        self.logger.info("开始运行智能体回测...")
+        self.logger.info("Starting agent backtest...")
         
-        # 初始化投资组合
+        # Initialize portfolio
         portfolio = {
             "cash": self.config.initial_capital,
             "stock": 0
         }
         
-        # 获取交易日期
+        # Get trading dates
         dates = pd.date_range(
             self.config.start_date, 
             self.config.end_date, 
@@ -251,13 +251,13 @@ class Backtester:
         trade_history = []
         daily_returns = []
         
-        # 添加调试计数器
+        # Add debug counters
         decision_count = 0
         trade_count = 0
         
         for current_date in dates:
             try:
-                # 获取智能体决策
+                # Get agent decision
                 decision_data = self._get_agent_decision(
                     current_date.strftime("%Y-%m-%d"),
                     portfolio
@@ -265,20 +265,20 @@ class Backtester:
                 
                 decision_count += 1
                 
-                # 调试输出
-                if decision_count <= 5:  # 只显示前5个决策
-                    self.logger.info(f"日期 {current_date.strftime('%Y-%m-%d')}: 决策 = {decision_data}")
+                # Debug output
+                if decision_count <= 5:  # Only show first 5 decisions
+                    self.logger.info(f"Date {current_date.strftime('%Y-%m-%d')}: Decision = {decision_data}")
                 
-                # 获取当前价格
+                # Get current price
                 current_price = self._get_current_price(
                     current_date.strftime("%Y-%m-%d")
                 )
                 
                 if current_price is None:
-                    self.logger.warning(f"无法获取 {current_date.strftime('%Y-%m-%d')} 的价格数据")
+                    self.logger.warning(f"Unable to get price data for {current_date.strftime('%Y-%m-%d')}")
                     continue
                 
-                # 执行交易
+                # Execute trades
                 executed_trades = self.trade_executor.execute_trade(
                     decision_data,
                     portfolio,
@@ -287,17 +287,17 @@ class Backtester:
                     self.cost_model
                 )
                 
-                # 记录交易
+                # Record trades
                 if executed_trades:
                     trade_count += len(executed_trades)
                     trade_history.extend(executed_trades)
-                    self.logger.info(f"执行交易: {executed_trades}")
+                    self.logger.info(f"Executed trades: {executed_trades}")
                 
-                # 计算投资组合价值
+                # Calculate portfolio value
                 total_value = portfolio["cash"] + portfolio["stock"] * current_price
                 portfolio["portfolio_value"] = total_value
                 
-                # 计算日收益率
+                # Calculate daily return
                 if len(portfolio_values) > 0:
                     prev_value = portfolio_values[-1]["Portfolio Value"]
                     daily_return = (total_value / prev_value - 1) if prev_value > 0 else 0
@@ -306,7 +306,7 @@ class Backtester:
                 
                 daily_returns.append(daily_return)
                 
-                # 记录投资组合价值
+                # Record portfolio value
                 portfolio_values.append({
                     "Date": current_date,
                     "Portfolio Value": total_value,
@@ -316,21 +316,21 @@ class Backtester:
                 })
                 
             except Exception as e:
-                self.logger.error(f"处理日期 {current_date} 时出错: {e}")
+                self.logger.error(f"Error processing date {current_date}: {e}")
                 continue
         
-        # 汇总统计
-        self.logger.info(f"AI Agent回测完成:")
-        self.logger.info(f"  - 处理决策数: {decision_count}")
-        self.logger.info(f"  - 执行交易数: {trade_count}")
-        self.logger.info(f"  - 最终现金: {portfolio['cash']:.2f}")
-        self.logger.info(f"  - 最终持股: {portfolio['stock']}")
+        # Summary statistics
+        self.logger.info(f"AI Agent backtest completed:")
+        self.logger.info(f"  - Decisions processed: {decision_count}")
+        self.logger.info(f"  - Trades executed: {trade_count}")
+        self.logger.info(f"  - Final cash: {portfolio['cash']:.2f}")
+        self.logger.info(f"  - Final stock holdings: {portfolio['stock']}")
         
         if len(daily_returns) == 0:
-            self.logger.warning("没有生成任何收益数据")
-            daily_returns = [0.0]  # 防止空数组导致的错误
+            self.logger.warning("No return data generated")
+            daily_returns = [0.0]  # Prevent errors from empty array
         
-        # 计算性能指标
+        # Calculate performance metrics
         metrics = PerformanceMetrics()
         performance_metrics = metrics.calculate_all_metrics(
             np.array(daily_returns),
@@ -346,21 +346,21 @@ class Backtester:
         )
         
         self.results["AI Agent"] = result
-        self.logger.info("智能体回测完成")
+        self.logger.info("Agent backtest completed")
         
         return result
     
     def run_baseline_backtests(self) -> Dict[str, BacktestResult]:
-        """运行所有baseline策略回测"""
+        """Run all baseline strategy backtests"""
         if not self.baseline_strategies:
             self.initialize_baseline_strategies()
         
-        self.logger.info(f"开始运行{len(self.baseline_strategies)}个baseline策略回测...")
+        self.logger.info(f"Starting {len(self.baseline_strategies)} baseline strategy backtests...")
         
         baseline_results = {}
         
         for strategy in self.baseline_strategies:
-            self.logger.info(f"运行策略: {strategy.name}")
+            self.logger.info(f"Running strategy: {strategy.name}")
             
             try:
                 result = self._run_single_strategy_backtest(strategy)
@@ -368,33 +368,33 @@ class Backtester:
                 self.results[strategy.name] = result
                 
             except Exception as e:
-                self.logger.error(f"策略 {strategy.name} 回测失败: {e}")
+                self.logger.error(f"Strategy {strategy.name} backtest failed: {e}")
                 continue
         
-        self.logger.info(f"完成{len(baseline_results)}个baseline策略回测")
+        self.logger.info(f"Completed {len(baseline_results)} baseline strategy backtests")
         return baseline_results
     
     def _run_single_strategy_backtest(self, strategy: BaseStrategy) -> BacktestResult:
-        """运行单个策略回测"""
-        # 重置策略状态
+        """Run single strategy backtest"""
+        # Reset strategy state
         strategy.reset()
         strategy.initialize(self.config.initial_capital)
         
-        # 初始化投资组合
+        # Initialize portfolio
         portfolio_obj = Portfolio(
             cash=self.config.initial_capital,
             stock=0,
             total_value=self.config.initial_capital
         )
         
-        # 获取交易日期
+        # Get trading dates
         dates = pd.date_range(
             self.config.start_date, 
             self.config.end_date, 
             freq="B"
         )
         
-        # 根据策略类型确定所需的历史数据长度
+        # Determine required historical data length based on strategy type
         required_lookback_days = self._get_strategy_lookback_days(strategy)
         
         portfolio_values = []
@@ -403,7 +403,7 @@ class Backtester:
         
         for i, current_date in enumerate(dates):
             try:
-                # 动态计算历史数据起始日期
+                # Dynamically calculate historical data start date
                 lookback_start = (current_date - timedelta(days=required_lookback_days)).strftime("%Y-%m-%d")
                 current_date_str = current_date.strftime("%Y-%m-%d")
                 
@@ -413,17 +413,17 @@ class Backtester:
                 
                 current_price = data.iloc[-1]['close']
                 
-                # 生成交易信号
+                # Generate trading signal
                 signal = strategy.generate_signal(
                     data, 
                     portfolio_obj, 
                     current_date_str
                 )
                 
-                # 记录信号
+                # Record signal
                 strategy.record_signal(signal, current_date_str, current_price)
                 
-                # 执行交易
+                # Execute trade
                 executed_quantity = self._execute_strategy_trade(
                     signal, 
                     portfolio_obj, 
@@ -432,11 +432,11 @@ class Backtester:
                     strategy
                 )
                 
-                # 更新投资组合价值
+                # Update portfolio value
                 total_value = portfolio_obj.cash + portfolio_obj.stock * current_price
                 portfolio_obj.total_value = total_value
                 
-                # 计算日收益率
+                # Calculate daily return
                 if len(portfolio_values) > 0:
                     prev_value = portfolio_values[-1]["Portfolio Value"]
                     daily_return = (total_value / prev_value - 1) if prev_value > 0 else 0
@@ -445,7 +445,7 @@ class Backtester:
                 
                 daily_returns.append(daily_return)
                 
-                # 记录投资组合价值
+                # Record portfolio value
                 portfolio_values.append({
                     "Date": current_date,
                     "Portfolio Value": total_value,
@@ -457,10 +457,10 @@ class Backtester:
                 })
                 
             except Exception as e:
-                self.logger.warning(f"策略 {strategy.name} 在日期 {current_date} 处理失败: {e}")
+                self.logger.warning(f"Strategy {strategy.name} failed to process date {current_date}: {e}")
                 continue
         
-        # 计算性能指标
+        # Calculate performance metrics
         metrics = PerformanceMetrics()
         performance_metrics = metrics.calculate_all_metrics(
             np.array(daily_returns),
@@ -488,11 +488,11 @@ class Backtester:
     def _execute_strategy_trade(self, signal: Signal, portfolio: Portfolio, 
                               current_price: float, date: str, 
                               strategy: BaseStrategy) -> int:
-        """执行策略交易"""
+        """Execute strategy trade"""
         executed_quantity = 0
         
         if signal.action == "buy" and signal.quantity > 0:
-            # 计算交易成本
+            # Calculate trading cost
             cost_without_fees = signal.quantity * current_price
             total_cost = self.cost_model.calculate_total_cost(
                 cost_without_fees, 'buy'
@@ -503,13 +503,13 @@ class Backtester:
                 portfolio.cash -= total_cost
                 executed_quantity = signal.quantity
                 
-                # 记录交易
+                # Record trade
                 strategy.record_trade(
                     'buy', signal.quantity, current_price, date,
                     cost_without_fees, total_cost - cost_without_fees
                 )
             else:
-                # 计算最大可买数量
+                # Calculate maximum buyable quantity
                 max_quantity = int(portfolio.cash / (current_price * (1 + self.config.trading_cost + self.config.slippage)))
                 if max_quantity > 0:
                     cost_without_fees = max_quantity * current_price
@@ -546,18 +546,18 @@ class Backtester:
         return executed_quantity
     
     def run_comprehensive_comparison(self) -> Dict[str, Any]:
-        """运行综合比较分析"""
-        self.logger.info("开始综合比较分析...")
+        """Run comprehensive comparison analysis"""
+        self.logger.info("Starting comprehensive comparison analysis...")
         
         if len(self.results) < 2:
-            raise ValueError("需要至少2个策略结果进行比较")
+            raise ValueError("At least 2 strategy results are required for comparison")
         
-        # 获取所有策略的收益率
+        # Get returns for all strategies
         strategy_returns = {}
         for name, result in self.results.items():
             strategy_returns[name] = result.daily_returns
         
-        # 两两比较所有策略
+        # Pairwise comparison of all strategies
         pairwise_comparisons = {}
         strategy_names = list(self.results.keys())
         
@@ -567,7 +567,7 @@ class Backtester:
                 
                 comparison_key = f"{name1}_vs_{name2}"
                 
-                # 进行统计显著性检验
+                # Perform statistical significance testing
                 comparison_result = self.significance_tester.comprehensive_comparison(
                     strategy_returns[name1],
                     strategy_returns[name2],
@@ -577,10 +577,10 @@ class Backtester:
                 
                 pairwise_comparisons[comparison_key] = comparison_result
         
-        # 策略排名分析
+        # Strategy ranking analysis
         ranking_analysis = self.strategy_comparator.rank_strategies(self.results)
         
-        # 生成综合报告
+        # Generate comprehensive report
         comprehensive_report = {
             'pairwise_comparisons': pairwise_comparisons,
             'strategy_ranking': ranking_analysis,
@@ -590,12 +590,12 @@ class Backtester:
         }
         
         self.comparison_results = comprehensive_report
-        self.logger.info("综合比较分析完成")
+        self.logger.info("Comprehensive comparison analysis completed")
         
         return comprehensive_report
     
     def _generate_performance_summary(self) -> Dict[str, Any]:
-        """生成性能摘要"""
+        """Generate performance summary"""
         summary = {}
         
         for name, result in self.results.items():
@@ -613,7 +613,7 @@ class Backtester:
         return summary
     
     def _generate_statistical_summary(self, pairwise_comparisons: Dict[str, Any]) -> Dict[str, Any]:
-        """生成统计摘要"""
+        """Generate statistical summary"""
         significant_pairs = []
         inconclusive_pairs = []
         
@@ -627,7 +627,7 @@ class Backtester:
             else:
                 inconclusive_pairs.append({
                     'pair': pair_name,
-                    'reason': '统计功效不足',
+                    'reason': 'Insufficient statistical power',
                     'power': comparison['summary']['statistical_power']
                 })
         
@@ -640,41 +640,41 @@ class Backtester:
     
     def _generate_recommendations(self, ranking: Dict[str, Any], 
                                 comparisons: Dict[str, Any]) -> List[str]:
-        """生成投资建议"""
+        """Generate investment recommendations"""
         recommendations = []
         
-        # 基于排名的建议
+        # Recommendations based on ranking
         if 'by_sharpe' in ranking and ranking['by_sharpe']:
             top_strategy = ranking['by_sharpe'][0]
             recommendations.append(
-                f"基于夏普比率排名，推荐使用 {top_strategy['strategy']} 策略 "
-                f"(夏普比率: {top_strategy['sharpe_ratio']:.3f})"
+                f"Based on Sharpe ratio ranking, recommend using {top_strategy['strategy']} strategy "
+                f"(Sharpe ratio: {top_strategy['sharpe_ratio']:.3f})"
             )
         elif 'top_performers' in ranking and ranking['top_performers']:
             top_strategy = ranking['top_performers'][0]
             recommendations.append(
-                f"基于综合表现，推荐使用 {top_strategy['name']} 策略 "
-                f"(综合得分: {top_strategy['composite_score']:.3f})"
+                f"Based on comprehensive performance, recommend using {top_strategy['name']} strategy "
+                f"(Composite score: {top_strategy['composite_score']:.3f})"
             )
         
-        # 基于风险调整收益的建议
+        # Recommendations based on risk-adjusted returns
         if self.results:
             best_sharpe = max(self.results.items(), 
                              key=lambda x: x[1].performance_metrics.get('sharpe_ratio', 0))
             recommendations.append(
-                f"基于风险调整收益，{best_sharpe[0]} 策略具有最佳夏普比率 "
+                f"Based on risk-adjusted returns, {best_sharpe[0]} strategy has the best Sharpe ratio "
                 f"({best_sharpe[1].performance_metrics.get('sharpe_ratio', 0):.3f})"
             )
         
-        # 基于统计显著性的建议
+        # Recommendations based on statistical significance
         significant_winners = []
         for comparison in comparisons.values():
             try:
                 if ('summary' in comparison and 
                     comparison['summary'].get('statistical_power', 0) > 0.7):
                     conclusion = comparison['summary'].get('overall_conclusion', '')
-                    if '显著优于' in conclusion:
-                        winner = conclusion.split('显著优于')[0].strip()
+                    if 'significantly outperforms' in conclusion:
+                        winner = conclusion.split('significantly outperforms')[0].strip()
                         significant_winners.append(winner)
             except (KeyError, AttributeError):
                 continue
@@ -683,13 +683,13 @@ class Backtester:
             from collections import Counter
             most_common_winner = Counter(significant_winners).most_common(1)[0][0]
             recommendations.append(
-                f"基于统计显著性检验，{most_common_winner} 在多项比较中表现优异"
+                f"Based on statistical significance tests, {most_common_winner} performs excellently in multiple comparisons"
             )
         
         return recommendations
     
     def generate_visualization(self) -> Dict[str, str]:
-        """生成可视化图表"""
+        """Generate visualization charts"""
         return self.visualizer.create_comparison_charts(
             self.results, 
             self.comparison_results,
@@ -697,14 +697,14 @@ class Backtester:
         )
     
     def _get_agent_decision(self, current_date: str, portfolio: dict) -> dict:
-        """获取智能体决策"""
-        # API限制处理
+        """Get agent decision"""
+        # API limit handling
         self._handle_api_limits()
         
         try:
-            # 增加回看窗口以支持区制检测 - 至少需要100天数据
-            # 区制检测需要足够的历史数据来计算技术指标和特征
-            lookback_days = 100  # 从30天增加到100天
+            # Increase lookback window to support regime detection - at least 100 days of data needed
+            # Regime detection requires sufficient historical data to calculate technical indicators and features
+            lookback_days = 100  # Increased from 30 days to 100 days
             lookback_start = (pd.to_datetime(current_date) - timedelta(days=lookback_days)).strftime("%Y-%m-%d")
             
             result = self.agent_function(
@@ -717,28 +717,28 @@ class Backtester:
                 tickers=self.tickers
             )
             
-            # 解析结果 - 增强的解析逻辑
+            # Parse result - enhanced parsing logic
             if isinstance(result, dict) and "decision" in result:
                 return result["decision"]
             elif isinstance(result, str):
                 import json
                 try:
-                    # 尝试解析JSON
+                    # Try to parse JSON
                     parsed = json.loads(result.replace('```json\n', '').replace('\n```', '').strip())
                     
-                    # 如果是portfolio_management_agent的返回格式
+                    # If it's portfolio_management_agent return format
                     if isinstance(parsed, dict):
-                        # 检查是否有嵌套的decision结构
+                        # Check if there's nested decision structure
                         if "decision" in parsed:
                             decision = parsed["decision"]
                         else:
                             decision = parsed
                         
-                        # 提取action和quantity
+                        # Extract action and quantity
                         action = decision.get("action", "hold")
                         quantity = decision.get("quantity", 0)
                         
-                        # 确保quantity是整数
+                        # Ensure quantity is integer
                         if isinstance(quantity, (int, float)):
                             quantity = int(quantity)
                         else:
@@ -747,25 +747,25 @@ class Backtester:
                         return {"action": action, "quantity": quantity}
                     
                 except (json.JSONDecodeError, KeyError) as e:
-                    self.logger.warning(f"解析JSON决策失败: {e}, 使用默认决策")
+                    self.logger.warning(f"Failed to parse JSON decision: {e}, using default decision")
                     return {"action": "hold", "quantity": 0}
             else:
                 return {"action": "hold", "quantity": 0}
                 
         except Exception as e:
-            self.logger.warning(f"获取智能体决策失败: {e}")
+            self.logger.warning(f"Failed to get agent decision: {e}")
             return {"action": "hold", "quantity": 0}
     
     def _handle_api_limits(self):
-        """处理API限制"""
+        """Handle API limits"""
         current_time = time.time()
         
-        # 重置时间窗口
+        # Reset time window
         if current_time - self._api_window_start >= 60:
             self._api_call_count = 0
             self._api_window_start = current_time
         
-        # 检查API限制
+        # Check API limits
         if self._api_call_count >= 8:
             wait_time = 60 - (current_time - self._api_window_start)
             if wait_time > 0:
@@ -773,7 +773,7 @@ class Backtester:
                 self._api_call_count = 0
                 self._api_window_start = time.time()
         
-        # 确保调用间隔
+        # Ensure call interval
         if self._last_api_call:
             time_since_last = time.time() - self._last_api_call
             if time_since_last < 3:
@@ -783,25 +783,25 @@ class Backtester:
         self._api_call_count += 1
     
     def _get_current_price(self, date: str) -> Optional[float]:
-        """获取当前价格"""
+        """Get current price"""
         try:
             data = get_price_data(self.ticker, date, date)
             if data is not None and not data.empty:
                 return data.iloc[-1]['close']
         except Exception as e:
-            self.logger.warning(f"获取价格数据失败 {date}: {e}")
+            self.logger.warning(f"Failed to get price data {date}: {e}")
         return None
     
     def _get_price_data(self, start_date: str, end_date: str) -> Optional[pd.DataFrame]:
-        """获取价格数据"""
+        """Get price data"""
         try:
             return get_price_data(self.ticker, start_date, end_date)
         except Exception as e:
-            self.logger.warning(f"获取价格数据失败 {start_date}-{end_date}: {e}")
+            self.logger.warning(f"Failed to get price data {start_date}-{end_date}: {e}")
             return None
     
     def save_results(self, filepath: str):
-        """保存回测结果"""
+        """Save backtest results"""
         import pickle
         
         results_data = {
@@ -814,10 +814,10 @@ class Backtester:
         with open(filepath, 'wb') as f:
             pickle.dump(results_data, f)
         
-        self.logger.info(f"回测结果已保存至: {filepath}")
+        self.logger.info(f"Backtest results saved to: {filepath}")
     
     def load_results(self, filepath: str):
-        """加载回测结果"""
+        """Load backtest results"""
         import pickle
         
         with open(filepath, 'rb') as f:
@@ -827,42 +827,42 @@ class Backtester:
         self.results = results_data['results']
         self.comparison_results = results_data.get('comparison_results', {})
         
-        self.logger.info(f"回测结果已从 {filepath} 加载")
+        self.logger.info(f"Backtest results loaded from {filepath}")
     
     def export_report(self, format: str = 'html') -> str:
-        """导出回测报告"""
+        """Export backtest report"""
         if format == 'html':
             return self._generate_html_report()
         elif format == 'pdf':
             return self._generate_pdf_report()
         else:
-            raise ValueError(f"不支持的格式: {format}")
+            raise ValueError(f"Unsupported format: {format}")
     
     def _generate_html_report(self) -> str:
-        """生成HTML报告"""
-        # 使用模板引擎生成详细的HTML报告
-        # 包含所有图表、统计结果和分析
+        """Generate HTML report"""
+        # Use template engine to generate detailed HTML report
+        # Include all charts, statistical results and analysis
         html_content = f"""
         <!DOCTYPE html>
         <html>
         <head>
-            <title>回测分析报告</title>
+            <title>Backtest Analysis Report</title>
             <meta charset="utf-8">
         </head>
         <body>
-            <h1>A股投资Agent系统回测分析报告</h1>
-            <h2>配置信息</h2>
-            <p>股票代码: {self.ticker}</p>
-            <p>回测期间: {self.config.start_date} 至 {self.config.end_date}</p>
-            <p>初始资金: {self.config.initial_capital:,.2f}</p>
+            <h1>A-Share Investment Agent System Backtest Analysis Report</h1>
+            <h2>Configuration Information</h2>
+            <p>Stock Ticker: {self.ticker}</p>
+            <p>Backtest Period: {self.config.start_date} to {self.config.end_date}</p>
+            <p>Initial Capital: {self.config.initial_capital:,.2f}</p>
             
-            <h2>策略表现摘要</h2>
+            <h2>Strategy Performance Summary</h2>
             {self._format_performance_table()}
             
-            <h2>统计显著性检验结果</h2>
+            <h2>Statistical Significance Test Results</h2>
             {self._format_significance_results()}
             
-            <h2>投资建议</h2>
+            <h2>Investment Recommendations</h2>
             {self._format_recommendations()}
         </body>
         </html>
@@ -875,14 +875,14 @@ class Backtester:
         return filename
     
     def _format_performance_table(self) -> str:
-        """格式化性能表格"""
+        """Format performance table"""
         if not hasattr(self, 'comparison_results') or not self.comparison_results:
-            return "<p>暂无性能数据</p>"
+            return "<p>No performance data available</p>"
         
         performance = self.comparison_results.get('performance_summary', {})
         
         table_html = "<table border='1'><tr>"
-        table_html += "<th>策略</th><th>总收益率</th><th>年化收益率</th><th>波动率</th><th>夏普比率</th><th>最大回撤</th></tr>"
+        table_html += "<th>Strategy</th><th>Total Return</th><th>Annual Return</th><th>Volatility</th><th>Sharpe Ratio</th><th>Max Drawdown</th></tr>"
         
         for strategy, metrics in performance.items():
             table_html += f"<tr>"
@@ -898,32 +898,32 @@ class Backtester:
         return table_html
     
     def _format_significance_results(self) -> str:
-        """格式化显著性检验结果"""
+        """Format significance test results"""
         if not hasattr(self, 'comparison_results') or not self.comparison_results:
-            return "<p>暂无统计检验结果</p>"
+            return "<p>No statistical test results available</p>"
         
         stats_summary = self.comparison_results.get('statistical_summary', {})
         significant = stats_summary.get('significant_differences', [])
         
         if not significant:
-            return "<p>未发现策略间的显著差异</p>"
+            return "<p>No significant differences found between strategies</p>"
         
         html = "<ul>"
         for item in significant:
-            html += f"<li>{item['conclusion']} (统计功效: {item['power']:.3f})</li>"
+            html += f"<li>{item['conclusion']} (Statistical power: {item['power']:.3f})</li>"
         html += "</ul>"
         
         return html
     
     def _format_recommendations(self) -> str:
-        """格式化投资建议"""
+        """Format investment recommendations"""
         if not hasattr(self, 'comparison_results') or not self.comparison_results:
-            return "<p>暂无投资建议</p>"
+            return "<p>No investment recommendations available</p>"
         
         recommendations = self.comparison_results.get('recommendations', [])
         
         if not recommendations:
-            return "<p>暂无具体建议</p>"
+            return "<p>No specific recommendations available</p>"
         
         html = "<ol>"
         for rec in recommendations:
@@ -933,24 +933,24 @@ class Backtester:
         return html
     
     def _generate_pdf_report(self) -> str:
-        """生成PDF报告"""
-        # 暂时返回HTML文件名
+        """Generate PDF report"""
+        # Temporarily return HTML filename
         return self._generate_html_report()
     
     def _get_strategy_lookback_days(self, strategy: BaseStrategy) -> int:
-        """根据策略类型确定所需的历史数据天数"""
+        """Determine required historical data days based on strategy type"""
         strategy_name = strategy.name.lower()
         
-        # 根据策略类型设置不同的历史数据需求
+        # Set different historical data requirements based on strategy type
         if 'momentum' in strategy_name:
-            return 400  # 动量策略需要更多历史数据
+            return 400  # Momentum strategy needs more historical data
         elif 'moving-average' in strategy_name:
-            # 移动平均策略根据窗口大小确定
+            # Moving average strategy determined by window size
             if hasattr(strategy, 'long_window'):
-                return max(400, strategy.long_window + 100)  # 长窗口 + 缓冲
+                return max(400, strategy.long_window + 100)  # Long window + buffer
             else:
                 return 300
         elif 'mean-reversion' in strategy_name:
-            return 400  # 均值回归策略需要足够的历史数据
+            return 400  # Mean reversion strategy needs sufficient historical data
         else:
-            return 365  # 默认一年历史数据
+            return 365  # Default one year of historical data

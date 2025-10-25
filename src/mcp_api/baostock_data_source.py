@@ -5,23 +5,23 @@ import logging
 from .data_source_interface import FinancialDataSource, DataSourceError, NoDataFoundError, LoginError
 from .mcp_utils import baostock_login_context
 
-# 为此模块获取一个logger实例
+# Get a logger instance for this module
 logger = logging.getLogger(__name__)
 
-# K线数据的默认字段
+# Default fields for K-line data
 DEFAULT_K_FIELDS = [
     "date", "code", "open", "high", "low", "close", "preclose",
     "volume", "amount", "adjustflag", "turn", "tradestatus",
     "pctChg", "isST"
 ]
 
-# 基本信息的默认字段
+# Default fields for basic information
 DEFAULT_BASIC_FIELDS = [
     "code", "tradeStatus", "code_name"
-    # 根据需要可以添加更多默认字段，例如 "industry", "listingDate"
+    # Can add more default fields as needed, e.g., "industry", "listingDate"
 ]
 
-# 辅助函数，用于减少金融数据获取中的重复代码
+# Helper function to reduce duplicate code in financial data fetching
 def _fetch_financial_data(
     bs_query_func,
     data_type_name: str,
@@ -30,17 +30,17 @@ def _fetch_financial_data(
     quarter: int
 ) -> pd.DataFrame:
     """
-    用于获取金融数据的辅助函数
+    Helper function for fetching financial data
     
-    参数:
-        bs_query_func: Baostock查询函数
-        data_type_name: 数据类型名称（用于日志）
-        code: 股票代码
-        year: 年份
-        quarter: 季度
+    Args:
+        bs_query_func: Baostock query function
+        data_type_name: Data type name (for logging)
+        code: Stock code
+        year: Year
+        quarter: Quarter
         
-    返回:
-        包含金融数据的DataFrame
+    Returns:
+        DataFrame containing financial data
     """
     logger.info(f"Fetching {data_type_name} data for {code}, year={year}, quarter={quarter}")
     try:
@@ -73,27 +73,27 @@ def _fetch_financial_data(
         logger.exception(f"Unexpected error fetching {data_type_name} data for {code}: {e}")
         raise DataSourceError(f"Unexpected error fetching {data_type_name} data for {code}: {e}")
 
-# 辅助函数，用于减少指数成分股数据获取中的重复代码
+# Helper function to reduce duplicate code in index constituent data fetching
 def _fetch_index_constituent_data(
     bs_query_func,
     index_name: str,
     date: Optional[str] = None
 ) -> pd.DataFrame:
     """
-    用于获取指数成分股数据的辅助函数
+    Helper function for fetching index constituent data
     
-    参数:
-        bs_query_func: Baostock查询函数
-        index_name: 指数名称（用于日志）
-        date: 可选。查询日期
+    Args:
+        bs_query_func: Baostock query function
+        index_name: Index name (for logging)
+        date: Optional. Query date
         
-    返回:
-        包含指数成分股数据的DataFrame
+    Returns:
+        DataFrame containing index constituent data
     """
     logger.info(f"Fetching {index_name} constituents for date={date or 'latest'}")
     try:
         with baostock_login_context():
-            rs = bs_query_func(date=date)  # date是可选的，默认为最新
+            rs = bs_query_func(date=date)  # date is optional, defaults to latest
 
             if rs.error_code != '0':
                 logger.error(f"Baostock API error ({index_name} Constituents) for date {date}: {rs.error_msg} (code: {rs.error_code})")
@@ -121,26 +121,26 @@ def _fetch_index_constituent_data(
         logger.exception(f"Unexpected error fetching {index_name} constituents for date {date}: {e}")
         raise DataSourceError(f"Unexpected error fetching {index_name} constituents for date {date}: {e}")
 
-# 辅助函数，用于减少宏观经济数据获取中的重复代码
+# Helper function to reduce duplicate code in macroeconomic data fetching
 def _fetch_macro_data(
     bs_query_func,
     data_type_name: str,
     start_date: Optional[str] = None,
     end_date: Optional[str] = None,
-    **kwargs  # 用于额外参数，如yearType
+    **kwargs  # For additional parameters, e.g., yearType
 ) -> pd.DataFrame:
     """
-    用于获取宏观经济数据的辅助函数
+    Helper function for fetching macroeconomic data
     
-    参数:
-        bs_query_func: Baostock查询函数
-        data_type_name: 数据类型名称（用于日志）
-        start_date: 可选。开始日期
-        end_date: 可选。结束日期
-        **kwargs: 额外关键字参数
+    Args:
+        bs_query_func: Baostock query function
+        data_type_name: Data type name (for logging)
+        start_date: Optional. Start date
+        end_date: Optional. End date
+        **kwargs: Additional keyword arguments
         
-    返回:
-        包含宏观经济数据的DataFrame
+    Returns:
+        DataFrame containing macroeconomic data
     """
     date_range_log = f"from {start_date or 'default'} to {end_date or 'default'}"
     kwargs_log = f", extra_args={kwargs}" if kwargs else ""
@@ -177,24 +177,24 @@ def _fetch_macro_data(
 
 class BaostockDataSource(FinancialDataSource):
     """
-    使用Baostock库实现的FinancialDataSource具体实现
+    FinancialDataSource concrete implementation using Baostock library
     """
 
     def _format_fields(self, fields: Optional[List[str]], default_fields: List[str]) -> str:
         """
-        将字段列表格式化为Baostock的逗号分隔字符串。
+        Format field list to Baostock comma-separated string.
         
-        参数:
-            fields: 请求的字段列表
-            default_fields: 默认字段列表
+        Args:
+            fields: Requested field list
+            default_fields: Default field list
             
-        返回:
-            格式化后的字段字符串
+        Returns:
+            Formatted field string
         """
         if fields is None or not fields:
             logger.debug(f"No specific fields requested, using defaults: {default_fields}")
             return ",".join(default_fields)
-        # 基本验证：确保请求的字段都是字符串
+        # Basic validation: ensure all requested fields are strings
         if not all(isinstance(f, str) for f in fields):
             raise ValueError("All items in the fields list must be strings.")
         logger.debug(f"Using requested fields: {fields}")
@@ -210,18 +210,18 @@ class BaostockDataSource(FinancialDataSource):
         fields: Optional[List[str]] = None,
     ) -> pd.DataFrame:
         """
-        使用Baostock获取历史K线数据。
+        Get historical K-line data using Baostock.
         
-        参数:
-            code: 股票代码
-            start_date: 开始日期
-            end_date: 结束日期
-            frequency: 数据频率，默认为'd'（日线）
-            adjust_flag: 复权标志，默认为'3'（不复权）
-            fields: 可选的字段列表
+        Args:
+            code: Stock code
+            start_date: Start date
+            end_date: End date
+            frequency: Data frequency, default is 'd' (daily)
+            adjust_flag: Adjustment flag, default is '3' (no adjustment)
+            fields: Optional field list
             
-        返回:
-            包含K线数据的DataFrame
+        Returns:
+            DataFrame containing K-line data
         """
         logger.info(f"Fetching K-data for {code} ({start_date} to {end_date}), freq={frequency}, adjust={adjust_flag}")
         try:
@@ -240,8 +240,8 @@ class BaostockDataSource(FinancialDataSource):
 
                 if rs.error_code != '0':
                     logger.error(f"Baostock API error (K-data) for {code}: {rs.error_msg} (code: {rs.error_code})")
-                    # 检查常见错误代码，如没有数据
-                    if "no record found" in rs.error_msg.lower() or rs.error_code == '10002':  # 示例错误代码
+                    # Check common error codes, such as no data found
+                    if "no record found" in rs.error_msg.lower() or rs.error_code == '10002':  # Example error code
                          raise NoDataFoundError(f"No historical data found for {code} in the specified range. Baostock msg: {rs.error_msg}")
                     else:
                         raise DataSourceError(f"Baostock API error fetching K-data: {rs.error_msg} (code: {rs.error_code})")
@@ -254,41 +254,41 @@ class BaostockDataSource(FinancialDataSource):
                      logger.warning(f"No historical data found for {code} in range (empty result set from Baostock).")
                      raise NoDataFoundError(f"No historical data found for {code} in the specified range (empty result set).")
 
-                # 关键：使用rs.fields作为列名
+                # Key: use rs.fields as column names
                 result_df = pd.DataFrame(data_list, columns=rs.fields)
                 logger.info(f"Retrieved {len(result_df)} records for {code}.")
                 return result_df
 
         except (LoginError, NoDataFoundError, DataSourceError, ValueError) as e:
-            # 重新抛出已知错误
+            # Re-raise known errors
             logger.warning(f"Caught known error fetching K-data for {code}: {type(e).__name__}")
             raise e
         except Exception as e:
-            # 包装意外错误
-            logger.exception(f"Unexpected error fetching K-data for {code}: {e}")  # 使用logger.exception包含堆栈跟踪
+            # Wrap unexpected errors
+            logger.exception(f"Unexpected error fetching K-data for {code}: {e}")  # Use logger.exception to include stack trace
             raise DataSourceError(f"Unexpected error fetching K-data for {code}: {e}")
 
     def get_stock_basic_info(self, code: str, fields: Optional[List[str]] = None) -> pd.DataFrame:
         """
-        使用Baostock获取股票基本信息。
+        Get stock basic information using Baostock.
         
-        参数:
-            code: 股票代码
-            fields: 可选的字段列表，用于选择特定列
+        Args:
+            code: Stock code
+            fields: Optional field list for selecting specific columns
             
-        返回:
-            包含股票基本信息的DataFrame
+        Returns:
+            DataFrame containing stock basic information
         """
         logger.info(f"Fetching basic info for {code}")
         try:
-            # 注意：query_stock_basic在文档中似乎没有fields参数，
-            # 但我们保持签名一致。它返回一个固定集合。
-            # 如果需要，我们将在查询后使用`fields`参数选择列。
+            # Note: query_stock_basic doesn't seem to have fields parameter in documentation,
+            # but we keep the signature consistent. It returns a fixed set.
+            # If needed, we will use the `fields` parameter to select columns after query.
             logger.debug(f"Requesting basic info for {code}. Optional fields requested: {fields}")
 
             with baostock_login_context():
-                # 示例：获取基本信息；根据baostock文档根据需要调整API调用
-                # rs = bs.query_stock_basic(code=code, code_name=code_name)  # 如果支持名称查找
+                # Example: get basic information; adjust API call according to baostock documentation as needed
+                # rs = bs.query_stock_basic(code=code, code_name=code_name)  # If name lookup is supported
                 rs = bs.query_stock_basic(code=code)
 
                 if rs.error_code != '0':
@@ -306,11 +306,11 @@ class BaostockDataSource(FinancialDataSource):
                     logger.warning(f"No basic info found for {code} (empty result set from Baostock).")
                     raise NoDataFoundError(f"No basic info found for {code} (empty result set).")
 
-                # 关键：使用rs.fields作为列名
+                # Key: use rs.fields as column names
                 result_df = pd.DataFrame(data_list, columns=rs.fields)
                 logger.info(f"Retrieved basic info for {code}. Columns: {result_df.columns.tolist()}")
 
-                # 可选：如果提供了`fields`参数，选择列的子集
+                # Optional: if `fields` parameter is provided, select subset of columns
                 if fields:
                     available_cols = [col for col in fields if col in result_df.columns]
                     if not available_cols:
@@ -329,15 +329,15 @@ class BaostockDataSource(FinancialDataSource):
 
     def get_dividend_data(self, code: str, year: str, year_type: str = "report") -> pd.DataFrame:
         """
-        使用Baostock获取分红信息。
+        Get dividend information using Baostock.
         
-        参数:
-            code: 股票代码
-            year: 年份
-            year_type: 年份类型，'report'表示预案公告年份，'operate'表示除权除息年份
+        Args:
+            code: Stock code
+            year: Year
+            year_type: Year type, 'report' means proposal announcement year, 'operate' means ex-dividend year
             
-        返回:
-            包含分红信息的DataFrame
+        Returns:
+            DataFrame containing dividend information
         """
         logger.info(f"Fetching dividend data for {code}, year={year}, year_type={year_type}")
         try:
@@ -372,15 +372,15 @@ class BaostockDataSource(FinancialDataSource):
 
     def get_adjust_factor_data(self, code: str, start_date: str, end_date: str) -> pd.DataFrame:
         """
-        使用Baostock获取复权因子数据。
+        Get adjustment factor data using Baostock.
         
-        参数:
-            code: 股票代码
-            start_date: 开始日期
-            end_date: 结束日期
+        Args:
+            code: Stock code
+            start_date: Start date
+            end_date: End date
             
-        返回:
-            包含复权因子数据的DataFrame
+        Returns:
+            DataFrame containing adjustment factor data
         """
         logger.info(f"Fetching adjustment factor data for {code} ({start_date} to {end_date})")
         try:
@@ -415,99 +415,99 @@ class BaostockDataSource(FinancialDataSource):
 
     def get_profit_data(self, code: str, year: str, quarter: int) -> pd.DataFrame:
         """
-        使用Baostock获取季度盈利能力数据。
+        Get quarterly profitability data using Baostock.
         
-        参数:
-            code: 股票代码
-            year: 年份
-            quarter: 季度
+        Args:
+            code: Stock code
+            year: Year
+            quarter: Quarter
             
-        返回:
-            包含盈利能力数据的DataFrame
+        Returns:
+            DataFrame containing profitability data
         """
         return _fetch_financial_data(bs.query_profit_data, "Profitability", code, year, quarter)
 
     def get_operation_data(self, code: str, year: str, quarter: int) -> pd.DataFrame:
         """
-        使用Baostock获取季度运营能力数据。
+        Get quarterly operation capability data using Baostock.
         
-        参数:
-            code: 股票代码
-            year: 年份
-            quarter: 季度
+        Args:
+            code: Stock code
+            year: Year
+            quarter: Quarter
             
-        返回:
-            包含运营能力数据的DataFrame
+        Returns:
+            DataFrame containing operation capability data
         """
         return _fetch_financial_data(bs.query_operation_data, "Operation Capability", code, year, quarter)
 
     def get_growth_data(self, code: str, year: str, quarter: int) -> pd.DataFrame:
         """
-        使用Baostock获取季度增长能力数据。
+        Get quarterly growth capability data using Baostock.
         
-        参数:
-            code: 股票代码
-            year: 年份
-            quarter: 季度
+        Args:
+            code: Stock code
+            year: Year
+            quarter: Quarter
             
-        返回:
-            包含增长能力数据的DataFrame
+        Returns:
+            DataFrame containing growth capability data
         """
         return _fetch_financial_data(bs.query_growth_data, "Growth Capability", code, year, quarter)
 
     def get_balance_data(self, code: str, year: str, quarter: int) -> pd.DataFrame:
         """
-        使用Baostock获取季度资产负债表数据（偿债能力）。
+        Get quarterly balance sheet data (solvency) using Baostock.
         
-        参数:
-            code: 股票代码
-            year: 年份
-            quarter: 季度
+        Args:
+            code: Stock code
+            year: Year
+            quarter: Quarter
             
-        返回:
-            包含资产负债表数据的DataFrame
+        Returns:
+            DataFrame containing balance sheet data
         """
         return _fetch_financial_data(bs.query_balance_data, "Balance Sheet", code, year, quarter)
 
     def get_cash_flow_data(self, code: str, year: str, quarter: int) -> pd.DataFrame:
         """
-        使用Baostock获取季度现金流量数据。
+        Get quarterly cash flow data using Baostock.
         
-        参数:
-            code: 股票代码
-            year: 年份
-            quarter: 季度
+        Args:
+            code: Stock code
+            year: Year
+            quarter: Quarter
             
-        返回:
-            包含现金流量数据的DataFrame
+        Returns:
+            DataFrame containing cash flow data
         """
         return _fetch_financial_data(bs.query_cash_flow_data, "Cash Flow", code, year, quarter)
 
     def get_dupont_data(self, code: str, year: str, quarter: int) -> pd.DataFrame:
         """
-        使用Baostock获取季度杜邦分析数据。
+        Get quarterly DuPont analysis data using Baostock.
         
-        参数:
-            code: 股票代码
-            year: 年份
-            quarter: 季度
+        Args:
+            code: Stock code
+            year: Year
+            quarter: Quarter
             
-        返回:
-            包含杜邦分析数据的DataFrame
+        Returns:
+            DataFrame containing DuPont analysis data
         """
         return _fetch_financial_data(bs.query_dupont_data, "DuPont Analysis", code, year, quarter)
 
     def get_performance_express_report(self, code: str, start_date: str, end_date: str) -> pd.DataFrame:
         """
-        使用Baostock获取业绩快报。
+        Get performance express report using Baostock.
         
-        参数:
-            code: 股票代码
-            start_date: 开始日期
-            end_date: 结束日期
+        Args:
+            code: Stock code
+            start_date: Start date
+            end_date: End date
             
-        返回:
-            包含业绩快报数据的DataFrame
+        Returns:
+            DataFrame containing performance express report data
         """
         logger.info(f"Fetching Performance Express Report for {code} ({start_date} to {end_date})")
         try:
@@ -542,22 +542,22 @@ class BaostockDataSource(FinancialDataSource):
 
     def get_forecast_report(self, code: str, start_date: str, end_date: str) -> pd.DataFrame:
         """
-        使用Baostock获取业绩预告。
+        Get performance forecast report using Baostock.
         
-        参数:
-            code: 股票代码
-            start_date: 开始日期
-            end_date: 结束日期
+        Args:
+            code: Stock code
+            start_date: Start date
+            end_date: End date
             
-        返回:
-            包含业绩预告数据的DataFrame
+        Returns:
+            DataFrame containing performance forecast report data
         """
         logger.info(f"Fetching Performance Forecast Report for {code} ({start_date} to {end_date})")
         try:
             with baostock_login_context():
                 rs = bs.query_forecast_report(code=code, start_date=start_date, end_date=end_date)
-                # 注意：Baostock文档提到此函数有分页，但Python API似乎没有直接暴露它。
-                # 我们在下面的循环中获取所有可用页面。
+                # Note: Baostock documentation mentions this function has pagination, but Python API doesn't seem to expose it directly.
+                # We get all available pages in the loop below.
 
                 if rs.error_code != '0':
                     logger.error(f"Baostock API error (Forecast) for {code}: {rs.error_msg} (code: {rs.error_code})")
@@ -567,7 +567,7 @@ class BaostockDataSource(FinancialDataSource):
                         raise DataSourceError(f"Baostock API error fetching performance forecast report: {rs.error_msg} (code: {rs.error_code})")
 
                 data_list = []
-                while rs.next():  # 如果rs管理分页，循环应该隐式处理分页
+                while rs.next():  # If rs manages pagination, loop should implicitly handle pagination
                     data_list.append(rs.get_row_data())
 
                 if not data_list:
@@ -587,14 +587,14 @@ class BaostockDataSource(FinancialDataSource):
     
     def get_stock_industry(self, code: Optional[str] = None, date: Optional[str] = None) -> pd.DataFrame:
         """
-        使用Baostock获取行业分类数据。
+        Get industry classification data using Baostock.
         
-        参数:
-            code: 可选。股票代码，如果为None则获取所有股票
-            date: 可选。日期，如果为None则使用最新日期
+        Args:
+            code: Optional. Stock code, if None then get all stocks
+            date: Optional. Date, if None then use latest date
             
-        返回:
-            包含行业分类数据的DataFrame
+        Returns:
+            DataFrame containing industry classification data
         """
         log_msg = f"Fetching industry data for code={code or 'all'}, date={date or 'latest'}"
         logger.info(log_msg)
@@ -631,59 +631,59 @@ class BaostockDataSource(FinancialDataSource):
 
     def get_sz50_stocks(self, date: Optional[str] = None) -> pd.DataFrame:
         """
-        使用Baostock获取上证50指数成分股。
+        Get SZSE 50 index constituent stocks using Baostock.
         
-        参数:
-            date: 可选。日期，如果为None则使用最新日期
+        Args:
+            date: Optional. Date, if None then use latest date
             
-        返回:
-            包含上证50指数成分股的DataFrame
+        Returns:
+            DataFrame containing SZSE 50 index constituent stocks
         """
         return _fetch_index_constituent_data(bs.query_sz50_stocks, "SZSE 50", date)
 
     def get_hs300_stocks(self, date: Optional[str] = None) -> pd.DataFrame:
         """
-        使用Baostock获取沪深300指数成分股。
+        Get CSI 300 index constituent stocks using Baostock.
         
-        参数:
-            date: 可选。日期，如果为None则使用最新日期
+        Args:
+            date: Optional. Date, if None then use latest date
             
-        返回:
-            包含沪深300指数成分股的DataFrame
+        Returns:
+            DataFrame containing CSI 300 index constituent stocks
         """
         return _fetch_index_constituent_data(bs.query_hs300_stocks, "CSI 300", date)
 
     def get_zz500_stocks(self, date: Optional[str] = None) -> pd.DataFrame:
         """
-        使用Baostock获取中证500指数成分股。
+        Get CSI 500 index constituent stocks using Baostock.
         
-        参数:
-            date: 可选。日期，如果为None则使用最新日期
+        Args:
+            date: Optional. Date, if None then use latest date
             
-        返回:
-            包含中证500指数成分股的DataFrame
+        Returns:
+            DataFrame containing CSI 500 index constituent stocks
         """
         return _fetch_index_constituent_data(bs.query_zz500_stocks, "CSI 500", date)
 
     def get_trade_dates(self, start_date: Optional[str] = None, end_date: Optional[str] = None) -> pd.DataFrame:
         """
-        使用Baostock获取交易日期信息。
+        Get trading date information using Baostock.
         
-        参数:
-            start_date: 可选。开始日期
-            end_date: 可选。结束日期
+        Args:
+            start_date: Optional. Start date
+            end_date: Optional. End date
             
-        返回:
-            包含交易日期信息的DataFrame
+        Returns:
+            DataFrame containing trading date information
         """
         logger.info(f"Fetching trade dates from {start_date or 'default'} to {end_date or 'default'}")
         try:
-            with baostock_login_context():  # 对于这种情况，登录可能不是严格需要的，但保持一致
+            with baostock_login_context():  # For this case, login may not be strictly required, but keep consistent
                 rs = bs.query_trade_dates(start_date=start_date, end_date=end_date)
 
                 if rs.error_code != '0':
                     logger.error(f"Baostock API error (Trade Dates): {rs.error_msg} (code: {rs.error_code})")
-                    # 日期查询不太可能有"未找到记录"，但处理API错误
+                    # Date queries are unlikely to have "no record found", but handle API errors
                     raise DataSourceError(f"Baostock API error fetching trade dates: {rs.error_msg} (code: {rs.error_code})")
 
                 data_list = []
@@ -691,7 +691,7 @@ class BaostockDataSource(FinancialDataSource):
                     data_list.append(rs.get_row_data())
 
                 if not data_list:
-                    # 如果API返回有效范围，这种情况理论上不应该发生
+                    # If API returns valid range, this situation should theoretically not occur
                     logger.warning(f"No trade dates returned for range {start_date}-{end_date} (empty result set).")
                     raise NoDataFoundError(f"No trade dates found for range {start_date}-{end_date} (empty result set).")
 
@@ -708,13 +708,13 @@ class BaostockDataSource(FinancialDataSource):
 
     def get_all_stock(self, date: Optional[str] = None) -> pd.DataFrame:
         """
-        使用Baostock获取指定日期的所有股票列表。
+        Get all stock list for specified date using Baostock.
         
-        参数:
-            date: 可选。日期，如果为None则使用当前日期
+        Args:
+            date: Optional. Date, if None then use current date
             
-        返回:
-            包含所有股票的DataFrame
+        Returns:
+            DataFrame containing all stocks
         """
         logger.info(f"Fetching all stock list for date={date or 'default'}")
         try:
@@ -723,7 +723,7 @@ class BaostockDataSource(FinancialDataSource):
 
                 if rs.error_code != '0':
                     logger.error(f"Baostock API error (All Stock) for date {date}: {rs.error_msg} (code: {rs.error_code})")
-                    if "no record found" in rs.error_msg.lower() or rs.error_code == '10002':  # 检查是否适用
+                    if "no record found" in rs.error_msg.lower() or rs.error_code == '10002':  # Check if applicable
                          raise NoDataFoundError(f"No stock data found for date {date}. Baostock msg: {rs.error_msg}")
                     else:
                         raise DataSourceError(f"Baostock API error fetching all stock list: {rs.error_msg} (code: {rs.error_code})")
@@ -749,85 +749,85 @@ class BaostockDataSource(FinancialDataSource):
     
     def get_deposit_rate_data(self, start_date: Optional[str] = None, end_date: Optional[str] = None) -> pd.DataFrame:
         """
-        使用Baostock获取基准存款利率数据。
+        Get benchmark deposit rate data using Baostock.
         
-        参数:
-            start_date: 可选。开始日期
-            end_date: 可选。结束日期
+        Args:
+            start_date: Optional. Start date
+            end_date: Optional. End date
             
-        返回:
-            包含存款利率数据的DataFrame
+        Returns:
+            DataFrame containing deposit rate data
         """
         return _fetch_macro_data(bs.query_deposit_rate_data, "Deposit Rate", start_date, end_date)
 
     def get_loan_rate_data(self, start_date: Optional[str] = None, end_date: Optional[str] = None) -> pd.DataFrame:
         """
-        使用Baostock获取基准贷款利率数据。
+        Get benchmark loan rate data using Baostock.
         
-        参数:
-            start_date: 可选。开始日期
-            end_date: 可选。结束日期
+        Args:
+            start_date: Optional. Start date
+            end_date: Optional. End date
             
-        返回:
-            包含贷款利率数据的DataFrame
+        Returns:
+            DataFrame containing loan rate data
         """
         return _fetch_macro_data(bs.query_loan_rate_data, "Loan Rate", start_date, end_date)
 
     def get_required_reserve_ratio_data(self, start_date: Optional[str] = None, end_date: Optional[str] = None, year_type: str = '0') -> pd.DataFrame:
         """
-        使用Baostock获取存款准备金率数据。
+        Get required reserve ratio data using Baostock.
         
-        参数:
-            start_date: 可选。开始日期
-            end_date: 可选。结束日期
-            year_type: 年份类型，'0'表示公告日期，'1'表示生效日期
+        Args:
+            start_date: Optional. Start date
+            end_date: Optional. End date
+            year_type: Year type, '0' for announcement date, '1' for effective date
             
-        返回:
-            包含存款准备金率数据的DataFrame
+        Returns:
+            DataFrame containing required reserve ratio data
         """
-        # 注意通过kwargs处理额外的yearType参数
+        # Note: handle additional yearType parameter through kwargs
         return _fetch_macro_data(bs.query_required_reserve_ratio_data, "Required Reserve Ratio", start_date, end_date, yearType=year_type)
 
     def get_money_supply_data_month(self, start_date: Optional[str] = None, end_date: Optional[str] = None) -> pd.DataFrame:
         """
-        使用Baostock获取月度货币供应量数据（M0, M1, M2）。
+        Get monthly money supply data (M0, M1, M2) using Baostock.
         
-        参数:
-            start_date: 可选。开始日期，格式为YYYY-MM
-            end_date: 可选。结束日期，格式为YYYY-MM
+        Args:
+            start_date: Optional. Start date, format: YYYY-MM
+            end_date: Optional. End date, format: YYYY-MM
             
-        返回:
-            包含月度货币供应量数据的DataFrame
+        Returns:
+            DataFrame containing monthly money supply data
         """
-        # Baostock这里期望日期格式为YYYY-MM
+        # Baostock expects date format as YYYY-MM
         return _fetch_macro_data(bs.query_money_supply_data_month, "Monthly Money Supply", start_date, end_date)
 
     def get_money_supply_data_year(self, start_date: Optional[str] = None, end_date: Optional[str] = None) -> pd.DataFrame:
         """
-        使用Baostock获取年度货币供应量数据（M0, M1, M2 - 年末余额）。
+        Get yearly money supply data (M0, M1, M2 - year-end balance) using Baostock.
         
-        参数:
-            start_date: 可选。开始年份，格式为YYYY
-            end_date: 可选。结束年份，格式为YYYY
+        Args:
+            start_date: Optional. Start year, format: YYYY
+            end_date: Optional. End year, format: YYYY
             
-        返回:
-            包含年度货币供应量数据的DataFrame
+        Returns:
+            DataFrame containing yearly money supply data
         """
-        # Baostock这里期望日期格式为YYYY
+        # Baostock expects date format as YYYY
         return _fetch_macro_data(bs.query_money_supply_data_year, "Yearly Money Supply", start_date, end_date)
 
     def get_shibor_data(self, start_date: Optional[str] = None, end_date: Optional[str] = None) -> pd.DataFrame:
         """
-        Baostock不提供SHIBOR（上海银行间同业拆放利率）数据API。
-        此方法用空数据帧代替，并引发NoDataFoundError。
+        Baostock does not provide SHIBOR (Shanghai Interbank Offered Rate) data API.
+        This method returns empty DataFrame and raises NoDataFoundError.
         
-        参数:
-            start_date: 可选。开始日期
-            end_date: 可选。结束日期
+        Args:
+            start_date: Optional. Start date
+            end_date: Optional. End date
             
-        返回:
-            抛出NoDataFoundError
+        Returns:
+            Raises NoDataFoundError
         """
-        logger.warning("Baostock API不提供SHIBOR数据。尝试请求SHIBOR数据。")
+        logger.warning("Baostock API does not provide SHIBOR data. Attempting to request SHIBOR data.")
         from .data_source_interface import NoDataFoundError
-        raise NoDataFoundError("Baostock API不提供SHIBOR数据。请使用其他数据源获取SHIBOR数据。")
+        raise NoDataFoundError("Baostock API does not provide SHIBOR data. Please use other data sources to get SHIBOR data.")

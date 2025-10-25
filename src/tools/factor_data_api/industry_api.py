@@ -1,5 +1,5 @@
 """
-行业数据API - 提供行业相关数据的获取和处理功能
+Industry Data API - Provides functionality for obtaining and processing industry-related data
 """
 
 import pandas as pd
@@ -14,24 +14,24 @@ def get_industry_index_returns(industry_codes: Union[str, List[str]],
                               end_date: str = None,
                               freq: str = 'D') -> pd.DataFrame:
     """
-    获取行业指数收益率数据
+    Get industry index return data
     
     Args:
-        industry_codes: 行业指数代码或代码列表，例如"801780"(银行)
-        start_date: 开始日期，格式：YYYY-MM-DD
-        end_date: 结束日期，格式：YYYY-MM-DD
-        freq: 数据频率，'D'为日度，'W'为周度，'M'为月度
+        industry_codes: Industry index code or code list, e.g. "801780" (banking)
+        start_date: Start date, format: YYYY-MM-DD
+        end_date: End date, format: YYYY-MM-DD
+        freq: Data frequency, 'D' for daily, 'W' for weekly, 'M' for monthly
         
     Returns:
-        包含多个行业指数收益率的DataFrame
+        DataFrame containing multiple industry index returns
     """
-    logger.info(f"获取行业指数收益率: {start_date} 至 {end_date}, 频率: {freq}")
+    logger.info(f"Getting industry index returns: {start_date} to {end_date}, frequency: {freq}")
     
-    # 转换为列表
+    # Convert to list
     if isinstance(industry_codes, str):
         industry_codes = [industry_codes]
     
-    # 定义行业名称映射
+    # Define industry name mapping
     industry_names = {
         '801010': '农林牧渔', '801020': '采掘', '801030': '化工', '801040': '钢铁',
         '801050': '有色金属', '801080': '电子', '801110': '家用电器', '801120': '食品饮料',
@@ -43,16 +43,16 @@ def get_industry_index_returns(industry_codes: Union[str, List[str]],
         '801950': '煤炭', '801960': '石油石化', '801970': '环保', '801980': '美容护理'
     }
     
-    # 获取指数收益率数据
+    # Get index return data
     returns_dict = {}
     
     for code in industry_codes:
         try:
-            # 获取指数数据
+            # Get index data
             index_data = get_index_data(code, None, start_date, end_date, freq)
             
             if not index_data.empty:
-                # 确保日期列为日期类型
+                # Ensure date column is date type
                 if 'date' in index_data.columns:
                     index_data['date'] = pd.to_datetime(index_data['date'])
                     index_data = index_data.set_index('date')
@@ -60,30 +60,30 @@ def get_industry_index_returns(industry_codes: Union[str, List[str]],
                     index_data['trade_date'] = pd.to_datetime(index_data['trade_date'])
                     index_data = index_data.set_index('trade_date')
                 
-                # 计算收益率
+                # Calculate returns
                 if 'close' in index_data.columns:
                     returns = index_data['close'].pct_change().dropna()
                     
-                    # 获取行业名称
+                    # Get industry name
                     industry_name = industry_names.get(code, code)
                     
                     returns_dict[industry_name] = returns
-                    logger.info(f"成功获取行业 {industry_name}({code}) 收益率数据: {len(returns)} 条记录")
+                    logger.info(f"Successfully obtained industry {industry_name}({code}) return data: {len(returns)} records")
                 else:
-                    logger.warning(f"行业指数 {code} 数据中不包含close列")
+                    logger.warning(f"Industry index {code} data does not contain close column")
             else:
-                logger.warning(f"无法获取行业指数 {code} 数据")
+                logger.warning(f"Unable to get industry index {code} data")
                 
         except Exception as e:
-            logger.error(f"获取行业指数 {code} 收益率时出错: {e}")
+            logger.error(f"Error getting industry index {code} returns: {e}")
             logger.error(traceback.format_exc())
     
-    # 如果没有获取到数据，返回空DataFrame
+    # If no data was obtained, return empty DataFrame
     if not returns_dict:
-        logger.warning("未获取到任何行业指数收益率数据")
+        logger.warning("No industry index return data obtained")
         return pd.DataFrame()
     
-    # 合并为DataFrame
+    # Merge into DataFrame
     returns_df = pd.DataFrame(returns_dict)
     
     return returns_df
@@ -92,55 +92,55 @@ def get_industry_rotation_factors(start_date: str = None,
                                  end_date: str = None,
                                  freq: str = 'W') -> pd.DataFrame:
     """
-    获取行业轮动因子数据 (包括行业动量、估值、成长性等)
+    Get industry rotation factor data (including industry momentum, valuation, growth, etc.)
     
     Args:
-        start_date: 开始日期，格式：YYYY-MM-DD
-        end_date: 结束日期，格式：YYYY-MM-DD
-        freq: 数据频率，推荐'W'为周度或'M'为月度
+        start_date: Start date, format: YYYY-MM-DD
+        end_date: End date, format: YYYY-MM-DD
+        freq: Data frequency, recommended 'W' for weekly or 'M' for monthly
         
     Returns:
-        包含行业轮动因子的DataFrame
+        DataFrame containing industry rotation factors
     """
-    logger.info(f"获取行业轮动因子数据: {start_date} 至 {end_date}, 频率: {freq}")
+    logger.info(f"Getting industry rotation factor data: {start_date} to {end_date}, frequency: {freq}")
     
     try:
-        # 1. 获取主要行业指数代码
+        # 1. Get main industry index codes
         main_industries = [
             '801010', '801020', '801030', '801040', '801050', '801080', 
             '801110', '801120', '801150', '801180', '801730', '801750', 
             '801760', '801770', '801780', '801790', '801880', '801890'
         ]
         
-        # 2. 获取行业收益率数据
+        # 2. Get industry return data
         industry_returns = get_industry_index_returns(main_industries, start_date, end_date, freq)
         
         if industry_returns.empty:
-            logger.warning("无法获取行业收益率数据")
+            logger.warning("Unable to get industry return data")
             return pd.DataFrame()
         
-        # 3. 计算行业动量因子
+        # 3. Calculate industry momentum factors
         factors_df = pd.DataFrame(index=industry_returns.index)
         
-        # 计算各个行业的动量因子 (过去1/3/6个月的回报)
+        # Calculate momentum factors for each industry (past 1/3/6 months returns)
         for industry in industry_returns.columns:
-            # 过去1个月动量
+            # Past 1 month momentum
             factors_df[f'{industry}_MOM_1M'] = industry_returns[industry].rolling(window=4 if freq == 'W' else 1).sum()
             
-            # 过去3个月动量
+            # Past 3 months momentum
             factors_df[f'{industry}_MOM_3M'] = industry_returns[industry].rolling(window=12 if freq == 'W' else 3).sum()
             
-            # 过去6个月动量
+            # Past 6 months momentum
             factors_df[f'{industry}_MOM_6M'] = industry_returns[industry].rolling(window=24 if freq == 'W' else 6).sum()
         
-        # 4. 尝试获取行业估值数据 (如PE、PB等)
-        # 这部分如果TuShare和AKShare没有直接提供，可能需要构建或用模拟数据
+        # 4. Try to get industry valuation data (such as PE, PB, etc.)
+        # This part may need to be constructed or use simulated data if TuShare and AKShare don't provide it directly
         
-        logger.info(f"成功计算行业轮动因子: {len(factors_df)} 条记录")
+        logger.info(f"Successfully calculated industry rotation factors: {len(factors_df)} records")
         return factors_df
         
     except Exception as e:
-        logger.error(f"获取行业轮动因子时出错: {e}")
+        logger.error(f"Error getting industry rotation factors: {e}")
         logger.error(traceback.format_exc())
         return pd.DataFrame()
 
@@ -148,19 +148,19 @@ def get_sector_index_returns(start_date: str = None,
                             end_date: str = None,
                             freq: str = 'D') -> pd.DataFrame:
     """
-    获取主要板块指数收益率数据 (上证、深证、创业板、中小板等)
+    Get main sector index return data (Shanghai Composite, Shenzhen Component, ChiNext, SME Board, etc.)
     
     Args:
-        start_date: 开始日期，格式：YYYY-MM-DD
-        end_date: 结束日期，格式：YYYY-MM-DD
-        freq: 数据频率，'D'为日度，'W'为周度，'M'为月度
+        start_date: Start date, format: YYYY-MM-DD
+        end_date: End date, format: YYYY-MM-DD
+        freq: Data frequency, 'D' for daily, 'W' for weekly, 'M' for monthly
         
     Returns:
-        包含主要板块指数收益率的DataFrame
+        DataFrame containing main sector index returns
     """
-    logger.info(f"获取主要板块指数收益率: {start_date} 至 {end_date}, 频率: {freq}")
+    logger.info(f"Getting main sector index returns: {start_date} to {end_date}, frequency: {freq}")
     
-    # 定义主要板块指数
+    # Define main sector indices
     sector_indices = {
         'sh000001': '上证指数', 
         'sz399001': '深证成指',
@@ -172,12 +172,12 @@ def get_sector_index_returns(start_date: str = None,
         'sh000852': '中证1000'
     }
     
-    # 获取各指数收益率
+    # Get returns for each index
     returns_dict = {}
     
     for code, name in sector_indices.items():
         try:
-            # 处理指数代码
+            # Process index code
             if code.startswith('sh'):
                 index_code = code[2:]
             elif code.startswith('sz'):
@@ -185,11 +185,11 @@ def get_sector_index_returns(start_date: str = None,
             else:
                 index_code = code
             
-            # 获取指数数据
+            # Get index data
             index_data = get_index_data(index_code, None, start_date, end_date, freq)
             
             if not index_data.empty:
-                # 确保日期列为日期类型
+                # Ensure date column is date type
                 if 'date' in index_data.columns:
                     index_data['date'] = pd.to_datetime(index_data['date'])
                     index_data = index_data.set_index('date')
@@ -197,26 +197,26 @@ def get_sector_index_returns(start_date: str = None,
                     index_data['trade_date'] = pd.to_datetime(index_data['trade_date'])
                     index_data = index_data.set_index('trade_date')
                 
-                # 计算收益率
+                # Calculate returns
                 if 'close' in index_data.columns:
                     returns = index_data['close'].pct_change().dropna()
                     returns_dict[name] = returns
-                    logger.info(f"成功获取 {name} 收益率数据: {len(returns)} 条记录")
+                    logger.info(f"Successfully obtained {name} return data: {len(returns)} records")
                 else:
-                    logger.warning(f"指数 {code} 数据中不包含close列")
+                    logger.warning(f"Index {code} data does not contain close column")
             else:
-                logger.warning(f"无法获取指数 {code} 数据")
+                logger.warning(f"Unable to get index {code} data")
                 
         except Exception as e:
-            logger.error(f"获取指数 {code} 收益率时出错: {e}")
+            logger.error(f"Error getting index {code} returns: {e}")
             logger.error(traceback.format_exc())
     
-    #  如果没有获取到数据，返回空DataFrame
+    # If no data was obtained, return empty DataFrame
     if not returns_dict:
-        logger.warning("未获取到任何板块指数收益率数据")
+        logger.warning("No sector index return data obtained")
         return pd.DataFrame()
     
-    # 合并为DataFrame
+    # Merge into DataFrame
     returns_df = pd.DataFrame(returns_dict)
     
     return returns_df
@@ -225,19 +225,19 @@ def get_style_index_returns(start_date: str = None,
                            end_date: str = None,
                            freq: str = 'D') -> pd.DataFrame:
     """
-    获取风格指数收益率数据 (大盘成长、小盘价值等)
+    Get style index return data (large-cap growth, small-cap value, etc.)
     
     Args:
-        start_date: 开始日期，格式：YYYY-MM-DD
-        end_date: 结束日期，格式：YYYY-MM-DD
-        freq: 数据频率，'D'为日度，'W'为周度，'M'为月度
+        start_date: Start date, format: YYYY-MM-DD
+        end_date: End date, format: YYYY-MM-DD
+        freq: Data frequency, 'D' for daily, 'W' for weekly, 'M' for monthly
         
     Returns:
-        包含风格指数收益率的DataFrame
+        DataFrame containing style index returns
     """
-    logger.info(f"获取风格指数收益率: {start_date} 至 {end_date}, 频率: {freq}")
+    logger.info(f"Getting style index returns: {start_date} to {end_date}, frequency: {freq}")
     
-    # 定义风格指数
+    # Define style indices
     style_indices = {
         'sh000919': '300价值',
         'sh000918': '300成长',
@@ -252,7 +252,7 @@ def get_style_index_returns(start_date: str = None,
     
     for code, name in style_indices.items():
         try:
-            # 处理指数代码
+            # Process index code
             if code.startswith('sh'):
                 index_code = code[2:]
             elif code.startswith('sz'):
@@ -260,11 +260,11 @@ def get_style_index_returns(start_date: str = None,
             else:
                 index_code = code
             
-            # 获取指数数据
+            # Get index data
             index_data = get_index_data(index_code, None, start_date, end_date, freq)
             
             if not index_data.empty:
-                # 确保日期列为日期类型
+                # Ensure date column is date type
                 if 'date' in index_data.columns:
                     index_data['date'] = pd.to_datetime(index_data['date'])
                     index_data = index_data.set_index('date')
@@ -272,26 +272,26 @@ def get_style_index_returns(start_date: str = None,
                     index_data['trade_date'] = pd.to_datetime(index_data['trade_date'])
                     index_data = index_data.set_index('trade_date')
                 
-                # 计算收益率
+                # Calculate returns
                 if 'close' in index_data.columns:
                     returns = index_data['close'].pct_change().dropna()
                     returns_dict[name] = returns
-                    logger.info(f"成功获取 {name} 收益率数据: {len(returns)} 条记录")
+                    logger.info(f"Successfully obtained {name} return data: {len(returns)} records")
                 else:
-                    logger.warning(f"指数 {code} 数据中不包含close列")
+                    logger.warning(f"Index {code} data does not contain close column")
             else:
-                logger.warning(f"无法获取指数 {code} 数据")
+                logger.warning(f"Unable to get index {code} data")
                 
         except Exception as e:
-            logger.error(f"获取指数 {code} 收益率时出错: {e}")
+            logger.error(f"Error getting index {code} returns: {e}")
             logger.error(traceback.format_exc())
     
-    # 如果没有获取到数据，返回空DataFrame
+    # If no data was obtained, return empty DataFrame
     if not returns_dict:
-        logger.warning("未获取到任何风格指数收益率数据")
+        logger.warning("No style index return data obtained")
         return pd.DataFrame()
     
-    # 合并为DataFrame
+    # Merge into DataFrame
     returns_df = pd.DataFrame(returns_dict)
     
     return returns_df

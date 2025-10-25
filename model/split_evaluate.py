@@ -11,7 +11,7 @@ import matplotlib.pyplot as plt
 from typing import Dict, List, Tuple, Any, Optional
 from datetime import datetime
 
-# 添加项目根目录到系统路径
+# Add project root directory to system path
 project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 sys.path.insert(0, project_root)
 
@@ -37,45 +37,45 @@ def split_and_evaluate(
     verbose: bool = True
 ) -> Tuple[Any, Dict[str, Any]]:
     """
-    划分数据，训练模型并进行评估
+    Split data, train model and evaluate
     
     Args:
-        ticker: 股票代码
-        price_data: 价格数据
-        model_type: 模型类型 ('dl', 'rl', 'factor')
-        train_ratio: 训练集比例
-        val_ratio: 验证集比例
-        test_ratio: 测试集比例
-        shuffle: 是否打乱数据
-        params: 模型参数
-        save_dir: 模型保存目录
-        eval_dir: 评估结果保存目录
-        verbose: 是否显示详细信息
+        ticker: Stock code
+        price_data: Price data
+        model_type: Model type ('dl', 'rl', 'factor')
+        train_ratio: Training set ratio
+        val_ratio: Validation set ratio
+        test_ratio: Test set ratio
+        shuffle: Whether to shuffle data
+        params: Model parameters
+        save_dir: Model save directory
+        eval_dir: Evaluation results save directory
+        verbose: Whether to show detailed information
         
     Returns:
-        训练好的模型和评估结果
+        Trained model and evaluation results
     """
     if verbose:
-        logger.info(f"开始数据划分和模型评估 - 股票代码: {ticker}")
-        logger.info(f"数据划分比例 - 训练集: {train_ratio*100:.1f}%, 验证集: {val_ratio*100:.1f}%, 测试集: {test_ratio*100:.1f}%")
+        logger.info(f"Starting data splitting and model evaluation - Stock code: {ticker}")
+        logger.info(f"Data split ratio - Training set: {train_ratio*100:.1f}%, Validation set: {val_ratio*100:.1f}%, Test set: {test_ratio*100:.1f}%")
     
-    # 初始化评估器
+    # Initialize evaluator
     evaluator = ModelEvaluator(output_dir=eval_dir)
     
-    # 确保目录存在
+    # Ensure directories exist
     os.makedirs(save_dir, exist_ok=True)
     os.makedirs(eval_dir, exist_ok=True)
     
-    # 预处理数据
+    # Preprocess data
     if model_type == 'dl' or model_type == 'rl':
         processed_data = preprocess_stock_data(price_data)
     else:
         processed_data = price_data.copy()
     
     if verbose:
-        logger.info(f"数据预处理完成，形状: {processed_data.shape}")
+        logger.info(f"Data preprocessing completed, shape: {processed_data.shape}")
     
-    # 划分数据
+    # Split data
     train_data, val_data, test_data = evaluator.split_data(
         data=processed_data,
         train_ratio=train_ratio,
@@ -85,20 +85,20 @@ def split_and_evaluate(
     )
     
     if verbose:
-        logger.info(f"数据划分完成 - 训练集: {train_data.shape}, 验证集: {val_data.shape}, 测试集: {test_data.shape}")
+        logger.info(f"Data splitting completed - Training set: {train_data.shape}, Validation set: {val_data.shape}, Test set: {test_data.shape}")
         
-    # 保存训练测试数据分布对比图
-    evaluator.compare_train_test_distributions(
-        train_data, test_data, 
-        columns=['close', 'returns', 'volatility_20d'] if all(col in processed_data.columns for col in ['close', 'returns', 'volatility_20d']) else None,
-        title_prefix=f'{ticker}'
-    )
+        # Save training-test data distribution comparison chart
+        evaluator.compare_train_test_distributions(
+            train_data, test_data, 
+            columns=['close', 'returns', 'volatility_20d'] if all(col in processed_data.columns for col in ['close', 'returns', 'volatility_20d']) else None,
+            title_prefix=f'{ticker}'
+        )
+        
+        # Calculate and save statistical information
+        evaluator.summary_statistics(train_data, name=f'{ticker}_train')
+        evaluator.summary_statistics(test_data, name=f'{ticker}_test')
     
-    # 计算并保存统计信息
-    evaluator.summary_statistics(train_data, name=f'{ticker}_train')
-    evaluator.summary_statistics(test_data, name=f'{ticker}_test')
-    
-    # 根据模型类型训练模型
+    # Train model based on model type
     agent = None
     evaluation_results = {}
     
@@ -125,19 +125,19 @@ def split_and_evaluate(
             evaluation_results.update(eval_results)
             
         else:
-            raise ValueError(f"不支持的模型类型: {model_type}")
+            raise ValueError(f"Unsupported model type: {model_type}")
             
     except Exception as e:
-        logger.error(f"训练和评估模型时出错: {str(e)}")
+        logger.error(f"Error training and evaluating model: {str(e)}")
         import traceback
         traceback.print_exc()
         
-    # 保存评估结果摘要
+    # Save evaluation results summary
     with open(f"{eval_dir}/{ticker}_{model_type}_evaluation_summary.json", 'w') as f:
         json.dump(evaluation_results, f, indent=4)
         
     if verbose:
-        logger.info(f"模型评估完成，结果已保存到 {eval_dir}")
+        logger.info(f"Model evaluation completed, results saved to {eval_dir}")
         
     return agent, evaluation_results
 
@@ -153,25 +153,25 @@ def train_and_evaluate_dl(
     verbose: bool = True
 ) -> Tuple[MLAgent, Dict[str, Any]]:
     """
-    训练和评估深度学习模型
+    Train and evaluate deep learning model
     
     Args:
-        ticker: 股票代码
-        train_data: 训练集
-        val_data: 验证集
-        test_data: 测试集
-        params: 模型参数
-        evaluator: 评估器实例
-        save_dir: 模型保存目录
-        verbose: 是否显示详细信息
+        ticker: Stock code
+        train_data: Training set
+        val_data: Validation set
+        test_data: Test set
+        params: Model parameters
+        evaluator: Evaluator instance
+        save_dir: Model save directory
+        verbose: Whether to show detailed information
         
     Returns:
-        训练好的MLAgent实例和评估结果
+        Trained MLAgent instance and evaluation results
     """
     if evaluator is None:
         evaluator = ModelEvaluator(f"{save_dir}/evaluation")
     
-    # 设置默认参数
+    # Set default parameters
     default_params = {
         'seq_length': 15,
         'forecast_days': 10,
@@ -182,7 +182,7 @@ def train_and_evaluate_dl(
         'learning_rate': 0.0005
     }
     
-    # 合并用户提供的参数
+    # Merge user-provided parameters
     model_params = default_params.copy()
     if params:
         for key, value in params.items():
@@ -190,27 +190,27 @@ def train_and_evaluate_dl(
                 model_params[key] = value
     
     if verbose:
-        logger.info("使用以下参数训练深度学习模型:")
+        logger.info("Training deep learning model with the following parameters:")
         for key, value in model_params.items():
             logger.info(f"  {key}: {value}")
     
-    # 初始化MLAgent
+    # Initialize MLAgent
     ml_agent = MLAgent(model_dir=save_dir)
     
-    # 准备特征列
+    # Prepare feature columns
     feature_cols = ['close', 'ma5', 'ma10', 'ma20', 'rsi', 'macd']
     missing_features = [col for col in feature_cols if col not in train_data.columns]
     if missing_features:
         if verbose:
-            logger.warning(f"以下特征在数据中缺失: {missing_features}")
-            logger.info("将使用可用的特征列")
+            logger.warning(f"The following features are missing from the data: {missing_features}")
+            logger.info("Will use available feature columns")
         feature_cols = [col for col in feature_cols if col in train_data.columns]
         if not feature_cols:
             feature_cols = ['close']
             if verbose:
-                logger.info("只使用close列作为特征")
+                logger.info("Only using close column as feature")
     
-    # 使用训练集训练模型
+    # Train model using training set
     ml_agent.train_models(
         train_data,
         seq_length=model_params['seq_length'],
@@ -223,7 +223,7 @@ def train_and_evaluate_dl(
         learning_rate=model_params['learning_rate']
     )
     
-    # 评估结果字典
+    # Evaluation results dictionary
     evaluation_results = {
         'model_type': 'dl',
         'params': model_params,
@@ -234,49 +234,49 @@ def train_and_evaluate_dl(
         'results': {}
     }
     
-    # 在测试集上评估LSTM模型
+    # Evaluate LSTM model on test set
     if ml_agent.dl_module.lstm_model is not None:
-        # 获取测试集的真实值和预测值
+        # Get true values and predictions for test set
         try:
-            # 在测试集上生成预测
+            # Generate predictions on test set
             test_predictions = []
             test_targets = []
             
-            # 序列长度
+            # Sequence length
             seq_length = model_params['seq_length']
             
-            # 对测试集中的每个窗口进行预测
+            # Make predictions for each window in test set
             for i in range(seq_length, len(test_data)):
-                # 获取序列窗口
+                # Get sequence window
                 test_window = test_data.iloc[i-seq_length:i]
                 target = test_data.iloc[i]['close']
                 
-                # 进行预测
+                # Make prediction
                 pred = ml_agent.dl_module.predict_lstm(
                     test_window, 
                     feature_cols=feature_cols,
                     seq_length=seq_length,
                     target_col='close'
-                )[0]  # 只取第一个预测值，即下一步预测
+                )[0]  # Only take the first prediction value, i.e., next step prediction
                 
                 test_predictions.append(pred)
                 test_targets.append(target)
             
-            # 转换为NumPy数组
+            # Convert to NumPy arrays
             test_predictions = np.array(test_predictions)
             test_targets = np.array(test_targets)
             
-            # 评估回归模型
+            # Evaluate regression model
             lstm_metrics = evaluator.evaluate_regression_model(
                 test_targets, test_predictions, 
                 model_name=f'{ticker}_lstm', dataset_name='test'
             )
             
-            # 可视化预测结果
+            # Visualize prediction results
             try:
                 date_index = None
                 if 'date' in test_data.columns:
-                    # 从序列长度之后开始的日期
+                    # Dates starting from after sequence length
                     date_index = test_data['date'].iloc[seq_length:].values
                 elif test_data.index.name == 'date':
                     date_index = test_data.index[seq_length:]
@@ -286,12 +286,12 @@ def train_and_evaluate_dl(
                     date_index=date_index,
                     model_name=f'{ticker}_lstm', 
                     dataset_name='test',
-                    title=f'{ticker} - LSTM模型测试集预测'
+                    title=f'{ticker} - LSTM Model Test Set Prediction'
                 )
             except Exception as viz_error:
-                logger.error(f"可视化预测结果时出错: {str(viz_error)}")
+                logger.error(f"Error visualizing prediction results: {str(viz_error)}")
             
-            # 生成未来预测
+            # Generate future predictions
             forecast = ml_agent.dl_module.predict_lstm(
                 test_data.iloc[-seq_length:], 
                 feature_cols=feature_cols,
@@ -299,48 +299,48 @@ def train_and_evaluate_dl(
                 target_col='close'
             )
             
-            # 可视化未来预测
+            # Visualize future predictions
             try:
                 history = test_data['close'].iloc[-30:].values
                 evaluator.visualize_forecast(
                     history, forecast,
                     model_name=f'{ticker}_lstm',
-                    title=f'{ticker} - 未来{len(forecast)}天价格预测'
+                    title=f'{ticker} - Future {len(forecast)} Day Price Prediction'
                 )
             except Exception as fore_error:
-                logger.error(f"可视化未来预测时出错: {str(fore_error)}")
+                logger.error(f"Error visualizing future predictions: {str(fore_error)}")
             
-            # 添加到评估结果
+            # Add to evaluation results
             evaluation_results['results']['lstm'] = {
                 'metrics': lstm_metrics,
                 'future_forecast': forecast.tolist()
             }
             
         except Exception as e:
-            logger.error(f"评估LSTM模型时出错: {str(e)}")
+            logger.error(f"Error evaluating LSTM model: {str(e)}")
     
-    # 在测试集上评估随机森林分类器
+    # Evaluate random forest classifier on test set
     if ml_agent.dl_module.rf_model is not None:
         try:
-            # 准备测试集特征和标签
+            # Prepare test set features and labels
             test_features = ml_agent.dl_module.prepare_features(test_data)
             test_labels = ml_agent.dl_module.generate_training_labels(test_data, forward_days=model_params['forecast_days'])
             
-            # 确保特征和标签具有相同的索引
+            # Ensure features and labels have the same index
             common_idx = test_features.index.intersection(test_labels.index)
             if len(common_idx) > 0:
-                # 获取预测
+                # Get predictions
                 test_features_scaled = ml_agent.dl_module.feature_scaler.transform(test_features.loc[common_idx])
                 test_pred = ml_agent.dl_module.rf_model.predict(test_features_scaled)
                 test_true = test_labels.loc[common_idx].values
                 
-                # 评估分类模型
+                # Evaluate classification model
                 rf_metrics = evaluator.evaluate_classification_model(
                     test_true, test_pred,
                     model_name=f'{ticker}_rf', dataset_name='test'
                 )
                 
-                # 特征重要性可视化
+                # Visualize feature importance
                 try:
                     evaluator.feature_importance_plot(
                         feature_names=test_features.columns.tolist(),
@@ -348,9 +348,9 @@ def train_and_evaluate_dl(
                         model_name=f'{ticker}_rf'
                     )
                 except Exception as feat_error:
-                    logger.error(f"可视化特征重要性时出错: {str(feat_error)}")
+                    logger.error(f"Error visualizing feature importance: {str(feat_error)}")
                 
-                # 添加到评估结果
+                # Add to evaluation results
                 evaluation_results['results']['random_forest'] = {
                     'metrics': rf_metrics,
                     'feature_importance': dict(zip(
@@ -359,7 +359,7 @@ def train_and_evaluate_dl(
                     ))
                 }
         except Exception as e:
-            logger.error(f"评估随机森林模型时出错: {str(e)}")
+            logger.error(f"Error evaluating random forest model: {str(e)}")
     
     return ml_agent, evaluation_results
 
@@ -375,29 +375,29 @@ def train_and_evaluate_rl(
     verbose: bool = True
 ) -> Tuple[RLTradingAgent, Dict[str, Any]]:
     """
-    训练和评估强化学习模型
+    Train and evaluate reinforcement learning model
     
     Args:
-        ticker: 股票代码
-        train_data: 训练集
-        val_data: 验证集
-        test_data: 测试集
-        params: 模型参数
-        evaluator: 评估器实例
-        save_dir: 模型保存目录
-        verbose: 是否显示详细信息
+        ticker: Stock code
+        train_data: Training set
+        val_data: Validation set
+        test_data: Test set
+        params: Model parameters
+        evaluator: Evaluator instance
+        save_dir: Model save directory
+        verbose: Whether to show detailed information
         
     Returns:
-        训练好的RLTradingAgent实例和评估结果
+        Trained RLTradingAgent instance and evaluation results
     """
     if evaluator is None:
         evaluator = ModelEvaluator(f"{save_dir}/evaluation")
     
-    # 实现强化学习模型的训练和评估
-    # 由于代码量较大，这里只是一个框架
-    # TODO: 实现具体的训练和评估逻辑
+    # Implement reinforcement learning model training and evaluation
+    # Due to large code volume, this is just a framework
+    # TODO: Implement specific training and evaluation logic
     
-    # 简单的返回值
+    # Simple return value
     rl_agent = RLTradingAgent()
     evaluation_results = {
         'model_type': 'rl',
@@ -421,29 +421,29 @@ def train_and_evaluate_factor(
     verbose: bool = True
 ) -> Tuple[FactorAgent, Dict[str, Any]]:
     """
-    训练和评估因子模型
+    Train and evaluate factor model
     
     Args:
-        ticker: 股票代码
-        train_data: 训练集
-        val_data: 验证集
-        test_data: 测试集
-        params: 模型参数
-        evaluator: 评估器实例
-        save_dir: 模型保存目录
-        verbose: 是否显示详细信息
+        ticker: Stock code
+        train_data: Training set
+        val_data: Validation set
+        test_data: Test set
+        params: Model parameters
+        evaluator: Evaluator instance
+        save_dir: Model save directory
+        verbose: Whether to show detailed information
         
     Returns:
-        训练好的FactorAgent实例和评估结果
+        Trained FactorAgent instance and evaluation results
     """
     if evaluator is None:
         evaluator = ModelEvaluator(f"{save_dir}/evaluation")
     
-    # 实现因子模型的训练和评估
-    # 由于代码量较大，这里只是一个框架
-    # TODO: 实现具体的训练和评估逻辑
+    # Implement factor model training and evaluation
+    # Due to large code volume, this is just a framework
+    # TODO: Implement specific training and evaluation logic
     
-    # 简单的返回值
+    # Simple return value
     factor_agent = FactorAgent()
     evaluation_results = {
         'model_type': 'factor',
@@ -457,68 +457,68 @@ def train_and_evaluate_factor(
 
 
 if __name__ == '__main__':
-    # 命令行参数解析
-    parser = argparse.ArgumentParser(description='股票模型数据划分与评估工具')
+    # Command line argument parsing
+    parser = argparse.ArgumentParser(description='Stock model data splitting and evaluation tool')
     
-    # 基本参数
+    # Basic parameters
     parser.add_argument('--ticker', type=str, required=True,
-                        help='股票代码，例如: 600519')
+                        help='Stock code, e.g.: 600519')
     parser.add_argument('--start-date', type=str,
                         default=(datetime.now() - timedelta(days=365*2)).strftime('%Y-%m-%d'),
-                        help='开始日期，格式：YYYY-MM-DD，默认为两年前')
+                        help='Start date, format: YYYY-MM-DD, default is two years ago')
     parser.add_argument('--end-date', type=str,
                         default=(datetime.now() - timedelta(days=1)).strftime('%Y-%m-%d'),
-                        help='结束日期，格式：YYYY-MM-DD，默认为昨天')
+                        help='End date, format: YYYY-MM-DD, default is yesterday')
     
-    # 模型选择
+    # Model selection
     parser.add_argument('--model', type=str, choices=['dl', 'rl', 'factor', 'all'],
                         default='dl',
-                        help='模型类型: dl (深度学习), rl (强化学习), factor (遗传编程因子), all (所有)')
+                        help='Model type: dl (deep learning), rl (reinforcement learning), factor (genetic programming factor), all (all)')
     
-    # 数据划分参数
+    # Data splitting parameters
     parser.add_argument('--train-ratio', type=float, default=0.7,
-                        help='训练集比例，默认0.7')
+                        help='Training set ratio, default 0.7')
     parser.add_argument('--val-ratio', type=float, default=0.2,
-                        help='验证集比例，默认0.2')
+                        help='Validation set ratio, default 0.2')
     parser.add_argument('--test-ratio', type=float, default=0.1,
-                        help='测试集比例，默认0.1')
+                        help='Test set ratio, default 0.1')
     parser.add_argument('--shuffle', action='store_true',
-                        help='是否打乱数据')
+                        help='Whether to shuffle data')
     
-    # 模型参数
+    # Model parameters
     parser.add_argument('--params', type=str, default=None,
-                        help='模型参数，JSON格式字符串，例如: \'{"hidden_dim": 128, "epochs": 100}\'')
+                        help='Model parameters, JSON format string, e.g.: \'{"hidden_dim": 128, "epochs": 100}\'')
     
-    # 其他选项
+    # Other options
     parser.add_argument('--model-dir', type=str, default='models',
-                        help='模型保存目录，默认为 "models"')
+                        help='Model save directory, default "models"')
     parser.add_argument('--eval-dir', type=str, default='models/evaluation',
-                        help='评估结果保存目录，默认为 "models/evaluation"')
+                        help='Evaluation results save directory, default "models/evaluation"')
     parser.add_argument('--verbose', action='store_true', default=True,
-                        help='显示详细输出')
+                        help='Show detailed output')
     
     args = parser.parse_args()
     
-    # 解析JSON参数
+    # Parse JSON parameters
     params = None
     if args.params:
         try:
             params = json.loads(args.params)
         except json.JSONDecodeError:
-            logger.error(f"错误: 无法解析参数JSON: {args.params}")
-            logger.error("请使用正确的JSON格式，例如: '{\"hidden_dim\": 128, \"epochs\": 100}'")
+            logger.error(f"Error: Unable to parse parameter JSON: {args.params}")
+            logger.error("Please use correct JSON format, e.g.: '{\"hidden_dim\": 128, \"epochs\": 100}'")
             sys.exit(1)
     
-    # 从train.py导入数据处理函数
+    # Import data processing function from train.py
     from model.train.train import process_data
     
-    # 获取并处理股票数据
+    # Get and process stock data
     price_data = process_data(args.ticker, args.start_date, args.end_date, args.verbose)
     if price_data is None or (isinstance(price_data, pd.DataFrame) and price_data.empty):
-        logger.error("错误: 无法获取股票数据或数据为空")
+        logger.error("Error: Unable to get stock data or data is empty")
         sys.exit(1)
     
-    # 执行模型训练和评估
+    # Execute model training and evaluation
     if args.model == 'all':
         models_to_train = ['dl', 'rl', 'factor']
     else:
@@ -526,7 +526,7 @@ if __name__ == '__main__':
     
     for model_type in models_to_train:
         logger.info(f"\n{'='*50}")
-        logger.info(f"开始处理 {model_type} 模型")
+        logger.info(f"Starting processing of {model_type} model")
         logger.info(f"{'='*50}")
         
         save_dir = args.eval_dir if model_type == 'factor' else args.model_dir
@@ -546,5 +546,5 @@ if __name__ == '__main__':
         )
         
         logger.info(f"\n{'='*50}")
-        logger.info(f"{model_type} 模型处理完成")
+        logger.info(f"{model_type} model processing completed")
         logger.info(f"{'='*50}") 

@@ -12,26 +12,26 @@ urllib3.disable_warnings()
 import logging
 logging.getLogger("urllib3").setLevel(logging.WARNING)
 
-# 设置日志记录
+# Setup logging
 logger = setup_logger('api')
 
-# 创建数据API实例
+# Create data API instance
 data_api = DataAPI()
 
 def handle_exception(func_name: str, exception: Exception, default_return=None):
-    """统一处理异常并返回默认值"""
+    """Unified exception handling and return default values"""
     logger.error(f"Error in {func_name}: {exception}")
     logger.debug(f"Error details: {traceback.format_exc()}")
     return default_return
 
 def get_financial_metrics(symbol: str) -> Dict[str, Any]:
-    """获取财务指标数据"""
+    """Get financial metrics data"""
     logger.info(f"Getting financial indicators for {symbol}...")
     try:
-        # 使用数据API获取财务指标
+        # Use data API to get financial metrics
         metrics = data_api.get_financial_metrics(symbol)
         
-        # 使用数据处理器处理财务数据
+        # Use data processor to process financial data
         processed_metrics = data_processor.process_financial_data(metrics)
         
         return processed_metrics
@@ -40,13 +40,13 @@ def get_financial_metrics(symbol: str) -> Dict[str, Any]:
 
 
 def get_financial_statements(symbol: str) -> Dict[str, Any]:
-    """获取财务报表数据"""
+    """Get financial statements data"""
     logger.info(f"Getting financial statements for {symbol}...")
     try:
-        # 使用数据API获取财务报表
+        # Use data API to get financial statements
         statements = data_api.get_financial_statements(symbol)
         
-        # 使用数据处理器处理财务数据
+        # Use data processor to process financial data
         processed_statements = data_processor.process_financial_data(statements)
         
         return processed_statements
@@ -64,9 +64,9 @@ def get_financial_statements(symbol: str) -> Dict[str, Any]:
 
 
 def get_market_data(symbol: str) -> Dict[str, Any]:
-    """获取市场数据"""
+    """Get market data"""
     try:
-        # 使用数据API获取市场数据
+        # Use data API to get market data
         market_data = data_api.get_market_data(symbol)
         return market_data
     except Exception as e:
@@ -74,36 +74,36 @@ def get_market_data(symbol: str) -> Dict[str, Any]:
 
 
 def get_price_history(symbol: str, start_date: str = None, end_date: str = None, adjust: str = "qfq") -> pd.DataFrame:
-    """获取历史价格数据
+    """Get historical price data
 
     Args:
-        symbol: 股票代码
-        start_date: 开始日期，格式：YYYY-MM-DD，如果为None则默认获取过去一年的数据
-        end_date: 结束日期，格式：YYYY-MM-DD，如果为None则使用昨天作为结束日期
-        adjust: 复权类型，可选值：
-               - "": 不复权
-               - "qfq": 前复权（默认）
-               - "hfq": 后复权
+        symbol: Stock code
+        start_date: Start date, format: YYYY-MM-DD, if None defaults to past year data
+        end_date: End date, format: YYYY-MM-DD, if None uses yesterday as end date
+        adjust: Adjustment type, options:
+               - "": No adjustment
+               - "qfq": Forward adjustment (default)
+               - "hfq": Backward adjustment
 
     Returns:
-        包含价格数据的DataFrame
+        DataFrame containing price data
     """
     try:
-        # 使用数据API获取价格数据
+        # Use data API to get price data
         df = data_api.get_price_data(symbol, start_date, end_date)
         
-        # 数据处理和验证
+        # Data processing and validation
         if df is None or df.empty:
             logger.warning(f"No price history data available for {symbol}")
-            # 尝试使用TuShare作为最后手段
+            # Try using TuShare as last resort
             df = _try_tushare_last_resort(symbol, start_date, end_date)
             if df.empty:
                 return pd.DataFrame()
         
-        # 检查DataFrame中必须包含的列
+        # Check DataFrame contains all required columns
         df = _ensure_required_columns(df)
         
-        # 使用数据处理器增强数据质量
+        # Use data processor to enhance data quality
         processed_df = data_processor.process_price_data(df)
         logger.info(f"Successfully processed price data ({len(processed_df)} records)")
         
@@ -114,7 +114,7 @@ def get_price_history(symbol: str, start_date: str = None, end_date: str = None,
 
 
 def _try_tushare_last_resort(symbol: str, start_date: str, end_date: str) -> pd.DataFrame:
-    """作为最后手段尝试使用TuShare获取数据"""
+    """Try using TuShare as last resort to get data"""
     try:
         import tushare as ts
         token = os.environ.get('TUSHARE_TOKEN', '')
@@ -122,7 +122,7 @@ def _try_tushare_last_resort(symbol: str, start_date: str, end_date: str) -> pd.
             ts.set_token(token)
             pro = ts.pro_api()
             
-            # 处理日期
+            # Process dates
             if not end_date:
                 end_date = datetime.now() - timedelta(days=1)
             else:
@@ -135,20 +135,20 @@ def _try_tushare_last_resort(symbol: str, start_date: str, end_date: str) -> pd.
                 if isinstance(start_date, str):
                     start_date = datetime.strptime(start_date, '%Y-%m-%d')
             
-            # 转换为TuShare格式
+            # Convert to TuShare format
             ts_start = start_date.strftime('%Y%m%d')
             ts_end = end_date.strftime('%Y%m%d')
             
-            # 添加前缀
+            # Add prefix
             ts_code = _convert_to_tushare_code(symbol)
             
-            # 直接使用TuShare API
-            logger.info(f"直接尝试TuShare获取数据: {ts_code}")
+            # Directly use TuShare API
+            logger.info(f"Directly trying TuShare to get data: {ts_code}")
             ts_df = pro.daily(ts_code=ts_code, start_date=ts_start, end_date=ts_end)
             
             if not ts_df.empty:
-                logger.info(f"TuShare最后手段成功获取到{len(ts_df)}条记录")
-                # 重命名列
+                logger.info(f"TuShare last resort successfully obtained {len(ts_df)} records")
+                # Rename columns
                 ts_df = ts_df.rename(columns={
                     "trade_date": "date",
                     "vol": "volume",
@@ -156,25 +156,25 @@ def _try_tushare_last_resort(symbol: str, start_date: str, end_date: str) -> pd.
                     "change": "change_amount"
                 })
                 
-                # 转换日期
+                # Convert dates
                 ts_df["date"] = pd.to_datetime(ts_df["date"], format="%Y%m%d")
                 
-                # 排序
+                # Sort
                 ts_df = ts_df.sort_values("date", ascending=True)
                 
-                # 处理数据
+                # Process data
                 processed_df = data_processor.process_price_data(ts_df)
                 return processed_df
     except Exception as e:
-        logger.error(f"直接使用TuShare也失败: {e}")
+        logger.error(f"Directly using TuShare also failed: {e}")
     
-    # 如果所有尝试都失败，返回空DataFrame
+    # If all attempts fail, return empty DataFrame
     return pd.DataFrame()
 
 
 def _convert_to_tushare_code(symbol: str) -> str:
-    """将股票代码转换为TuShare格式"""
-    # 添加前缀
+    """Convert stock code to TuShare format"""
+    # Add prefix
     if symbol.startswith(('sh', 'sz', 'bj')):
         code = symbol[2:]
         prefix = symbol[:2].upper()
@@ -191,13 +191,13 @@ def _convert_to_tushare_code(symbol: str) -> str:
 
 
 def _ensure_required_columns(df: pd.DataFrame) -> pd.DataFrame:
-    """确保DataFrame包含所有必须的列"""
+    """Ensure DataFrame contains all required columns"""
     required_columns = ['date', 'open', 'high', 'low', 'close', 'volume']
     missing_columns = [col for col in required_columns if col not in df.columns]
     
     if missing_columns:
         logger.warning(f"Missing required columns: {missing_columns}")
-        # 添加缺失的列
+        # Add missing columns
         for col in missing_columns:
             df[col] = 0.0 if col != 'date' else pd.to_datetime('today')
     
@@ -209,7 +209,7 @@ def prices_to_df(prices):
     try:
         df = pd.DataFrame(prices)
 
-        # 标准化列名映射
+        # Standardize column name mapping
         column_mapping = {
             '收盘': 'close',
             '开盘': 'open',
@@ -223,42 +223,42 @@ def prices_to_df(prices):
             '换手率': 'turnover_rate'
         }
 
-        # 重命名列
+        # Rename columns
         for cn, en in column_mapping.items():
             if cn in df.columns:
                 df[en] = df[cn]
 
-        # 确保必要的列存在
+        # Ensure necessary columns exist
         required_columns = ['close', 'open', 'high', 'low', 'volume']
         for col in required_columns:
             if col not in df.columns:
-                df[col] = 0.0  # 使用0填充缺失的必要列
+                df[col] = 0.0  # Use 0 to fill missing necessary columns
         
-        # 确保日期列是正确的日期格式
+        # Ensure date column is in correct date format
         if 'date' in df.columns:
             df['date'] = pd.to_datetime(df['date'])
-            # 设置日期作为索引并排序
+            # Set date as index and sort
             df.set_index('date', inplace=True)
             df.sort_index(inplace=True)
                 
-        # 使用数据处理器增强数据质量
+        # Use data processor to enhance data quality
         df = data_processor.process_price_data(df)
 
         return df
     except Exception as e:
-        logger.error(f"prices_to_df错误: {e}")
+        logger.error(f"prices_to_df error: {e}")
         return pd.DataFrame(columns=['close', 'open', 'high', 'low', 'volume'])
 
 
 def get_price_data(ticker: str, start_date: str, end_date: str) -> pd.DataFrame:
-    """获取股票价格数据
+    """Get stock price data
 
     Args:
-        ticker: 股票代码
-        start_date: 开始日期，格式：YYYY-MM-DD
-        end_date: 结束日期，格式：YYYY-MM-DD
+        ticker: Stock code
+        start_date: Start date, format: YYYY-MM-DD
+        end_date: End date, format: YYYY-MM-DD
 
     Returns:
-        包含价格数据的DataFrame
+        DataFrame containing price data
     """
     return get_price_history(ticker, start_date, end_date)

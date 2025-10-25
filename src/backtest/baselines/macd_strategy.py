@@ -4,9 +4,9 @@ from .base_strategy import BaseStrategy, Signal, Portfolio
 
 class MACDStrategy(BaseStrategy):
     """
-    MACD策略
-    基于MACD指标的趋势跟踪和背离策略
-    参考：Gerald Appel (1979) - Moving Average Convergence Divergence
+    MACD Strategy
+    Trend following and divergence strategy based on MACD indicator
+    Reference: Gerald Appel (1979) - Moving Average Convergence Divergence
     """
     
     def __init__(self, fast_period: int = 12, slow_period: int = 26, 
@@ -24,47 +24,47 @@ class MACDStrategy(BaseStrategy):
         self.last_crossover = None
         
     def calculate_ema(self, prices: pd.Series, period: int) -> pd.Series:
-        """计算指数移动平均线"""
+        """Calculate exponential moving average"""
         return prices.ewm(span=period, adjust=False).mean()
     
     def calculate_macd(self, prices: pd.Series):
-        """计算MACD指标"""
+        """Calculate MACD indicator"""
         if len(prices) < self.slow_period:
             return None, None, None
             
-        # 计算快线和慢线EMA
+        # Calculate fast and slow EMA
         ema_fast = self.calculate_ema(prices, self.fast_period)
         ema_slow = self.calculate_ema(prices, self.slow_period)
         
-        # 计算MACD线
+        # Calculate MACD line
         macd_line = ema_fast - ema_slow
         
-        # 计算信号线
+        # Calculate signal line
         signal_line = self.calculate_ema(macd_line, self.signal_period)
         
-        # 计算MACD柱状图
+        # Calculate MACD histogram
         histogram = macd_line - signal_line
         
         return macd_line.iloc[-1], signal_line.iloc[-1], histogram.iloc[-1]
     
     def detect_macd_divergence(self, prices: pd.Series, macd_line: pd.Series) -> str:
-        """检测MACD背离"""
+        """Detect MACD divergence"""
         if len(prices) < 20 or len(macd_line) < 20:
             return "none"
             
-        # 获取最近20天的数据
+        # Get recent 20 days of data
         recent_prices = prices.tail(20)
         recent_macd = macd_line.tail(20)
         
-        # 寻找价格和MACD的高点和低点
+        # Find peaks and troughs in price and MACD
         price_peaks = []
         macd_peaks = []
         price_troughs = []
         macd_troughs = []
         
-        # 简化的峰谷检测
+        # Simplified peak and trough detection
         for i in range(2, len(recent_prices) - 2):
-            # 检测峰值
+            # Detect peaks
             if (recent_prices.iloc[i] > recent_prices.iloc[i-1] and 
                 recent_prices.iloc[i] > recent_prices.iloc[i+1] and
                 recent_prices.iloc[i] > recent_prices.iloc[i-2] and
@@ -77,7 +77,7 @@ class MACDStrategy(BaseStrategy):
                 recent_macd.iloc[i] > recent_macd.iloc[i+2]):
                 macd_peaks.append((i, recent_macd.iloc[i]))
                 
-            # 检测谷值
+            # Detect troughs
             if (recent_prices.iloc[i] < recent_prices.iloc[i-1] and 
                 recent_prices.iloc[i] < recent_prices.iloc[i+1] and
                 recent_prices.iloc[i] < recent_prices.iloc[i-2] and
@@ -90,7 +90,7 @@ class MACDStrategy(BaseStrategy):
                 recent_macd.iloc[i] < recent_macd.iloc[i+2]):
                 macd_troughs.append((i, recent_macd.iloc[i]))
         
-        # 检查看涨背离（价格创新低，MACD未创新低）
+        # Check for bullish divergence (price makes new low, MACD does not)
         if len(price_troughs) >= 2 and len(macd_troughs) >= 2:
             latest_price_trough = price_troughs[-1]
             prev_price_trough = price_troughs[-2]
@@ -101,7 +101,7 @@ class MACDStrategy(BaseStrategy):
                 latest_macd_trough[1] > prev_macd_trough[1]):
                 return "bullish"
         
-        # 检查看跌背离（价格创新高，MACD未创新高）
+        # Check for bearish divergence (price makes new high, MACD does not)
         if len(price_peaks) >= 2 and len(macd_peaks) >= 2:
             latest_price_peak = price_peaks[-1]
             prev_price_peak = price_peaks[-2]
@@ -115,32 +115,32 @@ class MACDStrategy(BaseStrategy):
         return "none"
     
     def calculate_trend_strength(self, prices: pd.Series) -> float:
-        """计算趋势强度"""
+        """Calculate trend strength"""
         if len(prices) < 20:
             return 0.0
             
-        # 使用线性回归斜率衡量趋势强度
+        # Use linear regression slope to measure trend strength
         x = np.arange(len(prices.tail(20)))
         y = prices.tail(20).values
         
-        # 计算线性回归斜率
+        # Calculate linear regression slope
         slope = np.polyfit(x, y, 1)[0]
         
-        # 标准化斜率
+        # Normalize slope
         price_range = prices.tail(20).max() - prices.tail(20).min()
         if price_range == 0:
             return 0.0
             
-        normalized_slope = slope / price_range * 20  # 20天的标准化斜率
+        normalized_slope = slope / price_range * 20  # 20-day normalized slope
         
         return normalized_slope
     
     def calculate_macd_momentum(self, macd_line: pd.Series, signal_line: pd.Series) -> float:
-        """计算MACD动量"""
+        """Calculate MACD momentum"""
         if len(macd_line) < 5 or len(signal_line) < 5:
             return 0.0
             
-        # MACD线相对于信号线的动量
+        # MACD line momentum relative to signal line
         current_diff = macd_line.iloc[-1] - signal_line.iloc[-1]
         prev_diff = macd_line.iloc[-5] - signal_line.iloc[-5]
         
@@ -150,15 +150,15 @@ class MACDStrategy(BaseStrategy):
     def generate_signal(self, data: pd.DataFrame, portfolio: Portfolio, 
                        current_date: str, **kwargs) -> Signal:
         """
-        MACD策略逻辑：
-        - MACD线上穿信号线时买入
-        - MACD线下穿信号线时卖出
-        - 结合背离和趋势确认
-        - 使用柱状图确认信号强度
+        MACD strategy logic:
+        - Buy when MACD line crosses above signal line
+        - Sell when MACD line crosses below signal line
+        - Combine with divergence and trend confirmation
+        - Use histogram to confirm signal strength
         """
         prices = data['close']
         
-        # 计算MACD指标
+        # Calculate MACD indicator
         macd_result = self.calculate_macd(prices)
         if macd_result[0] is None:
             return Signal(
@@ -170,21 +170,21 @@ class MACDStrategy(BaseStrategy):
             
         macd_line, signal_line, histogram = macd_result
         
-        # 计算历史MACD数据用于背离检测
+        # Calculate historical MACD data for divergence detection
         if len(prices) >= self.slow_period + 10:
             ema_fast = self.calculate_ema(prices, self.fast_period)
             ema_slow = self.calculate_ema(prices, self.slow_period)
             macd_series = ema_fast - ema_slow
             
-            # 检测背离
+            # Detect divergence
             divergence = self.detect_macd_divergence(prices, macd_series)
         else:
             divergence = "none"
         
-        # 计算趋势强度
+        # Calculate trend strength
         trend_strength = self.calculate_trend_strength(prices)
         
-        # 计算MACD动量
+        # Calculate MACD momentum
         if len(prices) >= self.slow_period + 5:
             ema_fast = self.calculate_ema(prices, self.fast_period)
             ema_slow = self.calculate_ema(prices, self.slow_period)
@@ -194,20 +194,20 @@ class MACDStrategy(BaseStrategy):
         else:
             macd_momentum = 0.0
         
-        # 检测MACD交叉
+        # Detect MACD crossover
         if len(prices) >= self.slow_period + self.signal_period + 1:
             ema_fast = self.calculate_ema(prices, self.fast_period)
             ema_slow = self.calculate_ema(prices, self.slow_period)
             macd_series = ema_fast - ema_slow
             signal_series = self.calculate_ema(macd_series, self.signal_period)
             
-            # 当前和前一天的MACD状态
+            # Current and previous day MACD status
             current_above = macd_series.iloc[-1] > signal_series.iloc[-1]
             prev_above = macd_series.iloc[-2] > signal_series.iloc[-2]
             
-            # 检测金叉和死叉
-            golden_cross = current_above and not prev_above  # 金叉
-            death_cross = not current_above and prev_above   # 死叉
+            # Detect golden cross and death cross
+            golden_cross = current_above and not prev_above  # Golden cross
+            death_cross = not current_above and prev_above   # Death cross
         else:
             golden_cross = False
             death_cross = False
@@ -215,29 +215,29 @@ class MACDStrategy(BaseStrategy):
         current_price = prices.iloc[-1]
         position_ratio = (portfolio.stock * current_price) / (portfolio.cash + portfolio.stock * current_price)
         
-        # 买入信号（金叉）
+        # Buy signal (golden cross)
         if golden_cross and position_ratio < 0.8:
             signal_strength = 1.0
             
-            # MACD在零轴上方增强信号
+            # MACD above zero line enhances signal
             if macd_line > 0:
                 signal_strength *= 1.3
                 
-            # 柱状图确认
+            # Histogram confirmation
             if histogram > self.histogram_threshold:
                 signal_strength *= 1.2
                 
-            # 背离增强信号
+            # Divergence enhances signal
             if divergence == "bullish":
                 signal_strength *= 1.5
                 
-            # 趋势确认
+            # Trend confirmation
             if self.trend_confirmation and trend_strength > 0.02:
                 signal_strength *= 1.2
             elif self.trend_confirmation and trend_strength < -0.02:
-                signal_strength *= 0.7  # 逆趋势信号减弱
+                signal_strength *= 0.7  # Counter-trend signal weakened
                 
-            # MACD动量确认
+            # MACD momentum confirmation
             if macd_momentum > 0:
                 signal_strength *= 1.1
                 
@@ -263,29 +263,29 @@ class MACDStrategy(BaseStrategy):
                     }
                 )
         
-        # 卖出信号（死叉）
+        # Sell signal (death cross)
         elif death_cross and portfolio.stock > 0:
             signal_strength = 1.0
             
-            # MACD在零轴下方增强信号
+            # MACD below zero line enhances signal
             if macd_line < 0:
                 signal_strength *= 1.3
                 
-            # 柱状图确认
+            # Histogram confirmation
             if histogram < -self.histogram_threshold:
                 signal_strength *= 1.2
                 
-            # 背离增强信号
+            # Divergence enhances signal
             if divergence == "bearish":
                 signal_strength *= 1.5
                 
-            # 趋势确认
+            # Trend confirmation
             if self.trend_confirmation and trend_strength < -0.02:
                 signal_strength *= 1.2
             elif self.trend_confirmation and trend_strength > 0.02:
-                signal_strength *= 0.7  # 逆趋势信号减弱
+                signal_strength *= 0.7  # Counter-trend signal weakened
                 
-            # MACD动量确认
+            # MACD momentum confirmation
             if macd_momentum < 0:
                 signal_strength *= 1.1
                 
@@ -310,10 +310,10 @@ class MACDStrategy(BaseStrategy):
                     }
                 )
         
-        # 背离信号（无交叉时）
+        # Divergence signal (when no crossover)
         elif divergence == "bullish" and portfolio.stock == 0 and position_ratio < 0.6:
-            # 看涨背离买入信号
-            max_investment = portfolio.cash * 0.25  # 较小仓位
+            # Bullish divergence buy signal
+            max_investment = portfolio.cash * 0.25  # Smaller position
             quantity = int(max_investment / current_price)
             
             if quantity > 0:
@@ -331,8 +331,8 @@ class MACDStrategy(BaseStrategy):
                 )
         
         elif divergence == "bearish" and portfolio.stock > 0:
-            # 看跌背离卖出信号
-            quantity = int(portfolio.stock * 0.3)  # 部分减仓
+            # Bearish divergence sell signal
+            quantity = int(portfolio.stock * 0.3)  # Partial position reduction
             
             if quantity > 0:
                 return Signal(
@@ -348,13 +348,13 @@ class MACDStrategy(BaseStrategy):
                     }
                 )
         
-        # 零轴突破信号
+        # Zero line breakout signal
         elif macd_line > 0 and len(prices) >= self.slow_period + 1:
             ema_fast = self.calculate_ema(prices, self.fast_period)
             ema_slow = self.calculate_ema(prices, self.slow_period)
             macd_series = ema_fast - ema_slow
             
-            # 检查是否刚突破零轴
+            # Check if just broke through zero line
             if macd_series.iloc[-2] <= 0 and macd_line > 0 and position_ratio < 0.6:
                 max_investment = portfolio.cash * 0.2
                 quantity = int(max_investment / current_price)
@@ -372,13 +372,13 @@ class MACDStrategy(BaseStrategy):
                         }
                     )
         
-        # 记录最后信号
+        # Record last signal
         if golden_cross:
             self.last_signal = 'buy'
         elif death_cross:
             self.last_signal = 'sell'
             
-        # 持有信号
+        # Hold signal
         return Signal(
             action='hold',
             quantity=0,

@@ -3,26 +3,26 @@ from .base_strategy import BaseStrategy, Signal, Portfolio
 
 class BuyHoldStrategy(BaseStrategy):
     """
-    买入持有策略
-    经典的长期投资基准策略
+    Buy and Hold Strategy
+    Classic long-term investment benchmark strategy
     """
     
     def __init__(self, allocation_ratio: float = 1.0, **kwargs):
         # Extract name from kwargs if provided, otherwise use default
         name = kwargs.pop('name', 'Buy-and-Hold')
         super().__init__(name, **kwargs)
-        self.allocation_ratio = allocation_ratio  # 资金配置比例
+        self.allocation_ratio = allocation_ratio  # Capital allocation ratio
         self.initial_purchase_made = False
         
     def generate_signal(self, data: pd.DataFrame, portfolio: Portfolio, 
                        current_date: str, **kwargs) -> Signal:
         """
-        买入持有策略逻辑：
-        - 第一次交易时买入并持有
-        - 之后所有时间都持有
+        Buy and hold strategy logic:
+        - Buy and hold on first trade
+        - Hold all the time after that
         """
         if not self.initial_purchase_made and portfolio.cash > 0:
-            # 第一次投资：买入
+            # First investment: buy
             current_price = data.iloc[-1]['close']
             max_shares = int((portfolio.cash * self.allocation_ratio) / current_price)
             
@@ -36,7 +36,7 @@ class BuyHoldStrategy(BaseStrategy):
                     metadata={'allocation_ratio': self.allocation_ratio}
                 )
         
-        # 已投资或无法投资：持有
+        # Already invested or cannot invest: hold
         return Signal(
             action='hold',
             quantity=0,

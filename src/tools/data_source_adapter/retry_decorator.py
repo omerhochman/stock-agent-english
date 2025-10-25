@@ -7,13 +7,13 @@ logger = setup_logger('retry')
 
 def retry(max_tries=3, delay_seconds=2, backoff=2, exceptions=(Exception,)):
     """
-    重试装饰器：当函数失败时自动重试
+    Retry decorator: automatically retry when function fails
     
     Args:
-        max_tries: 最大重试次数
-        delay_seconds: 初始延迟秒数
-        backoff: 延迟增长倍数
-        exceptions: 需要重试的异常类型
+        max_tries: Maximum number of retries
+        delay_seconds: Initial delay in seconds
+        backoff: Delay growth multiplier
+        exceptions: Exception types that need retry
     """
     def decorator(func):
         @functools.wraps(func)
@@ -23,12 +23,12 @@ def retry(max_tries=3, delay_seconds=2, backoff=2, exceptions=(Exception,)):
                 try:
                     return func(*args, **kwargs)
                 except exceptions as e:
-                    logger.warning(f"函数 {func.__name__} 调用失败: {str(e)}, "
-                                 f"剩余重试次数: {mtries-1}")
+                    logger.warning(f"Function {func.__name__} call failed: {str(e)}, "
+                                 f"remaining retries: {mtries-1}")
                     
                     mtries -= 1
                     if mtries == 0:
-                        logger.error(f"函数 {func.__name__} 达到最大重试次数，抛出异常")
+                        logger.error(f"Function {func.__name__} reached maximum retry count, throwing exception")
                         raise
                     
                     time.sleep(mdelay)

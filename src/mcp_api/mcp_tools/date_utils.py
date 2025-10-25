@@ -10,20 +10,20 @@ logger = logging.getLogger(__name__)
 
 def register_date_utils_tools(app: FastMCP, active_data_source: FinancialDataSource):
     """
-    向MCP应用注册日期工具函数
+    Register date utility functions to MCP application
 
-    参数:
-        app: FastMCP应用实例
-        active_data_source: 活跃的金融数据源
+    Args:
+        app: FastMCP application instance
+        active_data_source: Active financial data source
     """
 
     @app.tool()
     def get_current_date() -> str:
         """
-        获取当前日期，可用于查询最新数据。
+        Get current date, can be used to query latest data.
 
-        返回:
-            当前日期，格式为'YYYY-MM-DD'。
+        Returns:
+            Current date in 'YYYY-MM-DD' format.
         """
         logger.info("Tool 'get_current_date' called")
         current_date = datetime.now().strftime("%Y-%m-%d")
@@ -33,27 +33,27 @@ def register_date_utils_tools(app: FastMCP, active_data_source: FinancialDataSou
     @app.tool()
     def get_latest_trading_date() -> str:
         """
-        获取最近的交易日期。如果当天是交易日，则返回当天日期；否则返回最近的交易日。
+        Get the latest trading date. If today is a trading day, return today's date; otherwise return the most recent trading day.
 
-        返回:
-            最近的交易日期，格式为'YYYY-MM-DD'。
+        Returns:
+            Latest trading date in 'YYYY-MM-DD' format.
         """
         logger.info("Tool 'get_latest_trading_date' called")
         try:
             today = datetime.now().strftime("%Y-%m-%d")
-            # 获取当前日期前后一周的交易日历
+            # Get trading calendar for around one week from current date
             start_date = (datetime.now().replace(day=1)).strftime("%Y-%m-%d")
             end_date = (datetime.now().replace(day=28)).strftime("%Y-%m-%d")
 
-            # 从数据源获取交易日期数据
+            # Get trading date data from data source
             df = active_data_source.get_trade_dates(
                 start_date=start_date, end_date=end_date)
 
-            # 筛选出有效的交易日
+            # Filter out valid trading days
             valid_trading_days = df[df['is_trading_day']
                                     == '1']['calendar_date'].tolist()
 
-            # 找出小于等于今天的最大日期（即最近的交易日）
+            # Find the maximum date less than or equal to today (i.e., the most recent trading day)
             latest_trading_date = None
             for date in valid_trading_days:
                 if date <= today and (latest_trading_date is None or date > latest_trading_date):
@@ -69,25 +69,25 @@ def register_date_utils_tools(app: FastMCP, active_data_source: FinancialDataSou
                 return today
 
         except Exception as e:
-            # 发生错误时记录异常并返回当前日期
+            # Log exception and return current date when error occurs
             logger.exception(f"Error determining latest trading date: {e}")
             return datetime.now().strftime("%Y-%m-%d")
 
     @app.tool()
     def get_market_analysis_timeframe(period: str = "recent") -> str:
         """
-        获取适合市场分析的时间范围，基于当前真实日期而不是训练数据。
-        这个工具应该在进行市场分析或大盘分析时首先调用，以确保使用最新的实际数据。
+        Get appropriate time range for market analysis, based on current real date rather than training data.
+        This tool should be called first when conducting market analysis or broad market analysis to ensure using the latest actual data.
 
-        参数:
-            period: 时间范围类型，可选值:
-                   "recent": 最近1-2个月(默认)
-                   "quarter": 最近一个季度
-                   "half_year": 最近半年
-                   "year": 最近一年
+        Args:
+            period: Time range type, optional values:
+                   "recent": Recent 1-2 months (default)
+                   "quarter": Recent quarter
+                   "half_year": Recent half year
+                   "year": Recent year
 
-        返回:
-            包含分析时间范围的详细描述字符串，格式为"YYYY年M月-YYYY年M月"。
+        Returns:
+            Detailed description string containing analysis time range, format "YYYY年M月-YYYY年M月" (Year-Month to Year-Month).
         """
         logger.info(
             f"Tool 'get_market_analysis_timeframe' called with period={period}")
@@ -95,31 +95,31 @@ def register_date_utils_tools(app: FastMCP, active_data_source: FinancialDataSou
         now = datetime.now()
         end_date = now
 
-        # 根据请求的时间段确定开始日期
+        # Determine start date based on requested time period
         if period == "recent":
-            # 最近1-2个月
+            # Recent 1-2 months
             if now.day < 15:
-                # 如果当前是月初，看前两个月
+                # If currently at beginning of month, look at previous two months
                 if now.month == 1:
-                    start_date = datetime(now.year - 1, 11, 1)  # 前年11月
-                    middle_date = datetime(now.year - 1, 12, 1)  # 前年12月
+                    start_date = datetime(now.year - 1, 11, 1)  # November of previous year
+                    middle_date = datetime(now.year - 1, 12, 1)  # December of previous year
                 elif now.month == 2:
-                    start_date = datetime(now.year, 1, 1)  # 今年1月
+                    start_date = datetime(now.year, 1, 1)  # January of this year
                     middle_date = start_date
                 else:
-                    start_date = datetime(now.year, now.month - 2, 1)  # 两个月前
-                    middle_date = datetime(now.year, now.month - 1, 1)  # 上个月
+                    start_date = datetime(now.year, now.month - 2, 1)  # Two months ago
+                    middle_date = datetime(now.year, now.month - 1, 1)  # Last month
             else:
-                # 如果当前是月中或月末，看前一个月到现在
+                # If currently mid-month or end of month, look from last month to now
                 if now.month == 1:
-                    start_date = datetime(now.year - 1, 12, 1)  # 前年12月
+                    start_date = datetime(now.year - 1, 12, 1)  # December of previous year
                     middle_date = start_date
                 else:
-                    start_date = datetime(now.year, now.month - 1, 1)  # 上个月
+                    start_date = datetime(now.year, now.month - 1, 1)  # Last month
                     middle_date = start_date
 
         elif period == "quarter":
-            # 最近一个季度 (约3个月)
+            # Recent quarter (about 3 months)
             if now.month <= 3:
                 start_date = datetime(now.year - 1, now.month + 9, 1)
             else:
@@ -127,59 +127,59 @@ def register_date_utils_tools(app: FastMCP, active_data_source: FinancialDataSou
             middle_date = start_date
 
         elif period == "half_year":
-            # 最近半年
+            # Recent half year
             if now.month <= 6:
                 start_date = datetime(now.year - 1, now.month + 6, 1)
             else:
                 start_date = datetime(now.year, now.month - 6, 1)
-            # 计算中间月份（半年中点）
+            # Calculate middle month (half-year midpoint)
             middle_date = datetime(start_date.year, start_date.month + 3, 1) if start_date.month <= 9 else \
                 datetime(start_date.year + 1, start_date.month - 9, 1)
 
         elif period == "year":
-            # 最近一年
+            # Recent year
             start_date = datetime(now.year - 1, now.month, 1)
-            # 计算中间月份（一年中点）
+            # Calculate middle month (year midpoint)
             middle_date = datetime(start_date.year, start_date.month + 6, 1) if start_date.month <= 6 else \
                 datetime(start_date.year + 1, start_date.month - 6, 1)
         else:
-            # 默认为最近1个月
+            # Default to recent 1 month
             if now.month == 1:
                 start_date = datetime(now.year - 1, 12, 1)
             else:
                 start_date = datetime(now.year, now.month - 1, 1)
             middle_date = start_date
 
-        # 格式化为用户友好的显示
+        # Format for user-friendly display
         def get_month_end_day(year, month):
-            # 获取指定年月的最后一天
+            # Get the last day of specified year and month
             return calendar.monthrange(year, month)[1]
 
-        # 确保结束日期不超过当前日期
+        # Ensure end date does not exceed current date
         end_day = min(get_month_end_day(
             end_date.year, end_date.month), end_date.day)
-        end_display_date = f"{end_date.year}年{end_date.month}月"
+        end_display_date = f"{end_date.year}年{end_date.month}月"  # Year and month (年=year, 月=month)
         end_iso_date = f"{end_date.year}-{end_date.month:02d}-{end_day:02d}"
 
-        # 开始日期显示
-        start_display_date = f"{start_date.year}年{start_date.month}月"
+        # Start date display
+        start_display_date = f"{start_date.year}年{start_date.month}月"  # Year and month (年=year, 月=month)
         start_iso_date = f"{start_date.year}-{start_date.month:02d}-01"
 
-        # 根据时间跨度生成适当的日期范围显示
+        # Generate appropriate date range display based on time span
         if start_date.year != end_date.year:
-            # 如果跨年，显示年份
-            date_range = f"{start_date.year}年{start_date.month}月-{end_date.year}年{end_date.month}月"
+            # If spanning years, show years
+            date_range = f"{start_date.year}年{start_date.month}月-{end_date.year}年{end_date.month}月"  # Year-month to year-month (年=year, 月=month)
         elif middle_date.month != start_date.month and middle_date.month != end_date.month:
-            # 如果是季度或半年，显示中间月份
-            date_range = f"{start_date.year}年{start_date.month}月-{middle_date.month}月-{end_date.month}月"
+            # If quarter or half year, show middle month
+            date_range = f"{start_date.year}年{start_date.month}月-{middle_date.month}月-{end_date.month}月"  # Year-month to month to month (年=year, 月=month)
         elif start_date.month != end_date.month:
-            # 如果是同一年内的不同月份
-            date_range = f"{start_date.year}年{start_date.month}月-{end_date.month}月"
+            # If different months within the same year
+            date_range = f"{start_date.year}年{start_date.month}月-{end_date.month}月"  # Year-month to month (年=year, 月=month)
         else:
-            # 如果是同一个月
-            date_range = f"{start_date.year}年{start_date.month}月"
+            # If same month
+            date_range = f"{start_date.year}年{start_date.month}月"  # Year-month (年=year, 月=month)
 
-        # 组合成最终的结果字符串，包含用户友好格式和ISO格式
-        result = f"{date_range} (ISO日期范围: {start_iso_date} 至 {end_iso_date})"
+        # Combine into final result string, including user-friendly format and ISO format
+        result = f"{date_range} (ISO date range: {start_iso_date} to {end_iso_date})"  # ISO date range: from to
         logger.info(f"Generated market analysis timeframe: {result}")
         return result

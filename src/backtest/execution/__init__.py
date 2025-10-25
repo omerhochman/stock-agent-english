@@ -1,11 +1,11 @@
 """
-交易执行模块
+Trading execution module
 
-提供交易执行和成本计算功能。
+Provides trading execution and cost calculation functionality.
 
-主要组件:
-- TradeExecutor: 交易执行引擎
-- CostModel: 交易成本模型
+Main Components:
+- TradeExecutor: Trading execution engine
+- CostModel: Trading cost model
 """
 
 from .trade_executor import TradeExecutor

@@ -6,11 +6,11 @@ from src.utils.api_utils import agent_endpoint
 from datetime import datetime, timedelta
 import pandas as pd
 
-# 设置日志记录
+# Setup logging
 logger = setup_logger('market_data_agent')
 
 
-@agent_endpoint("market_data", "市场数据收集，负责获取股价历史、财务指标和市场信息")
+@agent_endpoint("market_data", "Market data collection, responsible for obtaining stock price history, financial indicators and market information")
 def market_data_agent(state: AgentState):
     """Responsible for gathering and preprocessing market data"""
     show_workflow_status("Market Data Agent")
@@ -32,76 +32,76 @@ def market_data_agent(state: AgentState):
 
     if not data["start_date"]:
         # Calculate 1 year before end_date
-        start_date = end_date_obj - timedelta(days=365)  # 默认获取一年的数据
+        start_date = end_date_obj - timedelta(days=365)  # Default to get one year of data
         start_date = start_date.strftime('%Y-%m-%d')
     else:
         start_date = data["start_date"]
 
-    # 检查是否提供了多个股票代码
+    # Check if multiple stock codes are provided
     tickers = data.get("tickers", [])
     if isinstance(tickers, str):
         tickers = [ticker.strip() for ticker in tickers.split(',')]
     
-    # 如果没有提供tickers但提供了ticker，则使用单一ticker
+    # If no tickers provided but ticker is provided, use single ticker
     if not tickers and data.get("ticker"):
         tickers = [data["ticker"]]
     
-    # 如果仍然没有股票代码，则返回错误
+    # If still no stock codes, return error
     if not tickers:
-        logger.warning("未提供股票代码，无法获取市场数据")
+        logger.warning("No stock code provided, unable to get market data")
         return {
             "messages": messages,
             "data": {
                 **data,
-                "error": "未提供股票代码，请提供股票代码以获取市场数据"
+                "error": "No stock code provided, please provide stock code to get market data"
             },
             "metadata": state["metadata"],
         }
 
-    # 收集多个股票的数据
+    # Collect data for multiple stocks
     all_stock_data = {}
-    primary_ticker = tickers[0]  # 主要分析的股票
+    primary_ticker = tickers[0]  # Primary stock for analysis
 
     for ticker in tickers:
-        logger.info(f"正在获取 {ticker} 的数据...")
+        logger.info(f"Getting data for {ticker}...")
         
-        # 获取价格数据并验证
+        # Get price data and validate
         prices_df = get_price_history(ticker, start_date, end_date)
         if prices_df is None or prices_df.empty:
-            logger.warning(f"警告：无法获取{ticker}的价格数据，将使用空数据继续")
+            logger.warning(f"Warning: Unable to get price data for {ticker}, continuing with empty data")
             prices_df = pd.DataFrame(
                 columns=['close', 'open', 'high', 'low', 'volume'])
 
-        # 获取财务指标
+        # Get financial metrics
         try:
             financial_metrics = get_financial_metrics(ticker)
         except Exception as e:
-            logger.error(f"获取{ticker}财务指标失败: {str(e)}")
+            logger.error(f"Failed to get financial metrics for {ticker}: {str(e)}")
             financial_metrics = {}
 
-        # 获取财务报表
+        # Get financial statements
         try:
             financial_line_items = get_financial_statements(ticker)
         except Exception as e:
-            logger.error(f"获取{ticker}财务报表失败: {str(e)}")
+            logger.error(f"Failed to get {ticker} financial statements: {str(e)}")
             financial_line_items = {}
 
-        # 获取市场数据
+        # Get market data
         try:
             market_data = get_market_data(ticker)
         except Exception as e:
-            logger.error(f"获取{ticker}市场数据失败: {str(e)}")
+            logger.error(f"Failed to get {ticker} market data: {str(e)}")
             market_data = {"market_cap": 0}
 
-        # 确保数据格式正确
+        # Ensure data format is correct
         if not isinstance(prices_df, pd.DataFrame):
             prices_df = pd.DataFrame(
                 columns=['close', 'open', 'high', 'low', 'volume'])
 
-        # 转换价格数据为字典格式
+        # Convert price data to dictionary format
         prices_dict = prices_df.to_dict('records')
 
-        # 保存单只股票的数据
+        # Save single stock data
         all_stock_data[ticker] = {
             "prices": prices_dict,
             "financial_metrics": financial_metrics,
@@ -110,7 +110,7 @@ def market_data_agent(state: AgentState):
             "market_data": market_data,
         }
 
-    # 保存推理信息到metadata供API使用
+    # Save reasoning information to metadata for API use
     market_data_summary = {
         "tickers": tickers,
         "primary_ticker": primary_ticker,
@@ -125,14 +125,14 @@ def market_data_agent(state: AgentState):
             }
             for ticker in tickers
         },
-        "summary": f"为{', '.join(tickers)}收集了从{start_date}到{end_date}的市场数据，包括价格历史、财务指标和市场信息"
+        "summary": f"Collected market data for {', '.join(tickers)} from {start_date} to {end_date}, including price history, financial metrics and market information"
     }
 
     if show_reasoning:
         show_agent_reasoning(market_data_summary, "Market Data Agent")
         state["metadata"]["agent_reasoning"] = market_data_summary
 
-    # 将主要股票数据保存在原始位置，以保持与其他Agent的兼容性
+    # Save primary stock data in original location to maintain compatibility with other Agents
     return {
         "messages": messages,
         "data": {
@@ -146,7 +146,7 @@ def market_data_agent(state: AgentState):
             "financial_line_items": all_stock_data[primary_ticker]["financial_line_items"],
             "market_cap": all_stock_data[primary_ticker]["market_cap"],
             "market_data": all_stock_data[primary_ticker]["market_data"],
-            "all_stock_data": all_stock_data,  # 包含所有股票的数据
+            "all_stock_data": all_stock_data,  # Contains data for all stocks
         },
         "metadata": state["metadata"],
     }

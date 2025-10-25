@@ -4,9 +4,9 @@ from .base_strategy import BaseStrategy, Signal, Portfolio
 
 class RSIStrategy(BaseStrategy):
     """
-    RSI策略
-    基于相对强弱指数(RSI)的超买超卖策略
-    参考：Wilder (1978) - New Concepts in Technical Trading Systems
+    RSI Strategy
+    Overbought/oversold strategy based on Relative Strength Index (RSI)
+    Reference: Wilder (1978) - New Concepts in Technical Trading Systems
     """
     
     def __init__(self, rsi_period: int = 14, overbought: float = 70, 
@@ -22,7 +22,7 @@ class RSIStrategy(BaseStrategy):
         self.signal_count = 0
         
     def calculate_rsi(self, prices: pd.Series) -> float:
-        """计算RSI指标"""
+        """Calculate RSI indicator"""
         if len(prices) < self.rsi_period + 1:
             return 50.0
             
@@ -36,11 +36,11 @@ class RSIStrategy(BaseStrategy):
         return rsi.iloc[-1] if not pd.isna(rsi.iloc[-1]) else 50.0
     
     def calculate_rsi_divergence(self, prices: pd.Series, rsi_values: pd.Series) -> str:
-        """计算RSI背离"""
+        """Calculate RSI divergence"""
         if len(prices) < 10 or len(rsi_values) < 10:
             return "none"
             
-        # 寻找最近的高点和低点
+        # Find recent highs and lows
         recent_prices = prices.tail(10)
         recent_rsi = rsi_values.tail(10)
         
@@ -49,13 +49,13 @@ class RSIStrategy(BaseStrategy):
         rsi_high_idx = recent_rsi.idxmax()
         rsi_low_idx = recent_rsi.idxmin()
         
-        # 检查看涨背离（价格创新低，RSI未创新低）
+        # Check bullish divergence (price makes new low, RSI doesn't make new low)
         if (price_low_idx == recent_prices.index[-1] and 
             rsi_low_idx != recent_rsi.index[-1] and
             recent_rsi.iloc[-1] > recent_rsi.min()):
             return "bullish"
             
-        # 检查看跌背离（价格创新高，RSI未创新高）
+        # Check bearish divergence (price makes new high, RSI doesn't make new high)
         if (price_high_idx == recent_prices.index[-1] and 
             rsi_high_idx != recent_rsi.index[-1] and
             recent_rsi.iloc[-1] < recent_rsi.max()):
@@ -64,7 +64,7 @@ class RSIStrategy(BaseStrategy):
         return "none"
     
     def calculate_stochastic_rsi(self, rsi_values: pd.Series, period: int = 14) -> float:
-        """计算随机RSI"""
+        """Calculate Stochastic RSI"""
         if len(rsi_values) < period:
             return 50.0
             
@@ -81,33 +81,33 @@ class RSIStrategy(BaseStrategy):
     def generate_signal(self, data: pd.DataFrame, portfolio: Portfolio, 
                        current_date: str, **kwargs) -> Signal:
         """
-        RSI策略逻辑：
-        - RSI < 30时考虑买入（超卖）
-        - RSI > 70时考虑卖出（超买）
-        - 结合价格动量和成交量确认
-        - 使用RSI背离增强信号
+        RSI strategy logic:
+        - Consider buying when RSI < 30 (oversold)
+        - Consider selling when RSI > 70 (overbought)
+        - Combine with price momentum and volume confirmation
+        - Use RSI divergence to enhance signals
         """
         prices = data['close']
         
-        # 计算RSI
+        # Calculate RSI
         rsi_series = prices.rolling(window=self.rsi_period+1).apply(
             lambda x: self._single_rsi(x), raw=False
         )
         current_rsi = self.calculate_rsi(prices)
         
-        # 计算随机RSI
+        # Calculate Stochastic RSI
         stoch_rsi = self.calculate_stochastic_rsi(rsi_series.dropna())
         
-        # 计算RSI背离
+        # Calculate RSI divergence
         divergence = self.calculate_rsi_divergence(prices, rsi_series.dropna())
         
-        # 计算价格动量
+        # Calculate price momentum
         if len(prices) >= 5:
             momentum = (prices.iloc[-1] / prices.iloc[-5] - 1) * 100
         else:
             momentum = 0
             
-        # 计算成交量趋势
+        # Calculate volume trend
         if 'volume' in data.columns and len(data) >= 10:
             volume_ma_short = data['volume'].tail(5).mean()
             volume_ma_long = data['volume'].tail(10).mean()
@@ -118,20 +118,20 @@ class RSIStrategy(BaseStrategy):
         current_price = prices.iloc[-1]
         position_ratio = (portfolio.stock * current_price) / (portfolio.cash + portfolio.stock * current_price)
         
-        # 超卖买入信号
+        # Oversold buy signal
         if current_rsi < self.oversold and position_ratio < 0.8:
-            # 增强条件：RSI持续下降或出现看涨背离
+            # Enhanced condition: RSI continues to decline or bullish divergence appears
             signal_strength = (self.oversold - current_rsi) / self.oversold
             
-            # 背离增强信号
+            # Divergence enhances signal
             if divergence == "bullish":
                 signal_strength *= 1.5
                 
-            # 成交量确认
+            # Volume confirmation
             if volume_trend > 1.2:
                 signal_strength *= 1.2
                 
-            # 随机RSI确认
+            # Stochastic RSI confirmation
             if stoch_rsi < 20:
                 signal_strength *= 1.1
                 
@@ -154,19 +154,19 @@ class RSIStrategy(BaseStrategy):
                     }
                 )
         
-        # 超买卖出信号
+        # Overbought sell signal
         elif current_rsi > self.overbought and portfolio.stock > 0:
             signal_strength = (current_rsi - self.overbought) / (100 - self.overbought)
             
-            # 背离增强信号
+            # Divergence enhances signal
             if divergence == "bearish":
                 signal_strength *= 1.5
                 
-            # 成交量确认
+            # Volume confirmation
             if volume_trend > 1.2:
                 signal_strength *= 1.2
                 
-            # 随机RSI确认
+            # Stochastic RSI confirmation
             if stoch_rsi > 80:
                 signal_strength *= 1.1
                 
@@ -188,11 +188,11 @@ class RSIStrategy(BaseStrategy):
                     }
                 )
         
-        # 中性区域 - 部分获利了结
+        # Neutral zone - partial profit taking
         elif 40 < current_rsi < 60 and portfolio.stock > 0:
-            # 如果RSI回到中性区域，考虑部分获利了结
+            # If RSI returns to neutral zone, consider partial profit taking
             if self.last_signal == 'buy' and current_rsi > 50:
-                quantity = int(portfolio.stock * 0.2)  # 获利了结20%
+                quantity = int(portfolio.stock * 0.2)  # Take profit on 20%
                 return Signal(
                     action='sell',
                     quantity=quantity,
@@ -204,13 +204,13 @@ class RSIStrategy(BaseStrategy):
                     }
                 )
         
-        # 记录最后信号
+        # Record last signal
         if current_rsi < self.oversold:
             self.last_signal = 'buy'
         elif current_rsi > self.overbought:
             self.last_signal = 'sell'
             
-        # 持有信号
+        # Hold signal
         return Signal(
             action='hold',
             quantity=0,
@@ -224,7 +224,7 @@ class RSIStrategy(BaseStrategy):
         )
     
     def _single_rsi(self, prices):
-        """计算单个RSI值的辅助函数"""
+        """Helper function to calculate single RSI value"""
         if len(prices) < 2:
             return 50.0
             

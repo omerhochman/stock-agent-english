@@ -1,14 +1,14 @@
-# A 股辅助画图 MCP
+# A-Share Auxiliary Charting MCP
 
 Forked from: https://github.com/antvis/mcp-server-chart.git
 
-本项目作为 `mcp_api` 的辅助 mcp，用于可视化数据，使得 ai 生成的报告更美观。
+This project serves as an auxiliary MCP for `mcp_api`, used for data visualization to make AI-generated reports more beautiful.
 
-### 使用指南
+### Usage Guide
 
-1. 首先需要确保安装了`nodejs`和`npm`等前端工具
+1. First, ensure that frontend tools like `nodejs` and `npm` are installed
 
-验证安装：
+Verify installation:
 
 ```bash
 C:\Users\15170\Desktop\stock_agent>node -v
@@ -18,7 +18,7 @@ C:\Users\15170\Desktop\stock_agent>npm -v
 10.7.0
 ```
 
-2. 在 Cline 中进行配置：
+2. Configure in Cline:
 
 ```json
 {
@@ -30,12 +30,12 @@ C:\Users\15170\Desktop\stock_agent>npm -v
       "args": ["/c", "npx", "-y", "@antv/mcp-server-chart"],
       "transportType": "stdio"
     }
-    // 其他mcp服务器配置
+    // Other MCP server configurations
   }
 }
 ```
 
-3. 与 A 股 MCP 联合使用效果：
+3. Combined usage effect with A-Share MCP:
 
 ![mcp](../../assets/img/mcp_5.png)
 

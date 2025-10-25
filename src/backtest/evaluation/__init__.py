@@ -1,14 +1,14 @@
 """
-回测评估模块
+Backtesting evaluation module
 
-提供策略性能评估、统计显著性检验、策略比较和可视化功能。
+Provides strategy performance evaluation, statistical significance testing, strategy comparison and visualization functionality.
 
-主要组件:
-- PerformanceMetrics: 性能指标计算
-- SignificanceTester: 统计显著性检验
-- StrategyComparator: 策略比较分析
-- BacktestVisualizer: 可视化图表生成
-- BacktestTableGenerator: 表格生成器
+Main Components:
+- PerformanceMetrics: Performance metrics calculation
+- SignificanceTester: Statistical significance testing
+- StrategyComparator: Strategy comparison analysis
+- BacktestVisualizer: Visualization chart generation
+- BacktestTableGenerator: Table generator
 """
 
 from .metrics import PerformanceMetrics

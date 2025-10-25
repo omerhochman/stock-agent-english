@@ -5,7 +5,7 @@ import json
 import ast
 
 
-@agent_endpoint("researcher_bull", "多方研究员，从看多角度分析市场数据并提出投资论点")
+@agent_endpoint("researcher_bull", "Bullish researcher, analyzing market data from a bullish perspective and proposing investment theses")
 def researcher_bull_agent(state: AgentState):
     """Analyzes signals from a bullish perspective and generates optimistic investment thesis."""
     show_workflow_status("Bullish Researcher")
@@ -92,7 +92,7 @@ def researcher_bull_agent(state: AgentState):
 
     # Add opportunity adjustment reasoning
     if market_opportunity_adjustment > 0:
-        bullish_points.append(f"市场机会因素分析提升多头置信度: +{market_opportunity_adjustment:.2f}")
+        bullish_points.append(f"Market opportunity factor analysis increases bullish confidence: +{market_opportunity_adjustment:.2f}")
 
     message_content = {
         "perspective": "bullish",
@@ -100,7 +100,7 @@ def researcher_bull_agent(state: AgentState):
         "base_confidence": base_confidence,
         "opportunity_adjustment": market_opportunity_adjustment,
         "thesis_points": bullish_points,
-        "reasoning": f"多头观点基于技术、基本面、情绪和估值因素的综合分析，并考虑了市场整体机会环境",
+        "reasoning": f"Bullish perspective based on comprehensive analysis of technical, fundamental, sentiment and valuation factors, considering overall market opportunity environment",
         "opportunity_factors": {
             "market_risk_score": risk_data.get("risk_score") if risk_data else None,
             "macro_environment": macro_data.get("macro_environment") if macro_data else None,
@@ -115,7 +115,7 @@ def researcher_bull_agent(state: AgentState):
 
     if show_reasoning:
         show_agent_reasoning(message_content, "Bullish Researcher")
-        # 保存推理信息到metadata供API使用
+        # Save reasoning information to metadata for API use
         state["metadata"]["agent_reasoning"] = message_content
 
     show_workflow_status("Bullish Researcher", "completed")
@@ -127,164 +127,164 @@ def researcher_bull_agent(state: AgentState):
 
 
 def analyze_bullish_technical(technical_signals: dict) -> dict:
-    """分析技术指标的多头因素"""
+    """Analyze bullish factors in technical indicators"""
     signal = technical_signals.get("signal", "neutral")
     confidence = technical_signals.get("confidence", 0.5)
     
-    # 转换confidence格式
+    # Convert confidence format
     if isinstance(confidence, str):
         confidence = float(confidence.replace("%", "")) / 100
     
     if signal == "bullish":
         return {
-            "point": f"技术指标显示看多趋势，置信度: {confidence:.1%}",
+            "point": f"Technical indicators show bullish trend, confidence: {confidence:.1%}",
             "confidence": confidence
         }
     elif signal == "neutral":
-        # 中性信号可能暗示突破机会
+        # Neutral signal may indicate breakout opportunity
         confidence_adjustment = 0.1 if confidence > 0.7 else 0.05
         return {
-            "point": f"技术指标中性，但可能预示上行突破 (基础置信度: {confidence:.1%})",
+            "point": f"Technical indicators neutral, but may indicate upward breakout (base confidence: {confidence:.1%})",
             "confidence": 0.4 + confidence_adjustment
         }
     else:  # bearish
-        # 极度悲观可能是底部信号
+        # Extreme pessimism may be a bottom signal
         if confidence > 0.8:
             return {
-                "point": f"技术指标极度看空，存在超卖机会，可能反转 (置信度: {confidence:.1%})",
+                "point": f"Technical indicators extremely bearish, oversold opportunity, possible reversal (confidence: {confidence:.1%})",
                 "confidence": 0.55
             }
         elif confidence > 0.6:
             return {
-                "point": f"技术指标偏空，但可能接近支撑位 (置信度: {confidence:.1%})",
+                "point": f"Technical indicators bearish, but may be near support level (confidence: {confidence:.1%})",
                 "confidence": 0.35
             }
         else:
             return {
-                "point": f"技术指标轻度看空，关注反弹机会 (置信度: {confidence:.1%})",
+                "point": f"Technical indicators mildly bearish, watch for rebound opportunity (confidence: {confidence:.1%})",
                 "confidence": 0.3
             }
 
 
 def analyze_bullish_fundamental(fundamental_signals: dict) -> dict:
-    """分析基本面的多头因素"""
+    """Analyze bullish factors in fundamental indicators"""
     signal = fundamental_signals.get("signal", "neutral")
     confidence = fundamental_signals.get("confidence", 0.5)
     reasoning = fundamental_signals.get("reasoning", {})
     
-    # 转换confidence格式
+    # Convert confidence format
     if isinstance(confidence, str):
         confidence = float(confidence.replace("%", "")) / 100
     
     if signal == "bullish":
         return {
-            "point": f"基本面强劲，多项指标积极，置信度: {confidence:.1%}",
+            "point": f"Strong fundamentals, multiple positive indicators, confidence: {confidence:.1%}",
             "confidence": confidence
         }
     elif signal == "neutral":
-        # 分析具体的增长指标
+        # Analyze specific growth indicators
         growth_indicators = []
         if reasoning:
-            # 检查增长指标
+            # Check growth indicators
             if "growth" in str(reasoning).lower() and ("positive" in str(reasoning).lower() or "increas" in str(reasoning).lower()):
-                growth_indicators.append("增长势头良好")
-            # 检查利润质量
+                growth_indicators.append("Strong growth momentum")
+            # Check profitability quality
             if "profitability" in str(reasoning).lower() and ("improv" in str(reasoning).lower() or "strong" in str(reasoning).lower()):
-                growth_indicators.append("盈利能力增强")
-            # 检查现金流
+                growth_indicators.append("Enhanced profitability")
+            # Check cash flow
             if "cash" in str(reasoning).lower() and ("flow" in str(reasoning).lower() and "positive" in str(reasoning).lower()):
-                growth_indicators.append("现金流改善")
+                growth_indicators.append("Improved cash flow")
         
         growth_count = len(growth_indicators)
         confidence_adjustment = growth_count * 0.1
         
         return {
-            "point": f"基本面中性但有{growth_count}个积极因素: {', '.join(growth_indicators)}",
+            "point": f"Fundamentals neutral but with {growth_count} positive factors: {', '.join(growth_indicators)}",
             "confidence": 0.4 + confidence_adjustment
         }
     else:  # bearish
-        # 即使基本面不佳，也要寻找转机迹象
+        # Even with poor fundamentals, look for turnaround signs
         if confidence > 0.8:
             return {
-                "point": f"基本面暂时困难，但可能已充分反映，存在修复机会 (置信度: {confidence:.1%})",
+                "point": f"Fundamentals temporarily difficult, but may be fully reflected, recovery opportunity exists (confidence: {confidence:.1%})",
                 "confidence": 0.4
             }
         else:
             return {
-                "point": f"基本面待改善，关注管理层应对措施 (置信度: {confidence:.1%})",
+                "point": f"Fundamentals need improvement, watch management response measures (confidence: {confidence:.1%})",
                 "confidence": 0.3
             }
 
 
 def analyze_bullish_sentiment(sentiment_signals: dict) -> dict:
-    """分析市场情绪的多头因素"""
+    """Analyze bullish factors in market sentiment"""
     signal = sentiment_signals.get("signal", "neutral")
     confidence = sentiment_signals.get("confidence", 0.5)
     
-    # 转换confidence格式
+    # Convert confidence format
     if isinstance(confidence, str):
         confidence = float(confidence.replace("%", "")) / 100
     
     if signal == "bullish":
         return {
-            "point": f"市场情绪转向乐观，置信度: {confidence:.1%}",
+            "point": f"Market sentiment turning optimistic, confidence: {confidence:.1%}",
             "confidence": confidence
         }
     elif signal == "neutral":
         return {
-            "point": f"市场情绪中性，为多头提供买入机会",
+            "point": f"Market sentiment neutral, providing buying opportunity for bulls",
             "confidence": 0.4
         }
     else:  # bearish
-        # 极度悲观的情绪可能是底部信号
+        # Extreme pessimism may be a bottom signal
         if confidence > 0.8:
             return {
-                "point": f"市场情绪过度悲观，可能接近底部反转点 (置信度: {confidence:.1%})",
+                "point": f"Market sentiment overly pessimistic, may be near bottom reversal point (confidence: {confidence:.1%})",
                 "confidence": 0.6
             }
         elif confidence > 0.6:
             return {
-                "point": f"市场情绪偏空，但存在情绪修复机会 (置信度: {confidence:.1%})",
+                "point": f"Market sentiment bearish, but sentiment recovery opportunity exists (confidence: {confidence:.1%})",
                 "confidence": 0.4
             }
         else:
             return {
-                "point": f"市场情绪温和悲观，关注改善趋势 (置信度: {confidence:.1%})",
+                "point": f"Market sentiment mildly pessimistic, watch for improvement trend (confidence: {confidence:.1%})",
                 "confidence": 0.3
             }
 
 
 def analyze_bullish_valuation(valuation_signals: dict) -> dict:
-    """分析估值的多头因素"""
+    """Analyze bullish factors in valuation"""
     signal = valuation_signals.get("signal", "neutral")
     confidence = valuation_signals.get("confidence", 0.5)
     valuation_gap = valuation_signals.get("valuation_gap", 0)
     
-    # 转换confidence格式
+    # Convert confidence format
     if isinstance(confidence, str):
         confidence = float(confidence.replace("%", "")) / 100
     
     if signal == "bullish":
         return {
-            "point": f"估值有吸引力，存在上行空间 (低估{abs(valuation_gap)*100:.1f}%，置信度: {confidence:.1%})",
+            "point": f"Valuation attractive, upside potential exists (undervalued {abs(valuation_gap)*100:.1f}%, confidence: {confidence:.1%})",
             "confidence": confidence
         }
     elif signal == "neutral":
-        # 即使估值合理，也要考虑未来增长潜力
+        # Even with reasonable valuation, consider future growth potential
         return {
-            "point": f"估值合理，若基本面改善则有上行空间",
+            "point": f"Valuation reasonable, upside potential if fundamentals improve",
             "confidence": 0.35
         }
     else:  # bearish
-        # 即使估值偏高，也要考虑是否有增长支撑
-        if valuation_gap > 0.2:  # 高估超过20%
+        # Even with high valuation, consider if there's growth support
+        if valuation_gap > 0.2:  # Overvalued by more than 20%
             return {
-                "point": f"估值偏高，但若业绩超预期仍有上行潜力 (高估{abs(valuation_gap)*100:.1f}%)",
+                "point": f"Valuation high, but upside potential if earnings exceed expectations (overvalued {abs(valuation_gap)*100:.1f}%)",
                 "confidence": 0.3
             }
         else:
             return {
-                "point": f"估值略高，关注性能改善消化估值 (高估{abs(valuation_gap)*100:.1f}%)",
+                "point": f"Valuation slightly high, watch for performance improvement to digest valuation (overvalued {abs(valuation_gap)*100:.1f}%)",
                 "confidence": 0.35
             }
 
@@ -292,25 +292,25 @@ def analyze_bullish_valuation(valuation_signals: dict) -> dict:
 def analyze_market_opportunity_factors(fundamental_signals: dict, technical_signals: dict, 
                                     valuation_signals: dict, risk_data: dict = None, 
                                     macro_data: dict = None) -> float:
-    """分析市场整体机会因素，返回额外的多头置信度调整"""
+    """Analyze overall market opportunity factors, return additional bullish confidence adjustment"""
     opportunity_adjustment = 0.0
     
-    # 1. 估值机会
-    if valuation_signals.get("valuation_gap", 0) > 0.2:  # 低估超过20%
+    # 1. Valuation opportunity
+    if valuation_signals.get("valuation_gap", 0) > 0.2:  # Undervalued by more than 20%
         opportunity_adjustment += 0.15
     
-    # 2. 市场整体机会
+    # 2. Overall market opportunity
     if risk_data:
         risk_score = risk_data.get("risk_score", 5)
-        if risk_score <= 3:  # 低风险环境
+        if risk_score <= 3:  # Low risk environment
             opportunity_adjustment += 0.1
         
-        # 波动率环境
+        # Volatility environment
         volatility_regime = risk_data.get("risk_metrics", {}).get("volatility_regime", "medium")
         if volatility_regime == "low":
             opportunity_adjustment += 0.05
     
-    # 3. 宏观环境
+    # 3. Macro environment
     if macro_data:
         macro_env = macro_data.get("macro_environment", "neutral")
         stock_impact = macro_data.get("impact_on_stock", "neutral")
@@ -320,19 +320,19 @@ def analyze_market_opportunity_factors(fundamental_signals: dict, technical_sign
         elif macro_env == "positive" or stock_impact == "positive":
             opportunity_adjustment += 0.08
     
-    # 4. 基本面改善迹象
+    # 4. Fundamental improvement signs
     if fundamental_signals.get("reasoning", {}).get("growth_signal", {}).get("signal") == "bullish":
         opportunity_adjustment += 0.1
     
-    # 5. 技术指标显示底部形态
+    # 5. Technical indicators showing bottom pattern
     if technical_signals.get("signal") == "neutral" and technical_signals.get("confidence", 0) > 0.7:
-        # 高置信度的中性信号可能暗示趋势反转
+        # High confidence neutral signal may indicate trend reversal
         opportunity_adjustment += 0.05
     
-    # 6. 超卖回调机会
+    # 6. Oversold bounce opportunity
     if technical_signals.get("signal") == "bearish" and technical_signals.get("confidence", 0) > 0.7:
-        # 极度超卖可能是买入机会
+        # Extreme oversold may be buying opportunity
         opportunity_adjustment += 0.08
     
-    # 限制最大调整幅度
+    # Limit maximum adjustment
     return min(opportunity_adjustment, 0.4)

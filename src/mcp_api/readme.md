@@ -1,155 +1,155 @@
-# A 股数据分析 API (MCP 版)
+# A-Share Data Analysis API (MCP Version)
 
 Forked From：https://github.com/24mlight/a-share-mcp-is-just-i-need.git
 
-## 项目概述
+## Project Overview
 
-这是一个基于 MCP（Model Control Protocol）架构的中国 A 股市场数据分析 API，旨在为 AI 助手提供全面的中国股市数据访问和分析能力。该项目利用 Baostock 库作为数据源，提供了丰富的股票市场数据、财务报表数据、指数成分股信息以及宏观经济数据的查询功能。
+This is a China A-share market data analysis API based on MCP (Model Control Protocol) architecture, designed to provide AI assistants with comprehensive access to Chinese stock market data and analysis capabilities. The project uses Baostock library as the data source, providing rich stock market data, financial statement data, index constituent information, and macroeconomic data query functionality.
 
-### 主要特点
+### Key Features
 
-- **数据全面**：覆盖 A 股历史行情、财务报表、公司信息、指数成分股、宏观经济数据等
-- **架构灵活**：基于 MCP 协议，可轻松与 Claude、GPT 等大型语言模型集成
-- **接口统一**：提供标准化的工具函数接口，使 AI 助手能够像专业分析师一样处理金融数据
-- **错误处理**：完善的错误处理机制确保数据查询稳定可靠
-- **格式友好**：返回结果以 Markdown 表格形式呈现，便于阅读和分析
+- **Comprehensive Data**: Covers A-share historical quotes, financial statements, company information, index constituents, macroeconomic data, etc.
+- **Flexible Architecture**: Based on MCP protocol, easily integrates with large language models like Claude, GPT
+- **Unified Interface**: Provides standardized tool function interfaces, enabling AI assistants to process financial data like professional analysts
+- **Error Handling**: Robust error handling mechanism ensures stable and reliable data queries
+- **User-Friendly Format**: Returns results in Markdown table format for easy reading and analysis
 
-## 系统架构
+## System Architecture
 
-该项目采用模块化设计，主要组件包括：
+The project adopts a modular design with main components including:
 
-1. **数据源接口层**：定义了金融数据源的抽象接口（`FinancialDataSource`）
-2. **Baostock 实现**：基于 Baostock 库实现的具体数据源（`BaostockDataSource`）
-3. **工具函数模块**：按功能分类的多个工具集合，如：
-   - 股票市场数据工具
-   - 财务报告工具
-   - 指数工具
-   - 市场概览工具
-   - 宏观经济工具
-   - 日期工具
-   - 分析工具
-4. **MCP 服务器**：对接 AI 助手的 FastMCP 服务器实现
+1. **Data Source Interface Layer**: Defines abstract interface for financial data sources (`FinancialDataSource`)
+2. **Baostock Implementation**: Specific data source implementation based on Baostock library (`BaostockDataSource`)
+3. **Tool Function Modules**: Multiple tool collections categorized by function, such as:
+   - Stock market data tools
+   - Financial report tools
+   - Index tools
+   - Market overview tools
+   - Macroeconomic tools
+   - Date tools
+   - Analysis tools
+4. **MCP Server**: FastMCP server implementation for AI assistant integration
 
-## 安装指南
+## Installation Guide
 
-⚠️ **重要提示**：本项目必须使用 uv 进行安装，MCP 不支持其他包管理方式
+⚠️ **Important Note**: This project must be installed using uv, MCP does not support other package management methods
 
 ```bash
-# 1. 安装uv（如果尚未安装）
+# 1. Install uv (if not already installed)
 pip install uv
 
-# 2. 克隆代码仓库（如果需要）
+# 2. Clone repository (if needed)
 git clone https://github.com/yourusername/a-share-mcp-api.git
 cd a-share-mcp-api/src/mcp_api/
 
-# 3. 创建虚拟环境
+# 3. Create virtual environment
 uv venv
 
-# 4. 激活环境
+# 4. Activate environment
 # Windows
 .venv\Scripts\activate
 # macOS/Linux
 source .venv/bin/activate
 
-# 5. 下载依赖包
+# 5. Download dependencies
 uv sync
 ```
 
-## 功能特性
+## Feature Overview
 
-### 1. 股票市场数据
+### 1. Stock Market Data
 
-- **历史 K 线数据** (`get_historical_k_data`)：获取股票价格、交易量等时间序列数据
-- **基本信息** (`get_stock_basic_info`)：获取股票基本信息如股票名称、行业、上市日期等
-- **分红数据** (`get_dividend_data`)：获取股票历史分红数据
-- **复权因子** (`get_adjust_factor_data`)：获取价格复权所需的复权因子
+- **Historical K-line Data** (`get_historical_k_data`): Get stock price, trading volume and other time series data
+- **Basic Information** (`get_stock_basic_info`): Get basic stock information such as stock name, industry, listing date, etc.
+- **Dividend Data** (`get_dividend_data`): Get historical dividend data for stocks
+- **Adjustment Factor Data** (`get_adjust_factor_data`): Get adjustment factors needed for price adjustment
 
-### 2. 财务报告数据
+### 2. Financial Report Data
 
-- **盈利能力数据** (`get_profit_data`)：ROE、净利润率等盈利指标
-- **运营能力数据** (`get_operation_data`)：资产周转率等运营指标
-- **成长能力数据** (`get_growth_data`)：收入增长率、利润增长率等
-- **偿债能力数据** (`get_balance_data`)：资产负债率、流动比率等
-- **现金流量数据** (`get_cash_flow_data`)：经营现金流等现金流指标
-- **杜邦分析数据** (`get_dupont_data`)：ROE 分解数据
-- **业绩快报** (`get_performance_express_report`)：公司业绩快报数据
-- **业绩预告** (`get_forecast_report`)：公司业绩预告数据
+- **Profitability Data** (`get_profit_data`): ROE, net profit margin and other profitability indicators
+- **Operating Capability Data** (`get_operation_data`): Asset turnover and other operating indicators
+- **Growth Capability Data** (`get_growth_data`): Revenue growth rate, profit growth rate, etc.
+- **Solvency Data** (`get_balance_data`): Asset-liability ratio, current ratio, etc.
+- **Cash Flow Data** (`get_cash_flow_data`): Operating cash flow and other cash flow indicators
+- **DuPont Analysis Data** (`get_dupont_data`): ROE decomposition data
+- **Performance Express Report** (`get_performance_express_report`): Company performance express report data
+- **Performance Forecast Report** (`get_forecast_report`): Company performance forecast data
 
-### 3. 指数数据
+### 3. Index Data
 
-- **行业分类数据** (`get_stock_industry`)：获取股票所属行业信息
-- **上证 50 成分股** (`get_sz50_stocks`)：获取上证 50 指数成分股
-- **沪深 300 成分股** (`get_hs300_stocks`)：获取沪深 300 指数成分股
-- **中证 500 成分股** (`get_zz500_stocks`)：获取中证 500 指数成分股
+- **Industry Classification Data** (`get_stock_industry`): Get stock industry information
+- **Shanghai 50 Constituents** (`get_sz50_stocks`): Get Shanghai 50 index constituents
+- **CSI 300 Constituents** (`get_hs300_stocks`): Get CSI 300 index constituents
+- **CSI 500 Constituents** (`get_zz500_stocks`): Get CSI 500 index constituents
 
-### 4. 市场概览数据
+### 4. Market Overview Data
 
-- **交易日期信息** (`get_trade_dates`)：获取 A 股市场交易日历
-- **股票列表** (`get_all_stock`)：获取所有 A 股及其交易状态
+- **Trading Date Information** (`get_trade_dates`): Get A-share market trading calendar
+- **Stock List** (`get_all_stock`): Get all A-shares and their trading status
 
-### 5. 宏观经济数据
+### 5. Macroeconomic Data
 
-- **基准存款利率** (`get_deposit_rate_data`)：获取央行基准存款利率数据
-- **基准贷款利率** (`get_loan_rate_data`)：获取央行基准贷款利率数据
-- **存款准备金率** (`get_required_reserve_ratio_data`)：获取存款准备金率数据
-- **月度货币供应量** (`get_money_supply_data_month`)：M0、M1、M2 月度数据
-- **年度货币供应量** (`get_money_supply_data_year`)：M0、M1、M2 年度数据
-- **SHIBOR 利率** (`get_shibor_data`)：上海银行间同业拆放利率数据
+- **Benchmark Deposit Rate** (`get_deposit_rate_data`): Get central bank benchmark deposit rate data
+- **Benchmark Loan Rate** (`get_loan_rate_data`): Get central bank benchmark loan rate data
+- **Required Reserve Ratio** (`get_required_reserve_ratio_data`): Get required reserve ratio data
+- **Monthly Money Supply** (`get_money_supply_data_month`): M0, M1, M2 monthly data
+- **Annual Money Supply** (`get_money_supply_data_year`): M0, M1, M2 annual data
+- **SHIBOR Rate** (`get_shibor_data`): Shanghai Interbank Offered Rate data
 
-### 6. 日期工具
+### 6. Date Tools
 
-- **当前日期** (`get_current_date`)：获取系统当前日期
-- **最近交易日** (`get_latest_trading_date`)：获取最近的 A 股交易日期
-- **市场分析时间范围** (`get_market_analysis_timeframe`)：获取适用于市场分析的时间范围
+- **Current Date** (`get_current_date`): Get system current date
+- **Latest Trading Date** (`get_latest_trading_date`): Get the latest A-share trading date
+- **Market Analysis Timeframe** (`get_market_analysis_timeframe`): Get time range suitable for market analysis
 
-### 7. 分析工具
+### 7. Analysis Tools
 
-- **股票分析报告** (`get_stock_analysis`)：获取基于数据的股票分析报告
+- **Stock Analysis Report** (`get_stock_analysis`): Get data-based stock analysis report
 
-## 使用指南
+## Usage Guide
 
-### 1. 在 Cherry Studio 中配置 MCP
+### 1. Configure MCP in Cherry Studio
 
-首先确保您已经安装了[Cherry Studio 客户端](https://www.cherry-ai.com/)，然后进行如下配置：
+First, make sure you have installed the [Cherry Studio client](https://www.cherry-ai.com/), then configure as follows:
 
-1. 打开 Cherry Studio 设置
-2. 在 MCP 配置部分添加新配置
-3. 参数设置如下：
+1. Open Cherry Studio settings
+2. Add new configuration in the MCP configuration section
+3. Set parameters as follows:
 
 ```
 --directory
-项目路径/src/mcp_api
+project_path/src/mcp_api
 run
 python
 mcp_server.py
 ```
 
-**配置截图:**
+**Configuration Screenshot:**
 
-![mcp配置示例](../../assets/img/mcp_config.png)
+![mcp configuration example](../../assets/img/mcp_config.png)
 
-#### 通过 Claude/GPT 等助手使用
+#### Using through Claude/GPT and other assistants
 
-配置完成后，您可以通过 AI 助手来查询和分析 A 股数据。以下是一些示例查询：
+After configuration, you can query and analyze A-share data through AI assistants. Here are some example queries:
 
-## 使用效果展示
+## Usage Effect Display
 
-![分析示例1](../../assets/img/mcp_1.png)
+![Analysis Example 1](../../assets/img/mcp_1.png)
 
-![分析示例2](../../assets/img/mcp_2.png)
+![Analysis Example 2](../../assets/img/mcp_2.png)
 
-![分析示例3](../../assets/img/mcp_3.png)
+![Analysis Example 3](../../assets/img/mcp_3.png)
 
-![分析示例4](../../assets/img/mcp_4.png)
+![Analysis Example 4](../../assets/img/mcp_4.png)
 
-### 2. 通过 Cline 进行配置
+### 2. Configure through Cline
 
-在 vscode 中下载 cline 插件，在 mcp 配置界面使用 json 配置：
+Download the cline plugin in vscode, use json configuration in the mcp configuration interface:
 
 ```json
 {
   "mcpServers": {
-    // 其他mcp的配置....
+    // other mcp configurations....
     "a-share-mcp": {
       "timeout": 60,
       "command": "uv",
@@ -163,61 +163,61 @@ mcp_server.py
       "transportType": "stdio",
       "disabled": false
     }
-    // 其他mcp的配置....
+    // other mcp configurations....
   }
 }
 ```
 
-之后便可以进行对话
+Then you can start conversations
 
-## 注意事项
+## Important Notes
 
-1. **数据来源**：本项目使用 Baostock 作为数据源，数据仅供参考，不构成投资建议。
-2. **实时性**：Baostock 数据可能存在延迟，不保证数据的实时性。
-3. **使用限制**：请遵守 Baostock 的使用条款，避免频繁请求导致 IP 被限制。
-4. **免责声明**：使用本项目进行投资决策风险自负，作者不对因使用本项目而导致的任何损失负责。
+1. **Data Source**: This project uses Baostock as the data source, data is for reference only and does not constitute investment advice.
+2. **Real-time**: Baostock data may have delays and does not guarantee real-time data.
+3. **Usage Restrictions**: Please comply with Baostock's terms of use to avoid IP restrictions due to frequent requests.
+4. **Disclaimer**: Users are responsible for their own investment decisions when using this project, and the author is not responsible for any losses caused by using this project.
 
-## 开发指南
+## Development Guide
 
-### 扩展数据源
+### Extending Data Sources
 
-如需添加新的数据源（如 TuShare、AkShare 等），只需实现`FinancialDataSource`接口：
+To add new data sources (such as TuShare, AkShare, etc.), simply implement the `FinancialDataSource` interface:
 
 ```python
 from src.mcp_api.data_source_interface import FinancialDataSource
 
 class MyNewDataSource(FinancialDataSource):
-    # 实现所有抽象方法
+    # Implement all abstract methods
     def get_historical_k_data(self, code, start_date, end_date, frequency, adjust_flag, fields):
-        # 实现代码
+        # Implementation code
         pass
 
-    # 实现其他必要方法...
+    # Implement other necessary methods...
 ```
 
-### 添加新工具
+### Adding New Tools
 
-如需添加新的工具函数，可以在现有模块中添加或创建新模块：
+To add new tool functions, you can add them to existing modules or create new modules:
 
 ```python
 def register_my_new_tools(app: FastMCP, active_data_source: FinancialDataSource):
     @app.tool()
     def my_new_tool(param1: str, param2: int) -> str:
         """
-        新工具函数的文档字符串，描述其功能和参数
+        Documentation string for the new tool function, describing its functionality and parameters
         """
-        # 实现代码
-        return "结果"
+        # Implementation code
+        return "result"
 ```
 
-然后在`mcp_server.py`中注册新工具模块：
+Then register the new tool module in `mcp_server.py`:
 
 ```python
 from src.mcp_api.mcp_tools.my_new_tools import register_my_new_tools
 
-# 其他导入...
+# Other imports...
 
-# 注册各模块的工具
+# Register tools from each module
 register_my_new_tools(app, active_data_source)
-# 其他注册...
+# Other registrations...
 ```

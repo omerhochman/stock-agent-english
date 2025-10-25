@@ -10,11 +10,11 @@ import ast
 import pandas as pd
 import logging
 
-# 获取日志记录器
+# Get logger
 logger = setup_logger('debate_room')
 
 
-@agent_endpoint("debate_room", "辩论室，分析多空双方观点，得出平衡的投资结论")
+@agent_endpoint("debate_room", "Debate room, analyzes both bullish and bearish perspectives to reach balanced investment conclusions")
 def debate_room_agent(state: AgentState):
     """
     Enhanced debate room with regime-aware signal aggregation
@@ -23,41 +23,41 @@ def debate_room_agent(state: AgentState):
     try:
         show_workflow_status("Debate Room")
         show_reasoning = state["metadata"]["show_reasoning"]
-        logger.info("开始分析研究员观点并进行辩论...")
+        logger.info("Starting analysis of researcher perspectives and conducting debate...")
 
-        # 初始化高级区制检测器
+        # Initialize advanced regime detector
         regime_detector = AdvancedRegimeDetector()
         
-        # 获取价格数据进行区制分析
+        # Get price data for regime analysis
         data = state["data"]
         prices = data["prices"]
         prices_df = prices_to_df(prices)
         
-        # 提取区制特征并进行分析
+        # Extract regime features and perform analysis
         regime_features = regime_detector.extract_regime_features(prices_df)
         regime_model_results = regime_detector.fit_regime_model(regime_features)
         current_regime = regime_detector.predict_current_regime(regime_features)
         
-        logger.info(f"检测到市场区制: {current_regime.get('regime_name', 'unknown')} (置信度: {current_regime.get('confidence', 0):.2f})")
+        logger.info(f"Detected market regime: {current_regime.get('regime_name', 'unknown')} (confidence: {current_regime.get('confidence', 0):.2f})")
 
-        # 收集所有agent信号 - 向前兼容设计（添加防御性检查）
+        # Collect all agent signals - forward compatibility design (add defensive checks)
         agent_signals = {}
         researcher_messages = {}
         
         for msg in state["messages"]:
-            # 添加防御性检查，确保 msg 和 msg.name 不为 None
+            # Add defensive checks to ensure msg and msg.name are not None
             if msg is None:
                 continue
             if not hasattr(msg, 'name') or msg.name is None:
                 continue
                 
-            # 收集各类agent信号
+            # Collect various agent signals
             if msg.name.endswith("_agent"):
                 try:
                     if hasattr(msg, 'content') and msg.content is not None:
                         content = json.loads(msg.content) if isinstance(msg.content, str) else msg.content
                         
-                        # 映射agent名称到信号类型
+                        # Map agent names to signal types
                         agent_type_mapping = {
                             'technical_analyst_agent': 'technical',
                             'fundamentals_agent': 'fundamental', 
@@ -69,7 +69,7 @@ def debate_room_agent(state: AgentState):
                         
                         if msg.name in agent_type_mapping:
                             signal_type = agent_type_mapping[msg.name]
-                            # 确保信号值的正确处理
+                            # Ensure proper handling of signal values
                             raw_signal = content.get('signal', 'neutral')
                             confidence = content.get('confidence', 0.5)
                             
@@ -78,18 +78,18 @@ def debate_room_agent(state: AgentState):
                                 'confidence': confidence,
                                 'raw_data': content
                             }
-                            logger.debug(f"收集到{signal_type}信号: {raw_signal} (置信度: {confidence})")
+                            logger.debug(f"Collected {signal_type} signal: {raw_signal} (confidence: {confidence})")
                         
-                        # 同时保持原有的研究员逻辑
+                        # Also maintain original researcher logic
                         if msg.name.startswith("researcher_"):
                             researcher_messages[msg.name] = msg
-                            logger.debug(f"收集到研究员信息: {msg.name}")
+                            logger.debug(f"Collected researcher information: {msg.name}")
                             
                 except (json.JSONDecodeError, TypeError, AttributeError) as e:
-                    logger.warning(f"无法解析 {msg.name} 的消息内容: {e}")
+                    logger.warning(f"Unable to parse {msg.name} message content: {e}")
                     continue
 
-        # 使用新的自适应信号聚合系统
+        # Use new adaptive signal aggregation system
         if agent_signals and current_regime.get('regime_name') != 'unknown':
             aggregated_result = adaptive_signal_aggregation(
                 signals=agent_signals,
@@ -100,19 +100,19 @@ def debate_room_agent(state: AgentState):
             final_signal = aggregated_result['aggregated_signal']
             final_confidence = aggregated_result['aggregated_confidence']
             
-            logger.info(f"自适应信号聚合结果: {final_signal:.3f} (置信度: {final_confidence:.3f})")
-            logger.debug(f"原始信号: {aggregated_result.get('original_signal', 'N/A'):.3f}, "
-                        f"应用衰减: {aggregated_result.get('attenuation_applied', False)}, "
-                        f"动态阈值: {aggregated_result.get('dynamic_threshold', 'N/A')}")
+            logger.info(f"Adaptive signal aggregation result: {final_signal:.3f} (confidence: {final_confidence:.3f})")
+            logger.debug(f"Original signal: {aggregated_result.get('original_signal', 'N/A'):.3f}, "
+                        f"Attenuation applied: {aggregated_result.get('attenuation_applied', False)}, "
+                        f"Dynamic threshold: {aggregated_result.get('dynamic_threshold', 'N/A')}")
             
-            # 记录各信号的具体贡献
+            # Record specific contributions of each signal
             for signal_type, contribution in aggregated_result.get('signal_contributions', {}).items():
-                logger.debug(f"{signal_type} 贡献: 信号={contribution['signal']}, "
-                           f"置信度={contribution['confidence']:.3f}, "
-                           f"权重={contribution['weight']:.3f}, "
-                           f"贡献值={contribution['contribution']:.4f}")
+                logger.debug(f"{signal_type} contribution: signal={contribution['signal']}, "
+                           f"confidence={contribution['confidence']:.3f}, "
+                           f"weight={contribution['weight']:.3f}, "
+                           f"contribution_value={contribution['contribution']:.4f}")
             
-            # 创建增强的分析报告
+            # Create enhanced analysis report
             enhanced_analysis = {
                 "signal": final_signal,
                 "confidence": final_confidence,
@@ -128,58 +128,58 @@ def debate_room_agent(state: AgentState):
             }
             
         else:
-            # 回退到原有逻辑（保持向后兼容）
-            logger.info("使用传统辩论逻辑（信号不足或区制检测失败）")
+            # Fallback to original logic (maintain backward compatibility)
+            logger.info("Using traditional debate logic (insufficient signals or regime detection failed)")
             enhanced_analysis = _traditional_debate_logic(state, researcher_messages, logger)
 
-        # 确保至少有看多和看空两个研究员（保持原有验证逻辑）
+        # Ensure at least bullish and bearish researchers (maintain original validation logic)
         if "researcher_bull_agent" not in researcher_messages or "researcher_bear_agent" not in researcher_messages:
-            logger.error("缺少必要的研究员数据: researcher_bull_agent 或 researcher_bear_agent")
-            # 如果没有研究员数据但有其他信号，仍然可以继续
+            logger.error("Missing necessary researcher data: researcher_bull_agent or researcher_bear_agent")
+            # If no researcher data but other signals exist, can still continue
             if not agent_signals:
                 raise ValueError("Missing required researcher_bull_agent or researcher_bear_agent messages")
 
-        # 处理研究员数据（保持原有逻辑用于LLM分析）
+        # Process researcher data (maintain original logic for LLM analysis)
         researcher_data = {}
         for name, msg in researcher_messages.items():
             if not hasattr(msg, 'content') or msg.content is None:
-                logger.warning(f"研究员 {name} 的消息内容为空")
+                logger.warning(f"Researcher {name} message content is empty")
                 continue
             try:
                 data_content = json.loads(msg.content)
-                logger.debug(f"成功解析 {name} 的 JSON 内容")
+                logger.debug(f"Successfully parsed {name} JSON content")
             except (json.JSONDecodeError, TypeError):
                 try:
                     data_content = ast.literal_eval(msg.content)
-                    logger.debug(f"通过 ast.literal_eval 解析 {name} 的内容")
+                    logger.debug(f"Parsed {name} content through ast.literal_eval")
                 except (ValueError, SyntaxError, TypeError):
-                    logger.warning(f"无法解析 {name} 的消息内容，已跳过")
+                    logger.warning(f"Unable to parse {name} message content, skipped")
                     continue
             researcher_data[name] = data_content
 
-        # 如果有研究员数据，进行LLM增强分析
+        # If researcher data exists, perform LLM enhanced analysis
         if len(researcher_data) >= 2:
             llm_enhanced_analysis = _get_llm_enhanced_analysis(
                 researcher_data, agent_signals, current_regime, state, logger
             )
             
-            # 融合自适应聚合结果和LLM分析
+            # Fuse adaptive aggregation results and LLM analysis
             if 'signal' in enhanced_analysis and 'llm_score' in llm_enhanced_analysis:
-                # 使用加权平均融合两种方法的结果
+                # Use weighted average to fuse results from both methods
                 regime_confidence = current_regime.get('confidence', 0.5)
                 adaptive_weight = 0.7 if regime_confidence > 0.6 else 0.5
                 llm_weight = 1 - adaptive_weight
                 
-                # 确保信号是数值格式用于融合
+                # Ensure signal is in numeric format for fusion
                 current_signal = enhanced_analysis['signal']
                 if isinstance(current_signal, str):
-                    # 将字符串信号转换为数值
+                    # Convert string signal to numeric
                     signal_mapping = {'bullish': 1.0, 'neutral': 0.0, 'bearish': -1.0}
                     numeric_signal = signal_mapping.get(current_signal.lower(), 0.0)
                 else:
                     numeric_signal = float(current_signal)
                 
-                # 执行融合
+                # Perform fusion
                 fused_signal = (
                     adaptive_weight * numeric_signal + 
                     llm_weight * llm_enhanced_analysis['llm_score']
@@ -191,12 +191,12 @@ def debate_room_agent(state: AgentState):
                     'adaptive_aggregation': adaptive_weight,
                     'llm_analysis': llm_weight
                 }
-                enhanced_analysis['original_signal'] = current_signal  # 保留原始信号用于调试
+                enhanced_analysis['original_signal'] = current_signal  # Keep original signal for debugging
 
-        # 转换数值信号为字符串信号（为了与风险管理器兼容）
+        # Convert numeric signal to string signal (for compatibility with risk manager)
         enhanced_analysis = _convert_numeric_signal_to_string(enhanced_analysis)
 
-        # 创建最终消息
+        # Create final message
         message = HumanMessage(
             content=json.dumps(enhanced_analysis),
             name="debate_room_agent",
@@ -214,8 +214,8 @@ def debate_room_agent(state: AgentState):
         }
         
     except Exception as e:
-        logger.error(f"辩论室处理过程中发生错误: {e}")
-        # 返回默认中性结果
+        logger.error(f"Error occurred during debate room processing: {e}")
+        # Return default neutral result
         default_analysis = {
             "signal": "neutral",
             "confidence": 0.3,
@@ -236,8 +236,8 @@ def debate_room_agent(state: AgentState):
 
 
 def _traditional_debate_logic(state: AgentState, researcher_messages: dict, logger) -> dict:
-    """传统辩论逻辑的异步版本"""
-    # 这里实现原有的简单平均逻辑作为回退
+    """Asynchronous version of traditional debate logic"""
+    # Implement original simple averaging logic as fallback
     if len(researcher_messages) < 2:
         return {
             "signal": "neutral",
@@ -246,7 +246,7 @@ def _traditional_debate_logic(state: AgentState, researcher_messages: dict, logg
         }
     
     def _parse_confidence(conf_value):
-        """解析置信度值，支持字符串和数值格式"""
+        """Parse confidence value, supporting both string and numeric formats"""
         if isinstance(conf_value, str):
             if conf_value.endswith('%'):
                 try:
@@ -264,14 +264,14 @@ def _traditional_debate_logic(state: AgentState, researcher_messages: dict, logg
         else:
             return 0.5
     
-    # 转换研究员观点为数值信号
+    # Convert researcher perspectives to numeric signals
     perspective_values = {
         'bullish': 1.0,
         'neutral': 0.0,
         'bearish': -1.0
     }
     
-    # 简单平均研究员信号
+    # Simple average of researcher signals
     total_signal = 0
     total_confidence = 0
     count = 0
@@ -279,21 +279,21 @@ def _traditional_debate_logic(state: AgentState, researcher_messages: dict, logg
     for name, msg in researcher_messages.items():
         try:
             data = json.loads(msg.content)
-            # 研究员使用 perspective 而不是 signal
+            # Researchers use perspective instead of signal
             perspective = data.get('perspective', 'neutral')
             raw_confidence = data.get('confidence', 0.5)
             
-            # 解析置信度
+            # Parse confidence
             confidence = _parse_confidence(raw_confidence)
             
-            # 转换观点为数值
+            # Convert perspective to numeric
             numeric_signal = perspective_values.get(perspective, 0.0)
             
             total_signal += numeric_signal * confidence
             total_confidence += confidence
             count += 1
         except Exception as e:
-            logger.warning(f"解析研究员 {name} 数据时出错: {e}")
+            logger.warning(f"Error parsing researcher {name} data: {e}")
             continue
     
     if count > 0:
@@ -303,10 +303,10 @@ def _traditional_debate_logic(state: AgentState, researcher_messages: dict, logg
         avg_signal = 0
         avg_confidence = 0.3
     
-    # 转换数值信号为字符串信号
-    if avg_signal > 0.1:  # 从0.2降低到0.1
+    # Convert numeric signal to string signal
+    if avg_signal > 0.1:  # Reduced from 0.2 to 0.1
         signal_str = "bullish"
-    elif avg_signal < -0.1:  # 从-0.2降低到-0.1
+    elif avg_signal < -0.1:  # Reduced from -0.2 to -0.1
         signal_str = "bearish"
     else:
         signal_str = "neutral"
@@ -319,10 +319,10 @@ def _traditional_debate_logic(state: AgentState, researcher_messages: dict, logg
 
 
 def _get_llm_enhanced_analysis(researcher_data: dict, agent_signals: dict, current_regime: dict, state: AgentState, logger) -> dict:
-    """获取LLM增强分析"""
+    """Get LLM enhanced analysis"""
     
     def _parse_confidence_for_display(conf_value):
-        """解析置信度值用于显示"""
+        """Parse confidence value for display"""
         if isinstance(conf_value, str):
             if conf_value.endswith('%'):
                 try:
@@ -340,7 +340,7 @@ def _get_llm_enhanced_analysis(researcher_data: dict, agent_signals: dict, curre
         else:
             return 0.5
     
-    # 构建发送给 LLM 的提示（保持原有逻辑但增强）
+    # Build prompt to send to LLM (maintain original logic but enhanced)
     regime_confidence = _parse_confidence_for_display(current_regime.get('confidence', 0))
     
     llm_prompt = f"""
@@ -351,7 +351,7 @@ Current Market Regime: {current_regime.get('regime_name', 'unknown')} (Confidenc
 RESEARCH PERSPECTIVES:
 """
     
-    # 添加研究员观点
+    # Add researcher perspectives
     for name, data in researcher_data.items():
         perspective = name.replace("researcher_", "").replace("_agent", "").upper()
         researcher_confidence = _parse_confidence_for_display(data.get('confidence', 0))
@@ -359,20 +359,20 @@ RESEARCH PERSPECTIVES:
         for point in data.get("thesis_points", []):
             llm_prompt += f"- {point}\n"
     
-    # 添加量化信号摘要
+    # Add quantitative signals summary
     if agent_signals:
         llm_prompt += f"\nQUANTITATIVE SIGNALS:\n"
         for signal_type, signal_data in agent_signals.items():
             signal_value = signal_data.get('signal', 'neutral')
             confidence_value = signal_data.get('confidence', 0)
             
-            # 处理信号值显示
+            # Handle signal value display
             if isinstance(signal_value, str):
                 signal_display = signal_value
             else:
                 signal_display = f"{signal_value:.2f}"
             
-            # 处理置信度显示
+            # Handle confidence display
             parsed_confidence = _parse_confidence_for_display(confidence_value)
             llm_prompt += f"- {signal_type.title()}: {signal_display} (Confidence: {parsed_confidence:.2f})\n"
     
@@ -394,7 +394,7 @@ Ensure your response is valid JSON format and includes all fields above. Respond
 """
 
     try:
-        logger.info("开始调用 LLM 获取增强分析...")
+        logger.info("Starting LLM call to get enhanced analysis...")
         messages = [
             {"role": "system", "content": "You are a professional financial analyst. Provide analysis in English only."},
             {"role": "user", "content": llm_prompt}
@@ -405,44 +405,44 @@ Ensure your response is valid JSON format and includes all fields above. Respond
         )()
 
         if llm_response:
-            # 解析 LLM 返回的 JSON
+            # Parse LLM returned JSON
             json_start = llm_response.find('{')
             json_end = llm_response.rfind('}') + 1
             if json_start >= 0 and json_end > json_start:
                 json_str = llm_response[json_start:json_end]
                 llm_analysis = json.loads(json_str)
                 llm_score = float(llm_analysis.get("score", 0))
-                llm_score = max(min(llm_score, 1.0), -1.0)  # 确保在有效范围内
+                llm_score = max(min(llm_score, 1.0), -1.0)  # Ensure within valid range
                 
-                logger.info(f"LLM增强分析完成，评分: {llm_score}")
+                logger.info(f"LLM enhanced analysis completed, score: {llm_score}")
                 return {
                     "llm_score": llm_score,
                     "llm_analysis": llm_analysis,
                     "llm_response": llm_response
                 }
     except Exception as e:
-        logger.error(f"LLM增强分析失败: {e}")
+        logger.error(f"LLM enhanced analysis failed: {e}")
     
     return {"llm_score": 0, "error": "LLM analysis failed"}
 
 
 def _convert_numeric_signal_to_string(analysis: dict) -> dict:
-    """将数值信号转换为字符串信号"""
+    """Convert numeric signal to string signal"""
     if "signal" in analysis and isinstance(analysis["signal"], (int, float)):
         numeric_signal = analysis["signal"]
         original_signal = numeric_signal
         
-        # 降低转换阈值使系统对较小信号更敏感
-        if numeric_signal > 0.1:  # 从0.2降低到0.1
+        # Lower conversion threshold to make system more sensitive to smaller signals
+        if numeric_signal > 0.1:  # Reduced from 0.2 to 0.1
             analysis["signal"] = "bullish"
-        elif numeric_signal < -0.1:  # 从-0.2降低到-0.1
+        elif numeric_signal < -0.1:  # Reduced from -0.2 to -0.1
             analysis["signal"] = "bearish"
         else:
             analysis["signal"] = "neutral"
         
-        # 添加转换日志用于调试
+        # Add conversion log for debugging
         logger = logging.getLogger(__name__)
-        logger.info(f"信号转换: {original_signal:.4f} -> {analysis['signal']} "
-                   f"(阈值: ±0.1)")  # 改为INFO级别以便在日志中可见
+        logger.info(f"Signal conversion: {original_signal:.4f} -> {analysis['signal']} "
+                   f"(threshold: ±0.1)")  # Changed to INFO level for visibility in logs
     
     return analysis

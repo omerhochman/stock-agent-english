@@ -9,7 +9,7 @@ import numpy as np
 import json
 from datetime import datetime, timedelta
 
-# 添加项目根目录到系统路径
+# Add project root directory to system path
 project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), "../.."))
 sys.path.insert(0, project_root)
 
@@ -21,63 +21,63 @@ from model.deap_factors import FactorAgent, FactorMiningModule
 from src.tools.api import get_price_history
 from model.split_evaluate import split_and_evaluate
 
-# 根据操作系统配置中文字体
+# Configure Chinese fonts based on operating system
 if sys.platform.startswith('win'):
-    # Windows系统
+    # Windows system
     matplotlib.rc('font', family='Microsoft YaHei')
 elif sys.platform.startswith('linux'):
-    # Linux系统
+    # Linux system
     matplotlib.rc('font', family='WenQuanYi Micro Hei')
 else:
-    # macOS系统
+    # macOS system
     matplotlib.rc('font', family='PingFang SC')
 
-# 用来正常显示负号
+# For normal display of negative signs
 matplotlib.rcParams['axes.unicode_minus'] = False
 
 
 def process_data(ticker, start_date, end_date, verbose=True):
-    """获取并处理股票数据"""
+    """Get and process stock data"""
     if verbose:
-        print(f"正在获取 {ticker} 从 {start_date} 到 {end_date} 的数据...")
+        print(f"Getting data for {ticker} from {start_date} to {end_date}...")
     
     try:
         prices_data = get_price_history(ticker, start_date, end_date)
         
         if isinstance(prices_data, list):
             if verbose:
-                print(f"获取到 {len(prices_data)} 条记录（列表格式），正在转换为DataFrame...")
+                print(f"Got {len(prices_data)} records (list format), converting to DataFrame...")
             prices_df = pd.DataFrame(prices_data)
             
-            # 确保日期列格式正确
+            # Ensure date column format is correct
             if 'date' in prices_df.columns:
                 prices_df['date'] = pd.to_datetime(prices_df['date'])
         else:
             if verbose:
                 if hasattr(prices_data, 'shape'):
-                    print(f"获取到 {prices_data.shape[0]} 条记录...")
+                    print(f"Got {prices_data.shape[0]} records...")
                 else:
-                    print(f"获取到数据类型: {type(prices_data)}...")
+                    print(f"Got data type: {type(prices_data)}...")
             prices_df = prices_data
             
         if verbose:
             if isinstance(prices_df, pd.DataFrame):
-                print(f"数据处理完成。形状: {prices_df.shape}")
+                print(f"Data processing completed. Shape: {prices_df.shape}")
                 if not prices_df.empty:
-                    print(f"列名: {list(prices_df.columns)}")
+                    print(f"Column names: {list(prices_df.columns)}")
             else:
-                print(f"数据处理完成。数据类型: {type(prices_df)}")
+                print(f"Data processing completed. Data type: {type(prices_df)}")
         
         return prices_df
     
     except Exception as e:
-        print(f"获取或处理数据时出错: {e}")
+        print(f"Error getting or processing data: {e}")
         return None
 
 
 def add_technical_indicators(df):
-    """添加缺失的技术指标"""
-    # 确保数据框有必要的列
+    """Add missing technical indicators"""
+    # Ensure DataFrame has necessary columns
     if 'close' not in df.columns and 'Close' in df.columns:
         df['close'] = df['Close']
     if 'open' not in df.columns and 'Open' in df.columns:
@@ -89,7 +89,7 @@ def add_technical_indicators(df):
     if 'volume' not in df.columns and 'Volume' in df.columns:
         df['volume'] = df['Volume']
     
-    # 添加必要的技术指标 (如果不存在)
+    # Add necessary technical indicators (if they don't exist)
     if 'ma10' not in df.columns:
         df['ma10'] = df['close'].rolling(window=10).mean()
     
@@ -118,69 +118,69 @@ def add_technical_indicators(df):
     if 'volatility_20d' not in df.columns:
         df['volatility_20d'] = df['close'].pct_change().rolling(window=20).std()
     
-    # 填充NaN值
+    # Fill NaN values
     df = df.ffill().bfill().fillna(0)
     
     return df
 
 
 def train_dl_model(prices_df, params=None, save_dir='models', verbose=True):
-    """训练深度学习模型"""
+    """Train deep learning model"""
     if verbose:
-        print("正在准备训练深度学习模型...")
+        print("Preparing to train deep learning model...")
     
     try:
-        # 预处理数据
+        # Preprocess data
         processed_data = preprocess_stock_data(prices_df)
         
         if verbose:
-            print(f"预处理完成，数据形状: {processed_data.shape}")
+            print(f"Preprocessing completed, data shape: {processed_data.shape}")
         
-        # 设置默认参数 (不直接传递给train_models，而是分别设置)
+        # Set default parameters (not directly passed to train_models, but set separately)
         default_params = {
-            'seq_length': 15,  # 增加序列长度以捕获更多历史信息
-            'forecast_days': 10,  # 更有意义的预测期
-            'hidden_dim': 128,  # 增加隐藏层维度，提高模型容量
-            'num_layers': 3,  # 增加层数
-            'epochs': 100,  # 增加训练轮数
-            'batch_size': 32,  # 适当调整批量大小
-            'learning_rate': 0.0005  # 降低学习率以提高稳定性
+            'seq_length': 15,  # Increase sequence length to capture more historical information
+            'forecast_days': 10,  # More meaningful forecast period
+            'hidden_dim': 128,  # Increase hidden layer dimension, improve model capacity
+            'num_layers': 3,  # Increase number of layers
+            'epochs': 100,  # Increase training epochs
+            'batch_size': 32,  # Appropriately adjust batch size
+            'learning_rate': 0.0005  # Reduce learning rate to improve stability
         }
         
-        # 合并用户提供的参数
+        # Merge user-provided parameters
         if params:
             for key, value in params.items():
                 if key in default_params:
                     default_params[key] = value
         
         if verbose:
-            print("使用以下参数训练模型:")
+            print("Training model with the following parameters:")
             for key, value in default_params.items():
                 print(f"  {key}: {value}")
         
-        # 初始化并训练模型
+        # Initialize and train model
         ml_agent = MLAgent(model_dir=save_dir)
         
-        # 检测数据量是否足够
+        # Check if data volume is sufficient
         if len(processed_data) < 50:
-            print(f"警告: 数据量较少({len(processed_data)}行)，模型训练可能不充分")
+            print(f"Warning: Insufficient data ({len(processed_data)} rows), model training may be inadequate")
         
-        # 准备特征列
-        # 确保所有必要的特征都在处理后的数据中
+        # Prepare feature columns
+        # Ensure all necessary features are in the processed data
         feature_cols = ['close', 'ma5', 'ma10', 'ma20', 'rsi', 'macd']
         missing_features = [col for col in feature_cols if col not in processed_data.columns]
         if missing_features:
-            print(f"警告: 以下特征在数据中缺失: {missing_features}")
-            print("将使用可用的特征列")
+            print(f"Warning: The following features are missing from the data: {missing_features}")
+            print("Will use available feature columns")
             feature_cols = [col for col in feature_cols if col in processed_data.columns]
             if not feature_cols:
                 feature_cols = ['close']
-                print("只使用close列作为特征")
+                print("Only using close column as feature")
         
         if verbose:
-            print(f"使用以下特征列: {feature_cols}")
+            print(f"Using the following feature columns: {feature_cols}")
         
-        # 自定义参数
+        # Custom parameters
         custom_params = {
             'seq_length': default_params['seq_length'],
             'forecast_days': default_params['forecast_days'],
@@ -189,10 +189,10 @@ def train_dl_model(prices_df, params=None, save_dir='models', verbose=True):
             'epochs': default_params['epochs'],
             'batch_size': default_params['batch_size'],
             'learning_rate': default_params['learning_rate'],
-            'feature_cols': feature_cols  # 使用预先验证的特征列
+            'feature_cols': feature_cols  # Use pre-validated feature columns
         }
         
-        # 确保自定义参数传递给MLAgent
+        # Ensure custom parameters are passed to MLAgent
         ml_agent.train_models(processed_data, 
                              seq_length=custom_params['seq_length'],
                              feature_cols=custom_params['feature_cols'],
@@ -203,46 +203,46 @@ def train_dl_model(prices_df, params=None, save_dir='models', verbose=True):
                              batch_size=custom_params['batch_size'],
                              learning_rate=custom_params['learning_rate'])
         
-        # 生成交易信号
+        # Generate trading signals
         signals = ml_agent.generate_signals(processed_data)
         
         if verbose:
-            print(f"训练完成。生成的交易信号: {signals.get('signal', 'unknown')}, 置信度: {signals.get('confidence', 0)}")
+            print(f"Training completed. Generated trading signal: {signals.get('signal', 'unknown')}, confidence: {signals.get('confidence', 0)}")
             if 'reasoning' in signals:
-                print(f"信号解析: {signals['reasoning']}")
+                print(f"Signal analysis: {signals['reasoning']}")
         
         return ml_agent, signals
     
     except Exception as e:
-        print(f"训练深度学习模型时出错: {e}")
+        print(f"Error training deep learning model: {e}")
         import traceback
         traceback.print_exc()
         return None, None
 
 
 def train_rl_model(prices_df, params=None, save_dir='models', verbose=True):
-    """训练强化学习模型"""
+    """Train reinforcement learning model"""
     if verbose:
-        print("正在准备训练强化学习模型...")
+        print("Preparing to train reinforcement learning model...")
     
     try:
-        # 检查数据量是否足够
+        # Check if data volume is sufficient
         if len(prices_df) < 100:
-            print(f"警告: 数据量较少({len(prices_df)}行)，可能不足以训练RL模型。")
-            print("建议使用至少100个交易日的数据。")
+            print(f"Warning: Insufficient data ({len(prices_df)} rows), may not be enough to train RL model.")
+            print("Recommend using at least 100 trading days of data.")
         
-        # 添加缺失的技术指标
+        # Add missing technical indicators
         enhanced_df = add_technical_indicators(prices_df.copy())
         
-        # 确认所有必要的技术指标都已添加
+        # Confirm all necessary technical indicators have been added
         required_indicators = ['ma10', 'rsi', 'macd', 'macd_signal', 'macd_hist', 
                                'volatility_5d', 'volatility_10d', 'volatility_20d']
         missing_indicators = [ind for ind in required_indicators if ind not in enhanced_df.columns]
         if missing_indicators:
-            print(f"警告: 仍有缺失的技术指标: {missing_indicators}")
-            print("尝试继续训练...")
+            print(f"Warning: Still missing technical indicators: {missing_indicators}")
+            print("Attempting to continue training...")
         
-        # 设置默认参数
+        # Set default parameters
         window_size = 10
         available_data_points = len(enhanced_df) - window_size
         default_params = {
@@ -252,47 +252,47 @@ def train_rl_model(prices_df, params=None, save_dir='models', verbose=True):
             'initial_balance': 100000,
             'transaction_fee_percent': 0.001,
             'window_size': window_size,
-            'max_steps': max(20, available_data_points // 2)  # 使用一半可用数据点，但至少20步
+            'max_steps': max(20, available_data_points // 2)  # Use half of available data points, but at least 20 steps
         }
         
-        # 合并用户提供的参数
+        # Merge user-provided parameters
         if params:
             for key, value in params.items():
                 if key in default_params:
                     default_params[key] = value
         
         if verbose:
-            print("使用以下参数训练模型:")
+            print("Training model with the following parameters:")
             for key, value in default_params.items():
                 print(f"  {key}: {value}")
         
-        # 临时保存并加载数据，以确保格式正确
+        # Temporarily save and load data to ensure correct format
         temp_csv = os.path.join(save_dir, "temp_training_data.csv")
         enhanced_df.to_csv(temp_csv, index=False)
         df_for_training = pd.read_csv(temp_csv)
         
-        # 转换列类型并填充NaN
+        # Convert column types and fill NaN
         for col in df_for_training.columns:
             if col == 'date':
                 df_for_training[col] = pd.to_datetime(df_for_training[col])
             elif df_for_training[col].dtype == 'object':
                 df_for_training[col] = pd.to_numeric(df_for_training[col], errors='coerce')
         
-        # 再次检查并填充NaN
+        # Check and fill NaN again
         df_for_training = df_for_training.fillna(0)
         
-        # 检查是否有无穷大的值
+        # Check for infinite values
         values_array = df_for_training.select_dtypes(include=[np.number]).values.astype(float)
         if np.isinf(values_array).any():
-            print("警告: 数据中存在无穷大的值，将其替换为0")
+            print("Warning: Infinite values found in data, replacing with 0")
             df_for_training = df_for_training.replace([np.inf, -np.inf], 0)
         
-        # 初始化RL交易系统
+        # Initialize RL trading system
         rl_trader = RLTrader(model_dir=save_dir)
         
-        # 训练模型
+        # Train model
         if verbose:
-            print("开始训练RL模型，这可能需要一些时间...")
+            print("Starting RL model training, this may take some time...")
         
         training_history = rl_trader.train(
             df=df_for_training,
@@ -304,65 +304,65 @@ def train_rl_model(prices_df, params=None, save_dir='models', verbose=True):
             max_steps=default_params['max_steps'],
         )
         
-        # 创建RLTradingAgent并加载刚训练好的模型
+        # Create RLTradingAgent and load the newly trained model
         rl_agent = RLTradingAgent(model_dir=save_dir)
         success = rl_agent.load_model("best_model")
         
-        # 只有在加载成功后才生成信号
+        # Only generate signals if loading is successful
         if success:
             signals = rl_agent.generate_signals(df_for_training)
             if verbose:
-                print(f"训练完成。生成的交易信号: {signals.get('signal', 'unknown')}, 置信度: {signals.get('confidence', 0)}")
+                print(f"Training completed. Generated trading signal: {signals.get('signal', 'unknown')}, confidence: {signals.get('confidence', 0)}")
         else:
-            print("警告: 模型训练后无法加载，可能训练失败")
+            print("Warning: Unable to load model after training, training may have failed")
             signals = {'signal': 'neutral', 'confidence': 0.5}
         
-        # 清理临时文件
+        # Clean up temporary files
         try:
             os.remove(temp_csv)
         except:
             pass
         
-        # 只有在成功加载模型后才返回agent
+        # Only return agent if model loading is successful
         return (rl_agent, signals) if success else (None, signals)
     
     except Exception as e:
-        print(f"训练强化学习模型时出错: {e}")
+        print(f"Error training reinforcement learning model: {e}")
         import traceback
         traceback.print_exc()
         return None, {'signal': 'neutral', 'confidence': 0.5}
 
 
 def train_factor_model(prices_df, params=None, save_dir='factors', verbose=True):
-    """训练遗传编程因子模型"""
+    """Train genetic programming factor model"""
     if verbose:
-        print("正在准备训练遗传编程因子模型...")
+        print("Preparing to train genetic programming factor model...")
     
     try:
-        # 设置默认参数
+        # Set default parameters
         default_params = {
-            'n_factors': 3,  # 因子数量
-            'population_size': 50,  # 种群大小
-            'n_generations': 20,  # 代数
+            'n_factors': 3,  # Number of factors
+            'population_size': 50,  # Population size
+            'n_generations': 20,  # Number of generations
             'future_return_periods': 5,
-            'min_fitness': 0.03  # 适应度
+            'min_fitness': 0.03  # Fitness threshold
         }
         
-        # 合并用户提供的参数
+        # Merge user-provided parameters
         if params:
             for key, value in params.items():
                 if key in default_params:
                     default_params[key] = value
         
         if verbose:
-            print("使用以下参数生成因子:")
+            print("Generating factors with the following parameters:")
             for key, value in default_params.items():
                 print(f"  {key}: {value}")
         
-        # 初始化因子挖掘模块
+        # Initialize factor mining module
         factor_agent = FactorAgent(model_dir=save_dir)
         
-        # 确保数据格式正确
+        # Ensure data format is correct
         if 'close' not in prices_df.columns and 'Close' in prices_df.columns:
             prices_df['close'] = prices_df['Close']
         if 'open' not in prices_df.columns and 'Open' in prices_df.columns:
@@ -374,253 +374,253 @@ def train_factor_model(prices_df, params=None, save_dir='factors', verbose=True)
         if 'volume' not in prices_df.columns and 'Volume' in prices_df.columns:
             prices_df['volume'] = prices_df['Volume']
             
-        # 预先添加一些基本技术指标来丰富特征空间
+        # Pre-add some basic technical indicators to enrich feature space
         enhanced_df = prices_df.copy()
         
-        # 添加一些基本技术指标
+        # Add some basic technical indicators
         if verbose:
-            print("添加基本技术指标以丰富特征空间...")
+            print("Adding basic technical indicators to enrich feature space...")
             
-        # 添加一些基本的移动平均线作为起点
+        # Add some basic moving averages as starting points
         enhanced_df['ma5'] = enhanced_df['close'].rolling(window=5).mean()
         enhanced_df['ma10'] = enhanced_df['close'].rolling(window=10).mean()
         enhanced_df['ma20'] = enhanced_df['close'].rolling(window=20).mean()
         
-        # 添加一些基本的价格动量指标
+        # Add some basic price momentum indicators
         enhanced_df['returns_1d'] = enhanced_df['close'].pct_change(1)
         enhanced_df['returns_5d'] = enhanced_df['close'].pct_change(5)
         
-        # 添加波动率指标
+        # Add volatility indicators
         enhanced_df['volatility_10d'] = enhanced_df['returns_1d'].rolling(window=10).std()
         
-        # 填充NaN值
+        # Fill NaN values
         enhanced_df = enhanced_df.fillna(0)
         
-        # 生成因子
+        # Generate factors
         if verbose:
-            print("开始生成因子，这可能需要较长时间...")
+            print("Starting factor generation, this may take a long time...")
         
-        # 生成因子
+        # Generate factors
         factors = factor_agent.generate_factors(
             price_data=enhanced_df,
             n_factors=default_params['n_factors']
         )
         
-        # 生成交易信号
+        # Generate trading signals
         signals = factor_agent.generate_signals(enhanced_df)
         
         if verbose:
-            print(f"因子生成完成。生成的交易信号: {signals.get('signal', 'unknown')}, 置信度: {signals.get('confidence', 0)}")
-            print(f"生成了 {len(factors)} 个因子")
+            print(f"Factor generation completed. Generated trading signal: {signals.get('signal', 'unknown')}, confidence: {signals.get('confidence', 0)}")
+            print(f"Generated {len(factors)} factors")
         
         return factor_agent, signals
     
     except Exception as e:
-        print(f"训练遗传编程因子模型时出错: {e}")
+        print(f"Error training genetic programming factor model: {e}")
         import traceback
         traceback.print_exc()
         return None, None
 
 
 def load_model(model_type, model_dir, verbose=True):
-    """加载已训练的模型"""
+    """Load trained model"""
     if verbose:
-        print(f"正在加载{model_type}模型...")
+        print(f"Loading {model_type} model...")
     
     try:
         if model_type == 'dl':
             agent = MLAgent(model_dir=model_dir)
             agent.load_models()
             if verbose:
-                print("深度学习模型加载成功")
+                print("Deep learning model loaded successfully")
             return agent
         
         elif model_type == 'rl':
             agent = RLTradingAgent(model_dir=model_dir)
             
-            # 检查模型文件是否存在
+            # Check if model file exists
             model_path = os.path.join(model_dir, "best_model.pth")
             if not os.path.exists(model_path):
                 if verbose:
-                    print(f"模型文件 {model_path} 不存在，无法加载")
+                    print(f"Model file {model_path} does not exist, cannot load")
                 return None
                 
-            success = agent.load_model("best_model")  # 指定模型名称
+            success = agent.load_model("best_model")  # Specify model name
             if success and verbose:
-                print("强化学习模型加载成功")
+                print("Reinforcement learning model loaded successfully")
             elif verbose:
-                print("强化学习模型加载失败")
+                print("Reinforcement learning model loading failed")
             return agent if success else None
         
         elif model_type == 'factor':
             agent = FactorAgent(model_dir=model_dir)
             factors = agent.load_factors()
             if factors and verbose:
-                print(f"因子模型加载成功，加载了{len(factors)}个因子")
+                print(f"Factor model loaded successfully, loaded {len(factors)} factors")
             elif verbose:
-                print("因子模型加载失败或没有找到因子")
+                print("Factor model loading failed or no factors found")
             return agent if factors else None
         
         else:
             if verbose:
-                print(f"不支持的模型类型: {model_type}")
+                print(f"Unsupported model type: {model_type}")
             return None
     
     except Exception as e:
-        print(f"加载模型时出错: {e}")
+        print(f"Error loading model: {e}")
         import traceback
         traceback.print_exc()
         return None
 
 
 def generate_signals(agent, model_type, prices_df, verbose=True):
-    """使用模型生成交易信号"""
+    """Generate trading signals using model"""
     if verbose:
-        print(f"使用{model_type}模型生成交易信号...")
+        print(f"Generating trading signals using {model_type} model...")
     
     try:
         if agent is None:
             if verbose:
-                print(f"警告: {model_type}模型不可用，使用中性信号")
+                print(f"Warning: {model_type} model not available, using neutral signal")
             return {'signal': 'neutral', 'confidence': 0.5}
         
-        # 添加缺失的技术指标
+        # Add missing technical indicators
         prices_df = add_technical_indicators(prices_df.copy())
         
-        # 初始化信号为默认值，确保所有路径都有值
+        # Initialize signal to default value, ensure all paths have values
         signals = {'signal': 'neutral', 'confidence': 0.5}
         
-        # 对于因子模型，需要特殊处理
+        # For factor model, special handling is needed
         if model_type == 'factor':
-            # 信号生成由因子模型内部处理，不需要提前计算特征
+            # Signal generation is handled internally by factor model, no need to pre-calculate features
             signals = agent.generate_signals(prices_df)
         elif model_type == 'rl':
-            window_size = 20  # RL模型默认窗口大小
-            if len(prices_df) < window_size + 10:  # 确保至少有窗口大小+10的数据量
+            window_size = 20  # RL model default window size
+            if len(prices_df) < window_size + 10:  # Ensure at least window_size+10 data points
                 if verbose:
-                    print(f"警告: 数据量({len(prices_df)}行)不足以使用RL模型。需要至少{window_size + 10}行数据。")
-                return {'signal': 'neutral', 'confidence': 0.5, 'error': '数据量不足'}
+                    print(f"Warning: Insufficient data ({len(prices_df)} rows) to use RL model. Need at least {window_size + 10} rows.")
+                return {'signal': 'neutral', 'confidence': 0.5, 'error': 'Insufficient data'}
             signals = agent.generate_signals(prices_df)
         else:
-            # 详细的错误捕获
+            # Detailed error handling
             try:
                 signals = agent.generate_signals(prices_df)
             except Exception as e:
                 import traceback
-                print(f"生成信号时出现错误: {e}")
+                print(f"Error generating signals: {e}")
                 traceback.print_exc()
-                # 使用简单的字典返回
+                # Use simple dictionary return
                 signals = {'signal': 'neutral', 'confidence': 0.5, 'error': str(e)}
         
         if verbose:
-            print(f"生成的交易信号: {signals.get('signal', 'unknown')}, 置信度: {signals.get('confidence', 0)}")
+            print(f"Generated trading signal: {signals.get('signal', 'unknown')}, confidence: {signals.get('confidence', 0)}")
             if 'reasoning' in signals:
-                print(f"决策理由: {signals['reasoning']}")
-            # 打印完整的信号字典以进行调试
-            print(f"完整信号信息: {signals}")
+                print(f"Decision reasoning: {signals['reasoning']}")
+            # Print complete signal dictionary for debugging
+            print(f"Complete signal information: {signals}")
         
         return signals
     
     except Exception as e:
-        print(f"生成交易信号时出错: {e}")
+        print(f"Error generating trading signals: {e}")
         import traceback
         traceback.print_exc()
         return {'signal': 'neutral', 'confidence': 0.5}
 
 
 def parse_arguments():
-    """解析命令行参数"""
-    parser = argparse.ArgumentParser(description='股票交易模型训练和测试工具')
+    """Parse command line arguments"""
+    parser = argparse.ArgumentParser(description='Stock trading model training and testing tool')
     
-    # 基本参数
+    # Basic parameters
     parser.add_argument('--ticker', type=str, required=True,
-                        help='股票代码，例如: 600519')
+                        help='Stock code, e.g.: 600519')
     parser.add_argument('--start-date', type=str,
                         default=(datetime.now() - timedelta(days=365*2)).strftime('%Y-%m-%d'),
-                        help='开始日期，格式：YYYY-MM-DD，默认为两年前')
+                        help='Start date, format: YYYY-MM-DD, default is two years ago')
     parser.add_argument('--end-date', type=str,
                         default=(datetime.now() - timedelta(days=1)).strftime('%Y-%m-%d'),
-                        help='结束日期，格式：YYYY-MM-DD，默认为昨天')
+                        help='End date, format: YYYY-MM-DD, default is yesterday')
     
-    # 模型选择和操作
+    # Model selection and operations
     parser.add_argument('--model', type=str, choices=['dl', 'rl', 'factor', 'all'],
                         default='all',
-                        help='模型类型: dl (深度学习), rl (强化学习), factor (遗传编程因子), all (所有)')
+                        help='Model type: dl (deep learning), rl (reinforcement learning), factor (genetic programming factor), all (all)')
     parser.add_argument('--action', type=str, choices=['train', 'test', 'both', 'evaluate'],
                         default='both',
-                        help='操作类型: train (仅训练), test (仅测试), both (训练并测试), evaluate (划分数据并评估)')
+                        help='Operation type: train (training only), test (testing only), both (train and test), evaluate (split data and evaluate)')
     
-    # 模型参数
+    # Model parameters
     parser.add_argument('--params', type=str, default=None,
-                        help='模型参数，JSON格式字符串，例如: \'{"hidden_dim": 128, "epochs": 100}\'')
+                        help='Model parameters, JSON format string, e.g.: \'{"hidden_dim": 128, "epochs": 100}\'')
     
-    # 数据划分参数
+    # Data split parameters
     parser.add_argument('--train-ratio', type=float, default=0.7,
-                        help='训练集比例，默认0.7')
+                        help='Training set ratio, default 0.7')
     parser.add_argument('--val-ratio', type=float, default=0.2,
-                        help='验证集比例，默认0.2')
+                        help='Validation set ratio, default 0.2')
     parser.add_argument('--test-ratio', type=float, default=0.1,
-                        help='测试集比例，默认0.1')
+                        help='Test set ratio, default 0.1')
     parser.add_argument('--shuffle', action='store_true',
-                        help='是否打乱数据')
+                        help='Whether to shuffle data')
     
-    # 其他选项
+    # Other options
     parser.add_argument('--model-dir', type=str, default='models',
-                        help='模型保存目录，默认为 "models"')
+                        help='Model save directory, default "models"')
     parser.add_argument('--factor-dir', type=str, default='factors',
-                        help='因子模型保存目录，默认为 "factors"')
+                        help='Factor model save directory, default "factors"')
     parser.add_argument('--eval-dir', type=str, default='models/evaluation',
-                        help='评估结果保存目录，默认为 "models/evaluation"')
+                        help='Evaluation results save directory, default "models/evaluation"')
     parser.add_argument('--verbose', action='store_true', default=True,
-                        help='显示详细输出')
+                        help='Show detailed output')
     
     return parser.parse_args()
 
 
 def main():
-    """主函数"""
-    # 解析命令行参数
+    """Main function"""
+    # Parse command line arguments
     args = parse_arguments()
     
-    # 解析JSON参数
+    # Parse JSON parameters
     params = None
     if args.params:
         try:
             params = json.loads(args.params)
             if args.verbose:
-                print(f"使用自定义参数: {params}")
+                print(f"Using custom parameters: {params}")
         except json.JSONDecodeError:
-            print(f"错误: 无法解析参数JSON: {args.params}")
-            print("请使用正确的JSON格式，例如: '{\"hidden_dim\": 128, \"epochs\": 100}'")
+            print(f"Error: Unable to parse parameter JSON: {args.params}")
+            print("Please use correct JSON format, e.g.: '{\"hidden_dim\": 128, \"epochs\": 100}'")
             return
     
-    # 获取并处理股票数据
+    # Get and process stock data
     prices_df = process_data(args.ticker, args.start_date, args.end_date, args.verbose)
     if prices_df is None or (isinstance(prices_df, pd.DataFrame) and prices_df.empty):
-        print("错误: 无法获取股票数据或数据为空")
+        print("Error: Unable to get stock data or data is empty")
         return
     
-    # 数据划分评估模式
+    # Data split evaluation mode
     if args.action == 'evaluate':
         if args.verbose:
             print(f"\n{'='*50}")
-            print(f"开始数据划分和模型评估 - 股票代码: {args.ticker}")
-            print(f"数据划分比例 - 训练集: {args.train_ratio*100:.1f}%, 验证集: {args.val_ratio*100:.1f}%, 测试集: {args.test_ratio*100:.1f}%")
+            print(f"Starting data splitting and model evaluation - Stock code: {args.ticker}")
+            print(f"Data split ratio - Training set: {args.train_ratio*100:.1f}%, Validation set: {args.val_ratio*100:.1f}%, Test set: {args.test_ratio*100:.1f}%")
             print(f"{'='*50}")
         
-        # 执行模型训练和评估
+        # Execute model training and evaluation
         models_to_evaluate = ['dl', 'rl', 'factor'] if args.model == 'all' else [args.model]
         
         evaluation_results = {}
         for model_type in models_to_evaluate:
             if args.verbose:
                 print(f"\n{'='*50}")
-                print(f"开始评估 {model_type} 模型")
+                print(f"Starting evaluation of {model_type} model")
                 print(f"{'='*50}")
             
             save_dir = args.factor_dir if model_type == 'factor' else args.model_dir
             
-            # 调用split_evaluate模块进行训练和评估
+            # Call split_evaluate module for training and evaluation
             agent, model_results = split_and_evaluate(
                 ticker=args.ticker,
                 price_data=prices_df,
@@ -639,18 +639,18 @@ def main():
             
             if args.verbose:
                 print(f"\n{'='*50}")
-                print(f"{model_type} 模型评估完成")
+                print(f"{model_type} model evaluation completed")
                 print(f"{'='*50}")
         
-        # 打印综合评估结果
+        # Print comprehensive evaluation results
         if args.verbose and len(evaluation_results) > 0:
             print("\n")
             print("="*50)
-            print("评估结果摘要:")
+            print("Evaluation Results Summary:")
             print("="*50)
             
             for model_type, results in evaluation_results.items():
-                print(f"\n{model_type} 模型:")
+                print(f"\n{model_type} model:")
                 if 'results' in results:
                     model_results = results['results']
                     for sub_model, metrics in model_results.items():
@@ -662,34 +662,34 @@ def main():
                                 else:
                                     print(f"    {metric_name}: {metric_value}")
                 
-                print(f"  训练集大小: {results.get('train_size', 'N/A')}")
-                print(f"  测试集大小: {results.get('test_size', 'N/A')}")
+                print(f"  Training set size: {results.get('train_size', 'N/A')}")
+                print(f"  Test set size: {results.get('test_size', 'N/A')}")
             
-            print(f"\n评估结果详情已保存到 {args.eval_dir} 目录")
+            print(f"\nEvaluation results details saved to {args.eval_dir} directory")
         
         return
 
-    # 执行模型训练和测试（原始模式）
+    # Execute model training and testing (original mode)
     models_to_train = ['dl', 'rl', 'factor'] if args.model == 'all' else [args.model]
     results = {}
     
     for model_type in models_to_train:
         if args.verbose:
             print(f"\n{'='*50}")
-            print(f"开始处理 {model_type} 模型")
+            print(f"Starting processing of {model_type} model")
             print(f"{'='*50}")
         
         model_dir = args.factor_dir if model_type == 'factor' else args.model_dir
         agent = None
         signals = None
         
-        # 确保目录存在
+        # Ensure directory exists
         os.makedirs(model_dir, exist_ok=True)
         
-        # 训练模型
+        # Train model
         if args.action in ['train', 'both']:
             if args.verbose:
-                print(f"\n--- 训练 {model_type} 模型 ---")
+                print(f"\n--- Training {model_type} model ---")
             
             if model_type == 'dl':
                 agent, signals = train_dl_model(prices_df, params, model_dir, args.verbose)
@@ -698,39 +698,39 @@ def main():
             elif model_type == 'factor':
                 agent, signals = train_factor_model(prices_df, params, model_dir, args.verbose)
         
-        # 测试模型
+        # Test model
         if args.action in ['test', 'both']:
             if args.verbose:
-                print(f"\n--- 测试 {model_type} 模型 ---")
+                print(f"\n--- Testing {model_type} model ---")
             
-            # 如果只是测试但没有训练，尝试加载已有模型
+            # If only testing but not training, try to load existing model
             if args.action == 'test':
                 agent = load_model(model_type, model_dir, args.verbose)
             
-            # 生成信号 - 已训练或已加载才生成信号
+            # Generate signals - only generate signals if trained or loaded
             if agent is not None:
                 signals = generate_signals(agent, model_type, prices_df, args.verbose)
             else:
-                # 如果没有成功训练或加载模型，提供中性信号
+                # If model training or loading failed, provide neutral signal
                 if args.verbose:
-                    print(f"警告: 未能训练或加载{model_type}模型，使用中性信号")
+                    print(f"Warning: Unable to train or load {model_type} model, using neutral signal")
                 signals = {'signal': 'neutral', 'confidence': 0.5}
         
-        # 保存结果
+        # Save results
         if signals:
             results[model_type] = signals
     
-    # 打印综合结果
+    # Print comprehensive results
     if args.verbose and len(results) > 0:
         print("\n")
         print("="*50)
-        print("综合结果:")
+        print("Comprehensive Results:")
         print("="*50)
         
         for model_type, signals in results.items():
             signal = signals.get('signal', 'unknown')
             confidence = signals.get('confidence', 0)
-            print(f"{model_type:6} 模型: {signal:8} (置信度: {confidence:.2f})")
+            print(f"{model_type:6} model: {signal:8} (confidence: {confidence:.2f})")
         
         if len(results) > 1:
             signal_counts = {'bullish': 0, 'bearish': 0, 'neutral': 0}
@@ -743,7 +743,7 @@ def main():
                 
                 signal_counts[signal] += 1
                 
-                # 使用置信度作为权重
+                # Use confidence as weight
                 if signal == 'bullish':
                     weighted_sum += confidence
                 elif signal == 'bearish':
@@ -751,13 +751,13 @@ def main():
                 
                 total_weight += confidence
             
-            # 计算综合信号
+            # Calculate comprehensive signal
             if total_weight > 0:
                 normalized_score = weighted_sum / total_weight
             else:
                 normalized_score = 0
             
-            # 确定最终信号
+            # Determine final signal
             if normalized_score > 0.2:
                 final_signal = 'bullish'
             elif normalized_score < -0.2:
@@ -765,10 +765,10 @@ def main():
             else:
                 final_signal = 'neutral'
             
-            print("\n模型投票结果:\n")
-            print(f"看多: {signal_counts['bullish']}，看空: {signal_counts['bearish']}，中性: {signal_counts['neutral']}\n")
-            print(f"加权评分: {normalized_score:.2f} (范围: -1到1)\n")
-            print(f"综合信号: {final_signal}\n")
+            print("\nModel voting results:\n")
+            print(f"Bullish: {signal_counts['bullish']}, Bearish: {signal_counts['bearish']}, Neutral: {signal_counts['neutral']}\n")
+            print(f"Weighted score: {normalized_score:.2f} (range: -1 to 1)\n")
+            print(f"Comprehensive signal: {final_signal}\n")
 
 
 if __name__ == '__main__':

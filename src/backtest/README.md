@@ -1,52 +1,52 @@
-# A股投资Agent系统 - 回测框架使用指南
+# A-Share Investment Agent System - Backtesting Framework User Guide
 
-## 概述
+## Overview
 
-本回测框架提供了完整的量化投资策略回测功能，包括：
-- 多种基准策略实现
-- AI Agent策略回测
-- 统计显著性检验
-- 性能指标计算
-- 可视化图表生成
-- 详细报告导出
+This backtesting framework provides complete quantitative investment strategy backtesting functionality, including:
+- Multiple baseline strategy implementations
+- AI Agent strategy backtesting
+- Statistical significance testing
+- Performance metrics calculation
+- Visualization chart generation
+- Detailed report export
 
-## 快速开始
+## Quick Start
 
-### 1. 基本使用
+### 1. Basic Usage
 
 ```bash
-# 运行基准策略回测
+# Run baseline strategy backtesting
 python src/main_backtester.py --ticker 000001 --baseline-only
 
-# 运行完整回测（包括AI Agent）
+# Run complete backtesting (including AI Agent)
 python src/main_backtester.py --ticker 000001 --start-date 2023-01-01 --end-date 2023-12-31
 
-# 多股票组合回测
+# Multi-stock portfolio backtesting
 python src/main_backtester.py --ticker 000001 --tickers "000001,000002,600036" --initial-capital 500000
 ```
 
-### 2. 命令行参数
+### 2. Command Line Parameters
 
-| 参数 | 说明 | 默认值 |
-|------|------|--------|
-| `--ticker` | 主要股票代码（必需） | - |
-| `--tickers` | 多股票代码，逗号分隔 | - |
-| `--start-date` | 回测开始日期 | 一年前 |
-| `--end-date` | 回测结束日期 | 今天 |
-| `--initial-capital` | 初始资金 | 100000 |
-| `--benchmark` | 基准指数代码 | 000300 |
-| `--trading-cost` | 交易成本比例 | 0.001 |
-| `--slippage` | 滑点比例 | 0.001 |
-| `--baseline-only` | 仅运行基准策略 | False |
-| `--save-results` | 保存结果到文件 | False |
-| `--export-report` | 导出HTML报告 | False |
+| Parameter | Description | Default Value |
+|-----------|-------------|---------------|
+| `--ticker` | Main stock code (required) | - |
+| `--tickers` | Multiple stock codes, comma-separated | - |
+| `--start-date` | Backtesting start date | One year ago |
+| `--end-date` | Backtesting end date | Today |
+| `--initial-capital` | Initial capital | 100000 |
+| `--benchmark` | Benchmark index code | 000300 |
+| `--trading-cost` | Trading cost ratio | 0.001 |
+| `--slippage` | Slippage ratio | 0.001 |
+| `--baseline-only` | Run baseline strategies only | False |
+| `--save-results` | Save results to file | False |
+| `--export-report` | Export HTML report | False |
 
-### 3. 编程接口使用
+### 3. Programming Interface Usage
 
 ```python
 from src.backtest import Backtester, BacktestConfig
 
-# 创建配置
+# Create configuration
 config = BacktestConfig(
     initial_capital=100000,
     start_date="2023-01-01",
@@ -55,194 +55,194 @@ config = BacktestConfig(
     slippage=0.001
 )
 
-# 创建回测器
+# Create backtester
 backtester = Backtester(
     ticker="000001",
     config=config
 )
 
-# 运行基准策略回测
+# Run baseline strategy backtesting
 baseline_results = backtester.run_baseline_backtests()
 
-# 运行比较分析
+# Run comparison analysis
 comparison_results = backtester.run_comprehensive_comparison()
 
-# 生成可视化图表
+# Generate visualization charts
 chart_paths = backtester.generate_visualization()
 
-# 导出报告
+# Export report
 report_file = backtester.export_report(format='html')
 ```
 
-## 框架架构
+## Framework Architecture
 
-### 核心模块
+### Core Modules
 
-1. **core.py** - 主回测引擎
-   - `Backtester`: 主回测类
-   - `BacktestConfig`: 配置类
-   - `BacktestResult`: 结果类
+1. **core.py** - Main backtesting engine
+   - `Backtester`: Main backtesting class
+   - `BacktestConfig`: Configuration class
+   - `BacktestResult`: Result class
 
-2. **baselines/** - 基准策略
-   - `BuyHoldStrategy`: 买入持有策略
-   - `MomentumStrategy`: 动量策略
-   - `MeanReversionStrategy`: 均值回归策略
-   - `MovingAverageStrategy`: 移动平均策略
-   - `RandomWalkStrategy`: 随机游走策略
+2. **baselines/** - Baseline strategies
+   - `BuyHoldStrategy`: Buy and hold strategy
+   - `MomentumStrategy`: Momentum strategy
+   - `MeanReversionStrategy`: Mean reversion strategy
+   - `MovingAverageStrategy`: Moving average strategy
+   - `RandomWalkStrategy`: Random walk strategy
 
-3. **evaluation/** - 评估模块
-   - `PerformanceMetrics`: 性能指标计算
-   - `SignificanceTester`: 统计显著性检验
-   - `StrategyComparator`: 策略比较
-   - `BacktestVisualizer`: 可视化
+3. **evaluation/** - Evaluation module
+   - `PerformanceMetrics`: Performance metrics calculation
+   - `SignificanceTester`: Statistical significance testing
+   - `StrategyComparator`: Strategy comparison
+   - `BacktestVisualizer`: Visualization
 
-4. **execution/** - 执行模块
-   - `TradeExecutor`: 交易执行器
-   - `CostModel`: 成本模型
+4. **execution/** - Execution module
+   - `TradeExecutor`: Trade executor
+   - `CostModel`: Cost model
 
-5. **backtest_utils/** - 工具模块
-   - `DataProcessor`: 数据处理
-   - `PerformanceAnalyzer`: 性能分析
-   - `StatisticalAnalyzer`: 统计分析
+5. **backtest_utils/** - Utility modules
+   - `DataProcessor`: Data processing
+   - `PerformanceAnalyzer`: Performance analysis
+   - `StatisticalAnalyzer`: Statistical analysis
 
-### 基准策略说明
+### Baseline Strategy Description
 
-1. **买入持有策略 (Buy & Hold)**
-   - 在回测开始时买入并持有到结束
-   - 适合作为基准比较
+1. **Buy and Hold Strategy**
+   - Buy at the beginning of backtesting and hold until the end
+   - Suitable as a benchmark for comparison
 
-2. **动量策略 (Momentum)**
-   - 基于价格动量进行交易
-   - 支持多种参数组合
+2. **Momentum Strategy**
+   - Trade based on price momentum
+   - Support for multiple parameter combinations
 
-3. **均值回归策略 (Mean Reversion)**
-   - 基于价格偏离均值的程度进行交易
-   - 使用Z-score判断买卖时机
+3. **Mean Reversion Strategy**
+   - Trade based on the degree of price deviation from the mean
+   - Use Z-score to determine buy/sell timing
 
-4. **移动平均策略 (Moving Average)**
-   - 基于短期和长期移动平均线交叉
-   - 经典的技术分析策略
+4. **Moving Average Strategy**
+   - Based on short-term and long-term moving average crossovers
+   - Classic technical analysis strategy
 
-5. **随机游走策略 (Random Walk)**
-   - 随机生成交易信号
-   - 作为对照组验证其他策略的有效性
+5. **Random Walk Strategy**
+   - Randomly generate trading signals
+   - Used as a control group to validate the effectiveness of other strategies
 
-## 性能指标
+## Performance Metrics
 
-框架计算以下性能指标：
+The framework calculates the following performance metrics:
 
-- **收益率指标**
-  - 总收益率 (Total Return)
-  - 年化收益率 (Annual Return)
-  - 日收益率 (Daily Returns)
+- **Return Metrics**
+  - Total Return
+  - Annual Return
+  - Daily Returns
 
-- **风险指标**
-  - 波动率 (Volatility)
-  - 最大回撤 (Maximum Drawdown)
+- **Risk Metrics**
+  - Volatility
+  - Maximum Drawdown
   - VaR (Value at Risk)
 
-- **风险调整收益**
-  - 夏普比率 (Sharpe Ratio)
-  - 索提诺比率 (Sortino Ratio)
-  - 卡尔马比率 (Calmar Ratio)
+- **Risk-Adjusted Returns**
+  - Sharpe Ratio
+  - Sortino Ratio
+  - Calmar Ratio
 
-- **交易指标**
-  - 胜率 (Win Rate)
-  - 平均盈利/亏损
-  - 交易次数
+- **Trading Metrics**
+  - Win Rate
+  - Average Profit/Loss
+  - Number of Trades
 
-## 统计显著性检验
+## Statistical Significance Testing
 
-框架提供多种统计检验方法：
+The framework provides multiple statistical testing methods:
 
-1. **T检验** - 比较策略收益率差异
-2. **Sharpe比率检验** - 比较风险调整收益
-3. **Bootstrap检验** - 非参数统计检验
-4. **功效分析** - 评估检验的统计功效
+1. **T-test** - Compare strategy return differences
+2. **Sharpe Ratio Test** - Compare risk-adjusted returns
+3. **Bootstrap Test** - Non-parametric statistical testing
+4. **Power Analysis** - Evaluate statistical power of tests
 
-## 可视化图表
+## Visualization Charts
 
-自动生成以下图表：
+Automatically generates the following charts:
 
-1. **累计收益曲线** - 展示各策略的收益表现
-2. **回撤曲线** - 显示最大回撤情况
-3. **收益分布图** - 收益率的分布特征
-4. **相关性热力图** - 策略间的相关性
-5. **风险收益散点图** - 风险与收益的关系
+1. **Cumulative Return Curve** - Shows return performance of each strategy
+2. **Drawdown Curve** - Displays maximum drawdown situation
+3. **Return Distribution Chart** - Distribution characteristics of returns
+4. **Correlation Heatmap** - Correlations between strategies
+5. **Risk-Return Scatter Plot** - Relationship between risk and return
 
-## 测试框架
+## Testing Framework
 
-运行测试脚本验证框架功能：
+Run test scripts to verify framework functionality:
 
 ```bash
 python test/test_backtest.py
 ```
 
-测试内容包括：
-- 配置验证
-- 基准策略初始化
-- 单策略回测
-- 多策略比较
-- 统计分析
+Test content includes:
+- Configuration validation
+- Baseline strategy initialization
+- Single strategy backtesting
+- Multi-strategy comparison
+- Statistical analysis
 
-## 注意事项
+## Important Notes
 
-1. **数据依赖**
-   - 确保股票数据API可用
-   - 检查网络连接和API限制
+1. **Data Dependencies**
+   - Ensure stock data API is available
+   - Check network connection and API limits
 
-2. **计算资源**
-   - 长期回测可能需要较长时间
-   - 建议先用短期数据测试
+2. **Computational Resources**
+   - Long-term backtesting may take considerable time
+   - Recommend testing with short-term data first
 
-3. **参数调优**
-   - 交易成本和滑点设置要符合实际情况
-   - 基准策略参数可根据需要调整
+3. **Parameter Tuning**
+   - Trading costs and slippage settings should match actual conditions
+   - Baseline strategy parameters can be adjusted as needed
 
-4. **结果解读**
-   - 注意统计显著性的置信水平
-   - 考虑样本外验证
+4. **Result Interpretation**
+   - Pay attention to confidence levels of statistical significance
+   - Consider out-of-sample validation
 
-## 扩展开发
+## Extension Development
 
-### 添加新的基准策略
+### Adding New Baseline Strategies
 
-1. 继承 `BaseStrategy` 类
-2. 实现 `generate_signal` 方法
-3. 在 `Backtester.initialize_baseline_strategies` 中添加
+1. Inherit from `BaseStrategy` class
+2. Implement `generate_signal` method
+3. Add to `Backtester.initialize_baseline_strategies`
 
-### 自定义性能指标
+### Custom Performance Metrics
 
-1. 在 `PerformanceMetrics` 类中添加新方法
-2. 更新 `calculate_all_metrics` 方法
+1. Add new methods to `PerformanceMetrics` class
+2. Update `calculate_all_metrics` method
 
-### 新增可视化图表
+### Adding New Visualization Charts
 
-1. 在 `BacktestVisualizer` 类中添加新方法
-2. 更新 `create_comparison_charts` 方法
+1. Add new methods to `BacktestVisualizer` class
+2. Update `create_comparison_charts` method
 
-## 常见问题
+## Frequently Asked Questions
 
-**Q: 回测结果不稳定怎么办？**
-A: 检查数据质量，增加回测期间长度，使用多次运行取平均值。
+**Q: What to do if backtesting results are unstable?**
+A: Check data quality, increase backtesting period length, use multiple runs and take averages.
 
-**Q: 如何处理停牌股票？**
-A: 框架会自动跳过无法获取价格的日期，建议选择流动性好的股票。
+**Q: How to handle suspended stocks?**
+A: The framework will automatically skip dates when prices cannot be obtained, recommend selecting stocks with good liquidity.
 
-**Q: 统计检验显示不显著怎么办？**
-A: 可能是样本量不足或策略差异确实不大，考虑增加回测期间或调整策略参数。
+**Q: What to do if statistical tests show no significance?**
+A: May be due to insufficient sample size or indeed small strategy differences, consider increasing backtesting period or adjusting strategy parameters.
 
-**Q: 如何优化回测速度？**
-A: 减少回测期间，降低数据获取频率，使用缓存机制。
+**Q: How to optimize backtesting speed?**
+A: Reduce backtesting period, lower data acquisition frequency, use caching mechanisms.
 
-## 更新日志
+## Update Log
 
-- v1.0.0: 初始版本，包含基本回测功能
-- 支持多种基准策略
-- 统计显著性检验
-- 可视化图表生成
-- HTML报告导出
+- v1.0.0: Initial version with basic backtesting functionality
+- Support for multiple baseline strategies
+- Statistical significance testing
+- Visualization chart generation
+- HTML report export
 
 ---
 
-如有问题或建议，请联系开发团队。 
+For questions or suggestions, please contact the development team. 

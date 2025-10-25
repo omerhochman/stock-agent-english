@@ -3,10 +3,10 @@ from typing import Dict, Any, List
 
 from src.utils.logging_config import setup_logger
 
-# 设置日志记录器
+# Setup logger
 logger = setup_logger('structured_terminal')
 
-# 格式化符号
+# Formatting symbols
 SYMBOLS = {
     "border": "═",
     "header_left": "╔",
@@ -21,7 +21,7 @@ SYMBOLS = {
     "bullet": "• ",
 }
 
-# 状态图标
+# Status icons
 STATUS_ICONS = {
     "bearish": "📉",
     "bullish": "📈",
@@ -35,22 +35,22 @@ STATUS_ICONS = {
     "warning": "⚠️",
 }
 
-# Agent图标和名称映射
+# Agent icon and name mapping
 AGENT_MAP = {
-    "market_data_agent": {"icon": "📊", "name": "市场数据分析"},
-    "technical_analyst_agent": {"icon": "📈", "name": "技术分析"},
-    "fundamentals_agent": {"icon": "📝", "name": "基本面分析"},
-    "sentiment_agent": {"icon": "🔍", "name": "情感分析"},
-    "valuation_agent": {"icon": "💰", "name": "估值分析"},
-    "researcher_bull_agent": {"icon": "🐂", "name": "多方研究"},
-    "researcher_bear_agent": {"icon": "🐻", "name": "空方研究"},
-    "debate_room_agent": {"icon": "🗣️", "name": "辩论室分析"},
-    "risk_management_agent": {"icon": "⚠️", "name": "风险管理"},
-    "macro_analyst_agent": {"icon": "🌍", "name": "宏观分析"},
-    "portfolio_management_agent": {"icon": "📂", "name": "投资组合管理"}
+    "market_data_agent": {"icon": "📊", "name": "Market Data Analysis"},
+    "technical_analyst_agent": {"icon": "📈", "name": "Technical Analysis"},
+    "fundamentals_agent": {"icon": "📝", "name": "Fundamental Analysis"},
+    "sentiment_agent": {"icon": "🔍", "name": "Sentiment Analysis"},
+    "valuation_agent": {"icon": "💰", "name": "Valuation Analysis"},
+    "researcher_bull_agent": {"icon": "🐂", "name": "Bullish Research"},
+    "researcher_bear_agent": {"icon": "🐻", "name": "Bearish Research"},
+    "debate_room_agent": {"icon": "🗣️", "name": "Debate Room Analysis"},
+    "risk_management_agent": {"icon": "⚠️", "name": "Risk Management"},
+    "macro_analyst_agent": {"icon": "🌍", "name": "Macro Analysis"},
+    "portfolio_management_agent": {"icon": "📂", "name": "Portfolio Management"}
 }
 
-# Agent显示顺序
+# Agent display order
 AGENT_ORDER = [
     "market_data_agent",
     "technical_analyst_agent",
@@ -67,33 +67,33 @@ AGENT_ORDER = [
 
 
 class StructuredTerminalOutput:
-    """结构化终端输出类"""
+    """Structured terminal output class"""
 
     def __init__(self):
-        """初始化"""
+        """Initialize"""
         self.data = {}
         self.metadata = {}
 
     def set_metadata(self, key: str, value: Any) -> None:
-        """设置元数据"""
+        """Set metadata"""
         self.metadata[key] = value
 
     def add_agent_data(self, agent_name: str, data: Any) -> None:
-        """添加agent数据"""
+        """Add agent data"""
         self.data[agent_name] = data
 
     def _format_value(self, value: Any) -> str:
-        """格式化单个值"""
+        """Format single value"""
         if isinstance(value, bool):
             return "✅" if value else "❌"
         elif isinstance(value, (int, float)):
-            # 对大数进行特殊处理
+            # Special handling for large numbers
             if value > 1000000:
-                if value > 1000000000:  # 十亿以上
+                if value > 1000000000:  # Above billion
                     return f"${value/1000000000:.2f}B"
-                else:  # 百万到十亿
+                else:  # Million to billion
                     return f"${value/1000000:.2f}M"
-            # 对超过5位小数的数进行格式化
+            # Format numbers with more than 5 decimal places
             elif isinstance(value, float) and abs(value) < 0.00001:
                 return f"{value:.5f}"
             elif isinstance(value, float):
@@ -105,7 +105,7 @@ class StructuredTerminalOutput:
             return str(value)
 
     def _format_dict_as_tree(self, data: Dict[str, Any], indent: int = 0, max_str_len: int = 500) -> List[str]:
-        """将字典格式化为树形结构，限制字符串长度"""
+        """Format dictionary as tree structure, limiting string length"""
         result = []
         items = list(data.items())
 
@@ -114,30 +114,30 @@ class StructuredTerminalOutput:
             prefix = SYMBOLS["tree_last"] if is_last else SYMBOLS["tree_branch"]
             indent_str = "  " * indent
             
-            # 格式化当前值
+            # Format current value
             formatted_value = self._format_value(value)
 
-            # 特殊处理market_data和一些大型数据结构
+            # Special handling for market_data and some large data structures
             if key in ["market_returns", "stock_returns"] and isinstance(value, str) and len(value) > max_str_len:
-                result.append(f"{indent_str}{prefix} {key}: [数据过长，已省略]")
+                result.append(f"{indent_str}{prefix} {key}: [Data too long, omitted]")
                 continue
                     
-            # 添加特殊处理大数值的逻辑
+            # Add special handling for large values
             if "price" in key.lower() and isinstance(value, (int, float)) and value > 1000000:
-                if value > 1000000000:  # 十亿以上
+                if value > 1000000000:  # Above billion
                     formatted_value = f"${value/1000000000:.2f}B"
-                else:  # 百万到十亿
+                else:  # Million to billion
                     formatted_value = f"${value/1000000:.2f}M"
                 result.append(f"{indent_str}{prefix} {key}: {formatted_value}")
                 continue
                 
-            # 处理0.0值
+            # Handle 0.0 values
             if isinstance(value, (int, float)) and value == 0.0:
-                # 检查是否在应该显示0值的场景（如数量、计数等）
+                # Check if it's a scenario where 0 values should be displayed (like count, quantity, etc.)
                 if any(keyword in key.lower() for keyword in ['count', 'quantity', 'number', 'index']):
                     result.append(f"{indent_str}{prefix} {key}: {formatted_value}")
                 else:
-                    # 如果是在stress_test或其他默认为0的场景，可以选择不显示
+                    # If it's in stress_test or other scenarios that default to 0, can choose not to display
                     if "stress_test" not in key.lower() and "potential_loss" not in key.lower():
                         result.append(f"{indent_str}{prefix} {key}: {formatted_value}")
                 continue
@@ -156,13 +156,13 @@ class StructuredTerminalOutput:
                         result.extend(
                             ["  " + line for line in self._format_dict_as_tree(item, indent + 2, max_str_len)])
                     else:
-                        # 截断过长的列表项
+                        # Truncate overly long list items
                         item_str = str(item)
                         if len(item_str) > max_str_len:
                             item_str = item_str[:max_str_len] + "..."
                         result.append(f"{indent_str}  {sub_prefix} {item_str}")
             else:
-                # 截断过长的字符串
+                # Truncate overly long strings
                 if isinstance(formatted_value, str) and len(formatted_value) > max_str_len:
                     formatted_value = formatted_value[:max_str_len] + "..."
                 result.append(f"{indent_str}{prefix} {key}: {formatted_value}")
@@ -170,50 +170,50 @@ class StructuredTerminalOutput:
         return result
     
     def _format_market_data_section(self, data: Dict[str, Any]) -> List[str]:
-        """格式化市场数据部分为简洁摘要"""
+        """Format market data section as concise summary"""
         result = []
         width = 80
         
-        # 创建标题
-        title = "📊 市场数据摘要"
+        # Create title
+        title = "📊 Market Data Summary"
         result.append(
             f"{SYMBOLS['header_left']}{SYMBOLS['border'] * ((width - len(title) - 2) // 2)} {title} {SYMBOLS['border'] * ((width - len(title) - 2) // 2)}{SYMBOLS['header_right']}")
         
-        # 添加主要数据
+        # Add main data
         if data.get("ticker"):
-            result.append(f"{SYMBOLS['vertical']} 股票代码: {data.get('ticker')}")
+            result.append(f"{SYMBOLS['vertical']} Stock Code: {data.get('ticker')}")
         
         if data.get("start_date") and data.get("end_date"):
-            result.append(f"{SYMBOLS['vertical']} 分析区间: {data.get('start_date')} 至 {data.get('end_date')}")
+            result.append(f"{SYMBOLS['vertical']} Analysis Period: {data.get('start_date')} to {data.get('end_date')}")
         
-        # 价格摘要
+        # Price summary
         prices = data.get("prices", [])
         if prices:
-            # 计算价格统计数据
+            # Calculate price statistics
             if len(prices) > 0:
                 latest_price = prices[-1].get('close', 0)
                 avg_price = sum(p.get('close', 0) for p in prices) / len(prices)
                 max_price = max(p.get('high', 0) for p in prices)
                 min_price = min(p.get('low', 0) for p in prices) if all(p.get('low', 0) > 0 for p in prices) else 0
                 
-                result.append(f"{SYMBOLS['vertical']} {SYMBOLS['section_prefix']}价格统计:")
-                result.append(f"{SYMBOLS['vertical']}   • 最新价格: {latest_price:.2f}")
-                result.append(f"{SYMBOLS['vertical']}   • 平均价格: {avg_price:.2f}")
-                result.append(f"{SYMBOLS['vertical']}   • 最高价格: {max_price:.2f}")
-                result.append(f"{SYMBOLS['vertical']}   • 最低价格: {min_price:.2f}")
+                result.append(f"{SYMBOLS['vertical']} {SYMBOLS['section_prefix']}Price Statistics:")
+                result.append(f"{SYMBOLS['vertical']}   • Latest Price: {latest_price:.2f}")
+                result.append(f"{SYMBOLS['vertical']}   • Average Price: {avg_price:.2f}")
+                result.append(f"{SYMBOLS['vertical']}   • Highest Price: {max_price:.2f}")
+                result.append(f"{SYMBOLS['vertical']}   • Lowest Price: {min_price:.2f}")
         
-        # 财务指标摘要
+        # Financial metrics summary
         fin_metrics = data.get("financial_metrics", [{}])[0] if data.get("financial_metrics") else {}
         if fin_metrics:
-            result.append(f"{SYMBOLS['vertical']} {SYMBOLS['section_prefix']}主要财务指标:")
+            result.append(f"{SYMBOLS['vertical']} {SYMBOLS['section_prefix']}Key Financial Metrics:")
             
-            # 仅展示关键指标
+            # Show only key metrics
             key_metrics = {
-                "pe_ratio": "市盈率(P/E)",
-                "price_to_book": "市净率(P/B)",
-                "return_on_equity": "净资产收益率(ROE)",
-                "debt_to_equity": "负债/股本比",
-                "earnings_growth": "盈利增长率"
+                "pe_ratio": "P/E Ratio",
+                "price_to_book": "P/B Ratio",
+                "return_on_equity": "ROE",
+                "debt_to_equity": "Debt/Equity Ratio",
+                "earnings_growth": "Earnings Growth Rate"
             }
             
             for key, label in key_metrics.items():
@@ -221,46 +221,46 @@ class StructuredTerminalOutput:
                     value = fin_metrics[key]
                     result.append(f"{SYMBOLS['vertical']}   • {label}: {value}")
         
-        # 添加底部
+        # Add footer
         result.append(
             f"{SYMBOLS['footer_left']}{SYMBOLS['border'] * (width - 2)}{SYMBOLS['footer_right']}")
         
         return result
 
     def _format_agent_section(self, agent_name: str, data: Any) -> List[str]:
-        """格式化agent部分"""
+        """Format agent section"""
         result = []
 
-        # 获取agent信息
+        # Get agent information
         agent_info = AGENT_MAP.get(
             agent_name, {"icon": "🔄", "name": agent_name})
         icon = agent_info["icon"]
         display_name = agent_info["name"]
 
-        # 创建标题
+        # Create title
         width = 80
-        title = f"{icon} {display_name}分析"
+        title = f"{icon} {display_name} Analysis"
         result.append(
             f"{SYMBOLS['header_left']}{SYMBOLS['border'] * ((width - len(title) - 2) // 2)} {title} {SYMBOLS['border'] * ((width - len(title) - 2) // 2)}{SYMBOLS['header_right']}")
 
-        # 添加内容
+        # Add content
         if isinstance(data, dict):
             if agent_name == "market_data_agent":
-                # 使用简化的市场数据展示
+                # Use simplified market data display
                 return self._format_market_data_section(data)
             
-            # 特殊处理portfolio_management_agent 和 macro_analyst_agent
+            # Special handling for portfolio_management_agent and macro_analyst_agent
             if agent_name == "portfolio_management_agent":
-                # 尝试提取action和confidence
+                # Try to extract action and confidence
                 if "action" in data:
                     action = data.get("action", "")
                     action_icon = STATUS_ICONS.get(action.lower(), "")
                     result.append(
-                        f"{SYMBOLS['vertical']} 交易行动: {action_icon} {action.upper() if action else ''}")
+                        f"{SYMBOLS['vertical']} Trading Action: {action_icon} {action.upper() if action else ''}")
 
                 if "quantity" in data:
                     quantity = data.get("quantity", 0)
-                    result.append(f"{SYMBOLS['vertical']} 交易数量: {quantity}")
+                    result.append(f"{SYMBOLS['vertical']} Trading Quantity: {quantity}")
 
                 if "confidence" in data:
                     conf = data.get("confidence", 0)
@@ -268,80 +268,80 @@ class StructuredTerminalOutput:
                         conf_str = f"{conf*100:.0f}%"
                     else:
                         conf_str = str(conf)
-                    result.append(f"{SYMBOLS['vertical']} 决策信心: {conf_str}")
+                    result.append(f"{SYMBOLS['vertical']} Decision Confidence: {conf_str}")
 
-                # 显示各个Agent的信号
+                # Display signals from each agent
                 if "agent_signals" in data:
                     result.append(
-                        f"{SYMBOLS['vertical']} {SYMBOLS['section_prefix']}各分析师意见:")
+                        f"{SYMBOLS['vertical']} {SYMBOLS['section_prefix']}Analyst Opinions:")
 
                     for signal_info in data["agent_signals"]:
                         agent = signal_info.get("agent", "")
                         signal = signal_info.get("signal", "")
                         conf = signal_info.get("confidence", 1.0)
 
-                        # 跳过空信号
+                        # Skip empty signals
                         if not agent or not signal:
                             continue
 
-                        # 获取信号图标
+                        # Get signal icon
                         signal_icon = STATUS_ICONS.get(signal.lower(), "")
 
-                        # 格式化置信度
+                        # Format confidence
                         if isinstance(conf, (int, float)) and conf <= 1:
                             conf_str = f"{conf*100:.0f}%"
                         else:
                             conf_str = str(conf)
 
                         result.append(
-                            f"{SYMBOLS['vertical']}   • {agent}: {signal_icon} {signal} (置信度: {conf_str})")
+                            f"{SYMBOLS['vertical']}   • {agent}: {signal_icon} {signal} (Confidence: {conf_str})")
 
-                # 决策理由
+                # Decision reasoning
                 if "reasoning" in data:
                     reasoning = data["reasoning"]
                     result.append(
-                        f"{SYMBOLS['vertical']} {SYMBOLS['section_prefix']}决策理由:")
+                        f"{SYMBOLS['vertical']} {SYMBOLS['section_prefix']}Decision Reasoning:")
                     if isinstance(reasoning, str):
-                        # 将长文本拆分为多行，每行不超过width-4个字符
+                        # Split long text into multiple lines, each line not exceeding width-4 characters
                         for i in range(0, len(reasoning), width-4):
                             line = reasoning[i:i+width-4]
                             result.append(f"{SYMBOLS['vertical']}   {line}")
             elif agent_name == "macro_analyst_agent":
-                # 处理宏观分析
+                # Handle macro analysis
                 if isinstance(data, dict):
-                    # 提取关键信息
+                    # Extract key information
                     macro_env = data.get("macro_environment", "")
                     impact = data.get("impact_on_stock", "")
                     key_factors = data.get("key_factors", [])
                     
-                    # 添加高亮的宏观环境和影响
+                    # Add highlighted macro environment and impact
                     env_icon = "📈" if macro_env == "positive" else "📉" if macro_env == "negative" else "◽"
                     impact_icon = "📈" if impact == "positive" else "📉" if impact == "negative" else "◽"
                     
-                    result.append(f"{SYMBOLS['vertical']} 宏观环境: {env_icon} {macro_env}")
-                    result.append(f"{SYMBOLS['vertical']} 对股票影响: {impact_icon} {impact}")
+                    result.append(f"{SYMBOLS['vertical']} Macro Environment: {env_icon} {macro_env}")
+                    result.append(f"{SYMBOLS['vertical']} Impact on Stock: {impact_icon} {impact}")
                     
-                    # 添加关键因素列表
+                    # Add key factors list
                     if key_factors:
-                        result.append(f"{SYMBOLS['vertical']} {SYMBOLS['section_prefix']}关键因素:")
-                        for i, factor in enumerate(key_factors[:5]):  # 最多显示5个因素
+                        result.append(f"{SYMBOLS['vertical']} {SYMBOLS['section_prefix']}Key Factors:")
+                        for i, factor in enumerate(key_factors[:5]):  # Show at most 5 factors
                             result.append(f"{SYMBOLS['vertical']}   • {factor}")
                     
-                    # 添加简化的理由
+                    # Add simplified reasoning
                     reasoning = data.get("reasoning", "")
                     if reasoning:
-                        # 截取前100个字符作为摘要
+                        # Truncate first 100 characters as summary
                         reasoning_summary = reasoning[:100] + "..." if len(reasoning) > 100 else reasoning
-                        result.append(f"{SYMBOLS['vertical']} {SYMBOLS['section_prefix']}分析摘要:")
+                        result.append(f"{SYMBOLS['vertical']} {SYMBOLS['section_prefix']}Analysis Summary:")
                         result.append(f"{SYMBOLS['vertical']}   {reasoning_summary}")
             else:
-                # 标准处理其他agent
-                # 提取信号和置信度（如果有）
+                # Standard handling for other agents
+                # Extract signal and confidence (if available)
                 if "signal" in data:
                     signal = data.get("signal", "")
-                    # 确保signal是字符串类型
+                    # Ensure signal is string type
                     if isinstance(signal, (int, float)):
-                        # 将数值信号转换为字符串
+                        # Convert numeric signal to string
                         if signal > 0.2:
                             signal = "bullish"
                         elif signal < -0.2:
@@ -351,7 +351,7 @@ class StructuredTerminalOutput:
                     signal_str = str(signal)
                     signal_icon = STATUS_ICONS.get(signal_str.lower(), "")
                     result.append(
-                        f"{SYMBOLS['vertical']} 信号: {signal_icon} {signal_str}")
+                        f"{SYMBOLS['vertical']} Signal: {signal_icon} {signal_str}")
 
                 if "confidence" in data:
                     conf = data.get("confidence", "")
@@ -359,9 +359,9 @@ class StructuredTerminalOutput:
                         conf_str = f"{conf*100:.0f}%"
                     else:
                         conf_str = str(conf)
-                    result.append(f"{SYMBOLS['vertical']} 置信度: {conf_str}")
+                    result.append(f"{SYMBOLS['vertical']} Confidence: {conf_str}")
 
-            # 添加其他数据
+            # Add other data
             tree_lines = self._format_dict_as_tree(data)
             for line in tree_lines:
                 result.append(f"{SYMBOLS['vertical']} {line}")
@@ -373,121 +373,121 @@ class StructuredTerminalOutput:
         else:
             result.append(f"{SYMBOLS['vertical']} {data}")
 
-        # 添加底部
+        # Add footer
         result.append(
             f"{SYMBOLS['footer_left']}{SYMBOLS['border'] * (width - 2)}{SYMBOLS['footer_right']}")
 
         return result
 
     def generate_output(self) -> str:
-        """生成格式化输出"""
+        """Generate formatted output"""
         width = 80
         result = []
 
-        # 添加标题
-        ticker = self.metadata.get("ticker", "未知")
-        title = f"股票代码 {ticker} 投资分析报告"
+        # Add title
+        ticker = self.metadata.get("ticker", "Unknown")
+        title = f"Stock Code {ticker} Investment Analysis Report"
         result.append(SYMBOLS["border"] * width)
         result.append(f"{title:^{width}}")
         result.append(SYMBOLS["border"] * width)
 
-        # 添加日期范围（如果有）
+        # Add date range (if available)
         if "start_date" in self.metadata and "end_date" in self.metadata:
-            date_range = f"分析区间: {self.metadata['start_date']} 至 {self.metadata['end_date']}"
+            date_range = f"Analysis Period: {self.metadata['start_date']} to {self.metadata['end_date']}"
             result.append(f"{date_range:^{width}}")
             result.append("")
 
-        # 按顺序添加每个agent的输出
+        # Add each agent's output in order
         for agent_name in AGENT_ORDER:
             if agent_name in self.data:
                 result.extend(self._format_agent_section(
                     agent_name, self.data[agent_name]))
-                result.append("")  # 添加空行
+                result.append("")  # Add empty line
 
-        # 添加结束分隔线
+        # Add ending separator
         result.append(SYMBOLS["border"] * width)
 
         return "\n".join(result)
 
     def print_output(self) -> None:
-        """打印格式化输出"""
+        """Print formatted output"""
         output = self.generate_output()
         
-        # 添加ANSI颜色代码
+        # Add ANSI color codes
         colored_output = output
-        colored_output = colored_output.replace("bullish", "\033[32mbullish\033[0m")  # 绿色
-        colored_output = colored_output.replace("bearish", "\033[31mbearish\033[0m")  # 红色
-        colored_output = colored_output.replace("neutral", "\033[33mneutral\033[0m")  # 黄色
-        colored_output = colored_output.replace("positive", "\033[32mpositive\033[0m")  # 绿色
-        colored_output = colored_output.replace("negative", "\033[31mnegative\033[0m")  # 红色
-        colored_output = colored_output.replace("BUY", "\033[32mBUY\033[0m")  # 绿色
-        colored_output = colored_output.replace("SELL", "\033[31mSELL\033[0m")  # 红色
-        colored_output = colored_output.replace("HOLD", "\033[33mHOLD\033[0m")  # 黄色
+        colored_output = colored_output.replace("bullish", "\033[32mbullish\033[0m")  # Green
+        colored_output = colored_output.replace("bearish", "\033[31mbearish\033[0m")  # Red
+        colored_output = colored_output.replace("neutral", "\033[33mneutral\033[0m")  # Yellow
+        colored_output = colored_output.replace("positive", "\033[32mpositive\033[0m")  # Green
+        colored_output = colored_output.replace("negative", "\033[31mnegative\033[0m")  # Red
+        colored_output = colored_output.replace("BUY", "\033[32mBUY\033[0m")  # Green
+        colored_output = colored_output.replace("SELL", "\033[31mSELL\033[0m")  # Red
+        colored_output = colored_output.replace("HOLD", "\033[33mHOLD\033[0m")  # Yellow
         
-        # 直接使用print输出，不受日志级别限制
+        # Direct print output, not limited by log level
         print("\n" + colored_output)
 
 
-# 创建全局实例
+# Create global instance
 terminal = StructuredTerminalOutput()
 
 
 def extract_agent_data(state: Dict[str, Any], agent_name: str) -> Any:
     """
-    从状态中提取指定agent的数据
+    Extract data for specified agent from state
 
     Args:
-        state: 工作流状态
-        agent_name: agent名称
+        state: Workflow state
+        agent_name: Agent name
 
     Returns:
-        提取的agent数据
+        Extracted agent data
     """
-    # 特殊处理portfolio_management_agent
+    # Special handling for portfolio_management_agent
     if agent_name == "portfolio_management_agent":
-        # 尝试从最后一条消息中获取数据
+        # Try to get data from the last message
         messages = state.get("messages", [])
         if messages and hasattr(messages[-1], "content"):
             content = messages[-1].content
-            # 尝试解析JSON
+            # Try to parse JSON
             if isinstance(content, str):
                 try:
-                    # 如果是JSON字符串，尝试解析
+                    # If it's a JSON string, try to parse
                     if content.strip().startswith('{') and content.strip().endswith('}'):
                         return json.loads(content)
-                    # 如果是JSON字符串包含在其他文本中，尝试提取并解析
+                    # If JSON string is contained in other text, try to extract and parse
                     json_start = content.find('{')
                     json_end = content.rfind('}')
                     if json_start >= 0 and json_end > json_start:
                         json_str = content[json_start:json_end+1]
                         return json.loads(json_str)
                 except json.JSONDecodeError:
-                    # 如果解析失败，返回原始内容
+                    # If parsing fails, return original content
                     return {"message": content}
             return {"message": content}
 
-    # 首先尝试从metadata中的all_agent_reasoning获取
+    # First try to get from all_agent_reasoning in metadata
     metadata = state.get("metadata", {})
     all_reasoning = metadata.get("all_agent_reasoning", {})
 
-    # 查找匹配的agent数据
+    # Find matching agent data
     for name, data in all_reasoning.items():
         if agent_name in name:
             return data
 
-    # 如果在all_agent_reasoning中找不到，尝试从agent_reasoning获取
+    # If not found in all_agent_reasoning, try to get from agent_reasoning
     if agent_name == metadata.get("current_agent_name") and "agent_reasoning" in metadata:
         return metadata["agent_reasoning"]
 
-    # 尝试从messages中获取
+    # Try to get from messages
     messages = state.get("messages", [])
     for message in messages:
         if hasattr(message, "name") and message.name and agent_name in message.name:
-            # 尝试解析消息内容
+            # Try to parse message content
             try:
                 if hasattr(message, "content"):
                     content = message.content
-                    # 尝试解析JSON
+                    # Try to parse JSON
                     if isinstance(content, str) and (content.startswith('{') or content.startswith('[')):
                         try:
                             return json.loads(content)
@@ -497,27 +497,27 @@ def extract_agent_data(state: Dict[str, Any], agent_name: str) -> Any:
             except Exception:
                 pass
 
-    # 如果都找不到，返回None
+    # If all else fails, return None
     return None
 
 
 def process_final_state(state: Dict[str, Any]) -> None:
     """
-    处理最终状态，提取所有agent的数据
+    Process final state, extract all agent data
 
     Args:
-        state: 工作流的最终状态
+        state: Final state of the workflow
     """
-    # 提取元数据
+    # Extract metadata
     data = state.get("data", {})
 
-    # 设置元数据
-    terminal.set_metadata("ticker", data.get("ticker", "未知"))
+    # Set metadata
+    terminal.set_metadata("ticker", data.get("ticker", "Unknown"))
     if "start_date" in data and "end_date" in data:
         terminal.set_metadata("start_date", data["start_date"])
         terminal.set_metadata("end_date", data["end_date"])
 
-    # 提取每个agent的数据
+    # Extract each agent's data
     for agent_name in AGENT_ORDER:
         agent_data = extract_agent_data(state, agent_name)
         if agent_data:
@@ -526,18 +526,18 @@ def process_final_state(state: Dict[str, Any]) -> None:
 
 def print_structured_output(state: Dict[str, Any]) -> None:
     """
-    处理最终状态并打印结构化输出
+    Process final state and print structured output
 
     Args:
-        state: 工作流的最终状态
+        state: Final state of the workflow
     """
     try:
-        # 处理最终状态
+        # Process final state
         process_final_state(state)
 
-        # 打印输出
+        # Print output
         terminal.print_output()
     except Exception as e:
-        logger.error(f"生成结构化输出时出错: {str(e)}")
+        logger.error(f"Error generating structured output: {str(e)}")
         import traceback
         logger.error(traceback.format_exc())

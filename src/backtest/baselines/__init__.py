@@ -10,7 +10,7 @@ from .rsi_strategy import RSIStrategy
 from .bollinger_strategy import BollingerStrategy
 from .macd_strategy import MACDStrategy
 
-# 策略注册表
+# Strategy registry
 STRATEGY_REGISTRY = {
     'buy_hold': BuyHoldStrategy,
     'momentum': MomentumStrategy,
@@ -24,21 +24,21 @@ STRATEGY_REGISTRY = {
 
 def get_strategy(strategy_name: str, **kwargs) -> BaseStrategy:
     """
-    获取策略实例
+    Get strategy instance
     
     Args:
-        strategy_name: 策略名称
-        **kwargs: 策略参数
+        strategy_name: Strategy name
+        **kwargs: Strategy parameters
         
     Returns:
-        BaseStrategy: 策略实例
+        BaseStrategy: Strategy instance
     """
     if strategy_name not in STRATEGY_REGISTRY:
-        raise ValueError(f"未知策略: {strategy_name}. 可用策略: {list(STRATEGY_REGISTRY.keys())}")
+        raise ValueError(f"Unknown strategy: {strategy_name}. Available strategies: {list(STRATEGY_REGISTRY.keys())}")
     
     strategy_class = STRATEGY_REGISTRY[strategy_name]
     return strategy_class(**kwargs)
 
 def list_available_strategies() -> List[str]:
-    """列出所有可用策略"""
+    """List all available strategies"""
     return list(STRATEGY_REGISTRY.keys())

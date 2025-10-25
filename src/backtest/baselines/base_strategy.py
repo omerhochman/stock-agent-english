@@ -5,7 +5,7 @@ from dataclasses import dataclass
 
 @dataclass
 class Signal:
-    """交易信号类"""
+    """Trading signal class"""
     action: str  # 'buy', 'sell', 'hold'
     quantity: int
     confidence: float
@@ -14,15 +14,15 @@ class Signal:
 
 @dataclass 
 class Portfolio:
-    """投资组合状态"""
+    """Portfolio state"""
     cash: float
     stock: int
     total_value: float
     
 class BaseStrategy(ABC):
     """
-    策略基类
-    所有baseline策略都应该继承此类
+    Base strategy class
+    All baseline strategies should inherit from this class
     """
     
     def __init__(self, name: str, **kwargs):
@@ -35,30 +35,30 @@ class BaseStrategy(ABC):
     def generate_signal(self, data: pd.DataFrame, portfolio: Portfolio, 
                        current_date: str, **kwargs) -> Signal:
         """
-        生成交易信号
+        Generate trading signal
         
         Args:
-            data: 历史价格数据
-            portfolio: 当前投资组合状态
-            current_date: 当前日期
-            **kwargs: 其他参数
+            data: Historical price data
+            portfolio: Current portfolio state
+            current_date: Current date
+            **kwargs: Other parameters
             
         Returns:
-            Signal: 交易信号
+            Signal: Trading signal
         """
         pass
     
     def initialize(self, initial_capital: float):
-        """初始化策略"""
+        """Initialize strategy"""
         self.initial_capital = initial_capital
         self.trade_history = []
         self.signal_history = []
         
     def reset(self):
-        """重置策略状态"""
+        """Reset strategy state"""
         self.trade_history = []
         self.signal_history = []
-        # 重置策略特定的状态变量
+        # Reset strategy-specific state variables
         if hasattr(self, 'last_trade_date'):
             self.last_trade_date = None
         if hasattr(self, 'hold_until_date'):
@@ -73,7 +73,7 @@ class BaseStrategy(ABC):
             self.initial_purchase_made = False
         
     def record_signal(self, signal: Signal, date: str, price: float):
-        """记录信号历史"""
+        """Record signal history"""
         self.signal_history.append({
             'date': date,
             'signal': signal,
@@ -82,7 +82,7 @@ class BaseStrategy(ABC):
         
     def record_trade(self, action: str, quantity: int, price: float, 
                     date: str, value: float, fees: float):
-        """记录交易历史"""
+        """Record trade history"""
         self.trade_history.append({
             'date': date,
             'action': action,
@@ -93,7 +93,7 @@ class BaseStrategy(ABC):
         })
         
     def get_performance_summary(self) -> Dict[str, Any]:
-        """获取策略表现摘要"""
+        """Get strategy performance summary"""
         return {
             'name': self.name,
             'parameters': self.parameters,
@@ -103,5 +103,5 @@ class BaseStrategy(ABC):
         
     @property
     def strategy_type(self) -> str:
-        """策略类型"""
+        """Strategy type"""
         return self.__class__.__name__.replace('Strategy', '').lower()

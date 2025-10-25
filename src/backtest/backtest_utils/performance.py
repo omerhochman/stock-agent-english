@@ -4,8 +4,8 @@ from typing import Dict
 
 class PerformanceAnalyzer:
     """
-    性能分析器
-    提供投资组合性能分析功能
+    Performance Analyzer
+    Provides portfolio performance analysis functions
     """
     
     def __init__(self):
@@ -13,26 +13,26 @@ class PerformanceAnalyzer:
     
     def calculate_rolling_metrics(self, returns: pd.Series, window: int = 252) -> pd.DataFrame:
         """
-        计算滚动性能指标
+        Calculate rolling performance metrics
         
         Args:
-            returns: 收益率序列
-            window: 滚动窗口大小
+            returns: Returns series
+            window: Rolling window size
             
         Returns:
-            pd.DataFrame: 滚动指标
+            pd.DataFrame: Rolling metrics
         """
         rolling_metrics = pd.DataFrame(index=returns.index)
         
-        # 滚动收益率
+        # Rolling returns
         rolling_metrics['rolling_return'] = returns.rolling(window).apply(
             lambda x: (1 + x).prod() - 1, raw=True
         )
         
-        # 滚动波动率
+        # Rolling volatility
         rolling_metrics['rolling_volatility'] = returns.rolling(window).std() * np.sqrt(252)
         
-        # 滚动夏普比率
+        # Rolling Sharpe ratio
         def safe_rolling_sharpe(x):
             if len(x) == 0:
                 return 0.0
@@ -49,7 +49,7 @@ class PerformanceAnalyzer:
             safe_rolling_sharpe, raw=True
         )
         
-        # 滚动最大回撤
+        # Rolling maximum drawdown
         rolling_metrics['rolling_max_drawdown'] = returns.rolling(window).apply(
             self._calculate_max_drawdown, raw=True
         )
@@ -57,7 +57,7 @@ class PerformanceAnalyzer:
         return rolling_metrics.dropna()
     
     def _calculate_max_drawdown(self, returns: np.ndarray) -> float:
-        """计算最大回撤"""
+        """Calculate maximum drawdown"""
         cumulative = np.cumprod(1 + returns)
         running_max = np.maximum.accumulate(cumulative)
         drawdown = (cumulative / running_max) - 1
@@ -66,16 +66,16 @@ class PerformanceAnalyzer:
     def performance_attribution(self, portfolio_returns: pd.Series, 
                               benchmark_returns: pd.Series) -> Dict[str, float]:
         """
-        性能归因分析
+        Performance attribution analysis
         
         Args:
-            portfolio_returns: 投资组合收益率
-            benchmark_returns: 基准收益率
+            portfolio_returns: Portfolio returns
+            benchmark_returns: Benchmark returns
             
         Returns:
-            Dict: 归因分析结果
+            Dict: Attribution analysis results
         """
-        # 对齐数据
+        # Align data
         aligned_data = pd.DataFrame({
             'portfolio': portfolio_returns,
             'benchmark': benchmark_returns
@@ -84,7 +84,7 @@ class PerformanceAnalyzer:
         portfolio_ret = aligned_data['portfolio']
         benchmark_ret = aligned_data['benchmark']
         
-        # 计算各项指标
+        # Calculate metrics
         excess_returns = portfolio_ret - benchmark_ret
         
         attribution = {
@@ -103,7 +103,7 @@ class PerformanceAnalyzer:
     
     def _calculate_capture_ratio(self, portfolio_returns: pd.Series, 
                                 benchmark_returns: pd.Series, direction: str) -> float:
-        """计算上行/下行捕获比率"""
+        """Calculate up/down capture ratio"""
         if direction == 'up':
             mask = benchmark_returns > 0
         else:

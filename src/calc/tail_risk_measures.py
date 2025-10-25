@@ -7,111 +7,111 @@ def calculate_historical_var(returns: pd.Series,
                             confidence_level: float = 0.95,
                             window: int = None) -> float:
     """
-    使用历史模拟法计算VaR(Value at Risk)
+    Calculate VaR (Value at Risk) using historical simulation method
     
     Args:
-        returns: 收益率序列
-        confidence_level: 置信水平，默认95%
-        window: 如果指定，则只使用最近window个样本
+        returns: return series
+        confidence_level: confidence level, default 95%
+        window: if specified, only use the most recent window samples
         
     Returns:
-        在给定置信水平下的VaR值
+        VaR value at given confidence level
     """
     if window is not None and window < len(returns):
         returns = returns.iloc[-window:]
     
-    # 计算分位数
+    # Calculate quantile
     var = returns.quantile(1 - confidence_level)
     
-    return abs(var)  # 通常报告为正值
+    return abs(var)  # Usually reported as positive value
 
 def calculate_conditional_var(returns: pd.Series, 
                              confidence_level: float = 0.95,
                              window: int = None) -> float:
     """
-    计算条件风险价值(CVaR/Expected Shortfall)
-    CVaR是超过VaR阈值的平均亏损
+    Calculate Conditional Value at Risk (CVaR/Expected Shortfall)
+    CVaR is the average loss exceeding the VaR threshold
     
     Args:
-        returns: 收益率序列
-        confidence_level: 置信水平，默认95%
-        window: 如果指定，则只使用最近window个样本
+        returns: return series
+        confidence_level: confidence level, default 95%
+        window: if specified, only use the most recent window samples
         
     Returns:
-        CVaR值
+        CVaR value
     """
     if window is not None and window < len(returns):
         returns = returns.iloc[-window:]
     
-    # 计算VaR
+    # Calculate VaR
     var = calculate_historical_var(returns, confidence_level)
     
-    # 计算超过VaR的收益率的平均值
+    # Calculate average of returns exceeding VaR
     cvar = returns[returns <= -var].mean()
     
-    return abs(cvar)  # 通常报告为正值
+    return abs(cvar)  # Usually reported as positive value
 
 def calculate_parametric_var(returns: pd.Series, 
                             confidence_level: float = 0.95,
                             distribution: str = 'normal') -> float:
     """
-    使用参数法计算VaR，可假设正态分布或t分布
+    Calculate VaR using parametric method, can assume normal or t distribution
     
     Args:
-        returns: 收益率序列
-        confidence_level: 置信水平，默认95%
-        distribution: 分布假设，可选'normal'或't'
+        returns: return series
+        confidence_level: confidence level, default 95%
+        distribution: distribution assumption, optional 'normal' or 't'
         
     Returns:
-        参数法计算的VaR值
+        VaR value calculated by parametric method
     """
-    # 计算均值和标准差
+    # Calculate mean and standard deviation
     mu = returns.mean()
     sigma = returns.std()
     
     if distribution == 'normal':
-        # 使用正态分布
+        # Use normal distribution
         z_score = stats.norm.ppf(1 - confidence_level)
         var = -(mu + z_score * sigma)
     elif distribution == 't':
-        # 使用t分布，首先估计自由度
+        # Use t distribution, first estimate degrees of freedom
         params = stats.t.fit(returns)
-        df = params[0]  # 自由度
+        df = params[0]  # Degrees of freedom
         t_score = stats.t.ppf(1 - confidence_level, df)
         var = -(mu + t_score * sigma)
     else:
         raise ValueError(f"Unsupported distribution: {distribution}")
     
-    return abs(var)  # 通常报告为正值
+    return abs(var)  # Usually reported as positive value
 
 def backtesting_var(returns: pd.Series, 
                    var_method: str = 'historical',
                    confidence_level: float = 0.95,
                    window: int = 252) -> Dict[str, Union[int, float]]:
     """
-    回测VaR模型的准确性
+    Backtest VaR model accuracy
     
     Args:
-        returns: 收益率序列
-        var_method: VaR计算方法，可选'historical'、'parametric'
-        confidence_level: 置信水平
-        window: 滚动窗口大小
+        returns: return series
+        var_method: VaR calculation method, optional 'historical', 'parametric'
+        confidence_level: confidence level
+        window: rolling window size
         
     Returns:
-        回测结果统计
+        Backtest result statistics
     """
     violations = 0
     var_values = []
     
-    # 确保数据量足够
+    # Ensure sufficient data
     if len(returns) <= window:
         raise ValueError(f"Not enough data for backtesting. Need more than {window} observations.")
     
-    # 按照滚动窗口计算VaR
+    # Calculate VaR using rolling window
     for i in range(window, len(returns)):
         rolling_returns = returns.iloc[i - window:i]
         
-        # 根据指定方法计算VaR
+        # Calculate VaR using specified method
         if var_method == 'historical':
             var = calculate_historical_var(rolling_returns, confidence_level)
         elif var_method == 'parametric':
@@ -121,23 +121,23 @@ def backtesting_var(returns: pd.Series,
         
         var_values.append(var)
         
-        # 检查是否违反VaR
+        # Check if VaR is violated
         actual_return = returns.iloc[i]
         if actual_return < -var:
             violations += 1
     
-    # 计算违反率
+    # Calculate violation rate
     violation_rate = violations / (len(returns) - window)
     expected_rate = 1 - confidence_level
     
-    # Kupiec测试统计量
+    # Kupiec test statistic
     if violations > 0:
         kupiec_stat = -2 * (np.log((1 - expected_rate) ** (len(returns) - window - violations) * 
                                    expected_rate ** violations) - 
                            np.log((1 - violation_rate) ** (len(returns) - window - violations) * 
                                   violation_rate ** violations))
         
-        # Kupiec测试p值（使用卡方分布的1自由度）
+        # Kupiec test p-value (using chi-square distribution with 1 degree of freedom)
         kupiec_pvalue = 1 - stats.chi2.cdf(kupiec_stat, 1)
     else:
         kupiec_stat = None

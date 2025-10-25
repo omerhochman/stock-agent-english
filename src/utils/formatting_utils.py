@@ -4,20 +4,20 @@ from typing import Dict
 
 def format_market_data_summary(market_data: Dict) -> Dict:
     """
-    格式化市场数据，提供简洁的摘要统计
+    Format market data to provide concise summary statistics
     
     Args:
-        market_data: 原始市场数据
+        market_data: Raw market data
         
     Returns:
-        简化后的市场数据摘要
+        Simplified market data summary
     """
     formatted_data = {}
     
-    # 处理市场收益率
+    # Process market returns
     if "market_returns" in market_data:
         if isinstance(market_data["market_returns"], str):
-            # 如果已经是字符串，尝试解析为Series
+            # If already a string, try to parse as Series
             try:
                 import io
                 data = io.StringIO(market_data["market_returns"])
@@ -25,13 +25,13 @@ def format_market_data_summary(market_data: Dict) -> Dict:
                 formatted_data["market_returns_mean"] = float(series.mean())
                 formatted_data["market_returns_std"] = float(series.std())
             except:
-                # 如果解析失败，只保留前5个字符提示
-                formatted_data["market_returns"] = "[数据过长，已省略]"
+                # If parsing fails, keep only first 5 characters as hint
+                formatted_data["market_returns"] = "[Data too long, omitted]"
         elif isinstance(market_data["market_returns"], pd.Series):
             formatted_data["market_returns_mean"] = float(market_data["market_returns"].mean())
             formatted_data["market_returns_std"] = float(market_data["market_returns"].std())
     
-    # 处理股票收益率
+    # Process stock returns
     if "stock_returns" in market_data:
         if isinstance(market_data["stock_returns"], str):
             try:
@@ -41,12 +41,12 @@ def format_market_data_summary(market_data: Dict) -> Dict:
                 formatted_data["stock_returns_mean"] = float(series.mean())
                 formatted_data["stock_returns_std"] = float(series.std())
             except:
-                formatted_data["stock_returns"] = "[数据过长，已省略]"
+                formatted_data["stock_returns"] = "[Data too long, omitted]"
         elif isinstance(market_data["stock_returns"], pd.Series):
             formatted_data["stock_returns_mean"] = float(market_data["stock_returns"].mean())
             formatted_data["stock_returns_std"] = float(market_data["stock_returns"].std())
     
-    # 保留其他重要的市场数据
+    # Keep other important market data
     for key in ["market_volatility", "stock_volatility", "beta"]:
         if key in market_data:
             formatted_data[key] = market_data[key]
@@ -55,23 +55,23 @@ def format_market_data_summary(market_data: Dict) -> Dict:
 
 
 def format_float_as_percentage(value: float, decimal_places: int = 2) -> str:
-    """将浮点数格式化为百分比字符串"""
+    """Format float as percentage string"""
     if not isinstance(value, (int, float)):
         return str(value)
     return f"{value*100:.{decimal_places}f}%"
 
 
 def format_currency(value: float, decimal_places: int = 2, currency_symbol: str = "$") -> str:
-    """将数值格式化为货币字符串"""
+    """Format value as currency string"""
     if not isinstance(value, (int, float)):
         return str(value)
     
-    # 对大数使用更友好的表示
-    if abs(value) >= 1_000_000_000:  # 十亿
+    # Use more friendly representation for large numbers
+    if abs(value) >= 1_000_000_000:  # Billion
         return f"{currency_symbol}{value/1_000_000_000:.{decimal_places}f}B"
-    elif abs(value) >= 1_000_000:  # 百万
+    elif abs(value) >= 1_000_000:  # Million
         return f"{currency_symbol}{value/1_000_000:.{decimal_places}f}M"
-    elif abs(value) >= 1_000:  # 千
+    elif abs(value) >= 1_000:  # Thousand
         return f"{currency_symbol}{value/1_000:.{decimal_places}f}K"
     else:
         return f"{currency_symbol}{value:.{decimal_places}f}"

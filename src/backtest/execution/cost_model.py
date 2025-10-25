@@ -1,36 +1,36 @@
 class CostModel:
     """
-    交易成本模型
-    计算交易费用和滑点成本
+    Trading cost model
+    Calculates trading fees and slippage costs
     """
     
     def __init__(self, trading_cost: float = 0.001, slippage: float = 0.001,
                  min_commission: float = 5.0):
-        self.trading_cost = trading_cost    # 交易费率
-        self.slippage = slippage           # 滑点费率
-        self.min_commission = min_commission # 最低佣金
+        self.trading_cost = trading_cost    # Trading fee rate
+        self.slippage = slippage           # Slippage rate
+        self.min_commission = min_commission # Minimum commission
     
     def calculate_total_cost(self, trade_value: float, action: str) -> float:
         """
-        计算总交易成本
+        Calculate total trading cost
         
         Args:
-            trade_value: 交易金额
-            action: 交易动作 ('buy' 或 'sell')
+            trade_value: Trade amount
+            action: Trading action ('buy' or 'sell')
             
         Returns:
-            float: 总成本
+            float: Total cost
         """
-        # 基础佣金
+        # Base commission
         commission = max(trade_value * self.trading_cost, self.min_commission)
         
-        # 滑点成本
+        # Slippage cost
         slippage_cost = trade_value * self.slippage
         
-        # 印花税（仅卖出时收取）
+        # Stamp tax (only charged on sell)
         stamp_tax = trade_value * 0.001 if action == 'sell' else 0
         
-        # 过户费（按成交金额的0.002%收取）
+        # Transfer fee (0.002% of transaction amount)
         transfer_fee = trade_value * 0.00002
         
         total_cost = trade_value + commission + slippage_cost + stamp_tax + transfer_fee
@@ -39,25 +39,25 @@ class CostModel:
     
     def calculate_net_proceeds(self, trade_value: float, action: str) -> float:
         """
-        计算净收益（扣除费用后）
+        Calculate net proceeds (after deducting fees)
         
         Args:
-            trade_value: 交易金额
-            action: 交易动作
+            trade_value: Trade amount
+            action: Trading action
             
         Returns:
-            float: 净收益
+            float: Net proceeds
         """
-        # 基础佣金
+        # Base commission
         commission = max(trade_value * self.trading_cost, self.min_commission)
         
-        # 滑点成本
+        # Slippage cost
         slippage_cost = trade_value * self.slippage
         
-        # 印花税（仅卖出时收取）
+        # Stamp tax (only charged on sell)
         stamp_tax = trade_value * 0.001 if action == 'sell' else 0
         
-        # 过户费
+        # Transfer fee
         transfer_fee = trade_value * 0.00002
         
         total_fees = commission + slippage_cost + stamp_tax + transfer_fee

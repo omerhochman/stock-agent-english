@@ -9,25 +9,25 @@ logger = logging.getLogger(__name__)
 
 def register_financial_report_tools(app: FastMCP, active_data_source: FinancialDataSource):
     """
-    向MCP应用注册财务报告相关工具
+    Register financial report related tools with MCP application
 
-    参数:
-        app: FastMCP应用实例
-        active_data_source: 活跃的金融数据源
+    Args:
+        app: FastMCP application instance
+        active_data_source: Active financial data source
     """
 
     @app.tool()
     def get_profit_data(code: str, year: str, quarter: int) -> str:
         """
-        获取股票的季度盈利能力数据（例如ROE，净利润率）
+        Get quarterly profitability data for stock (e.g., ROE, net profit margin)
 
-        参数:
-            code: 股票代码（例如'sh.600000'）
-            year: 4位数年份（例如'2023'）
-            quarter: 季度（1, 2, 3, 或 4）
+        Args:
+            code: Stock code (e.g., 'sh.600000')
+            year: 4-digit year (e.g., '2023')
+            quarter: Quarter (1, 2, 3, or 4)
 
-        返回:
-            包含盈利能力数据的Markdown表格或错误信息
+        Returns:
+            Markdown table containing profitability data or error message
         """
         return call_financial_data_tool(
             "get_profit_data",
@@ -39,15 +39,15 @@ def register_financial_report_tools(app: FastMCP, active_data_source: FinancialD
     @app.tool()
     def get_operation_data(code: str, year: str, quarter: int) -> str:
         """
-        获取股票的季度运营能力数据（例如周转率）
+        Get quarterly operational capability data for stock (e.g., turnover ratios)
 
-        参数:
-            code: 股票代码（例如'sh.600000'）
-            year: 4位数年份（例如'2023'）
-            quarter: 季度（1, 2, 3, 或 4）
+        Args:
+            code: Stock code (e.g., 'sh.600000')
+            year: 4-digit year (e.g., '2023')
+            quarter: Quarter (1, 2, 3, or 4)
 
-        返回:
-            包含运营能力数据的Markdown表格或错误信息
+        Returns:
+            Markdown table containing operational capability data or error message
         """
         return call_financial_data_tool(
             "get_operation_data",
@@ -59,15 +59,15 @@ def register_financial_report_tools(app: FastMCP, active_data_source: FinancialD
     @app.tool()
     def get_growth_data(code: str, year: str, quarter: int) -> str:
         """
-        获取股票的季度增长能力数据（例如同比增长率）
+        Get quarterly growth capability data for stock (e.g., year-over-year growth rates)
 
-        参数:
-            code: 股票代码（例如'sh.600000'）
-            year: 4位数年份（例如'2023'）
-            quarter: 季度（1, 2, 3, 或 4）
+        Args:
+            code: Stock code (e.g., 'sh.600000')
+            year: 4-digit year (e.g., '2023')
+            quarter: Quarter (1, 2, 3, or 4)
 
-        返回:
-            包含增长能力数据的Markdown表格或错误信息
+        Returns:
+            Markdown table containing growth capability data or error message
         """
         return call_financial_data_tool(
             "get_growth_data",
@@ -79,15 +79,15 @@ def register_financial_report_tools(app: FastMCP, active_data_source: FinancialD
     @app.tool()
     def get_balance_data(code: str, year: str, quarter: int) -> str:
         """
-        获取股票的季度资产负债表/偿债能力数据（例如流动比率，负债率）
+        Get quarterly balance sheet/solvency data for stock (e.g., current ratio, debt ratio)
 
-        参数:
-            code: 股票代码（例如'sh.600000'）
-            year: 4位数年份（例如'2023'）
-            quarter: 季度（1, 2, 3, 或 4）
+        Args:
+            code: Stock code (e.g., 'sh.600000')
+            year: 4-digit year (e.g., '2023')
+            quarter: Quarter (1, 2, 3, or 4)
 
-        返回:
-            包含资产负债表数据的Markdown表格或错误信息
+        Returns:
+            Markdown table containing balance sheet data or error message
         """
         return call_financial_data_tool(
             "get_balance_data",
@@ -99,15 +99,15 @@ def register_financial_report_tools(app: FastMCP, active_data_source: FinancialD
     @app.tool()
     def get_cash_flow_data(code: str, year: str, quarter: int) -> str:
         """
-        获取股票的季度现金流量数据（例如经营活动现金流/营业收入比率）
+        Get quarterly cash flow data for stock (e.g., operating cash flow/revenue ratio)
 
-        参数:
-            code: 股票代码（例如'sh.600000'）
-            year: 4位数年份（例如'2023'）
-            quarter: 季度（1, 2, 3, 或 4）
+        Args:
+            code: Stock code (e.g., 'sh.600000')
+            year: 4-digit year (e.g., '2023')
+            quarter: Quarter (1, 2, 3, or 4)
 
-        返回:
-            包含现金流量数据的Markdown表格或错误信息
+        Returns:
+            Markdown table containing cash flow data or error message
         """
         return call_financial_data_tool(
             "get_cash_flow_data",
@@ -119,15 +119,15 @@ def register_financial_report_tools(app: FastMCP, active_data_source: FinancialD
     @app.tool()
     def get_dupont_data(code: str, year: str, quarter: int) -> str:
         """
-        获取股票的季度杜邦分析数据（ROE分解）
+        Get quarterly DuPont analysis data for stock (ROE decomposition)
 
-        参数:
-            code: 股票代码（例如'sh.600000'）
-            year: 4位数年份（例如'2023'）
-            quarter: 季度（1, 2, 3, 或 4）
+        Args:
+            code: Stock code (e.g., 'sh.600000')
+            year: 4-digit year (e.g., '2023')
+            quarter: Quarter (1, 2, 3, or 4)
 
-        返回:
-            包含杜邦分析数据的Markdown表格或错误信息
+        Returns:
+            Markdown table containing DuPont analysis data or error message
         """
         return call_financial_data_tool(
             "get_dupont_data",
@@ -139,21 +139,21 @@ def register_financial_report_tools(app: FastMCP, active_data_source: FinancialD
     @app.tool()
     def get_performance_express_report(code: str, start_date: str, end_date: str) -> str:
         """
-        获取指定日期范围内的股票业绩快报
-        注意：除特定情况外，公司并非必须发布业绩快报
+        Get performance express reports for stock within specified date range
+        Note: Companies are not required to publish performance express reports except in specific circumstances
 
-        参数:
-            code: 股票代码（例如'sh.600000'）
-            start_date: 开始日期（报告发布/更新日期），格式为'YYYY-MM-DD'
-            end_date: 结束日期（报告发布/更新日期），格式为'YYYY-MM-DD'
+        Args:
+            code: Stock code (e.g., 'sh.600000')
+            start_date: Start date (report publication/update date), format 'YYYY-MM-DD'
+            end_date: End date (report publication/update date), format 'YYYY-MM-DD'
 
-        返回:
-            包含业绩快报数据的Markdown表格或错误信息
+        Returns:
+            Markdown table containing performance express report data or error message
         """
         logger.info(
             f"Tool 'get_performance_express_report' called for {code} ({start_date} to {end_date})")
         try:
-            # 如果需要，可以添加日期验证
+            # Add date validation if needed
             df = active_data_source.get_performance_express_report(
                 code=code, start_date=start_date, end_date=end_date)
             logger.info(
@@ -169,21 +169,21 @@ def register_financial_report_tools(app: FastMCP, active_data_source: FinancialD
     @app.tool()
     def get_forecast_report(code: str, start_date: str, end_date: str) -> str:
         """
-        获取指定日期范围内的股票业绩预告
-        注意：除特定情况外，公司并非必须发布业绩预告
+        Get performance forecast reports for stock within specified date range
+        Note: Companies are not required to publish performance forecasts except in specific circumstances
 
-        参数:
-            code: 股票代码（例如'sh.600000'）
-            start_date: 开始日期（报告发布/更新日期），格式为'YYYY-MM-DD'
-            end_date: 结束日期（报告发布/更新日期），格式为'YYYY-MM-DD'
+        Args:
+            code: Stock code (e.g., 'sh.600000')
+            start_date: Start date (report publication/update date), format 'YYYY-MM-DD'
+            end_date: End date (report publication/update date), format 'YYYY-MM-DD'
 
-        返回:
-            包含业绩预告数据的Markdown表格或错误信息
+        Returns:
+            Markdown table containing performance forecast data or error message
         """
         logger.info(
             f"Tool 'get_forecast_report' called for {code} ({start_date} to {end_date})")
         try:
-            # 如果需要，可以添加日期验证
+            # Add date validation if needed
             df = active_data_source.get_forecast_report(
                 code=code, start_date=start_date, end_date=end_date)
             logger.info(

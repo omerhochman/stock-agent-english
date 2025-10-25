@@ -10,29 +10,29 @@ logger = logging.getLogger(__name__)
 
 def register_index_tools(app: FastMCP, active_data_source: FinancialDataSource):
     """
-    向MCP应用注册股票指数相关工具
+    Register stock index related tools with MCP application
 
-    参数:
-        app: FastMCP应用实例
-        active_data_source: 活跃的金融数据源
+    Args:
+        app: FastMCP application instance
+        active_data_source: Active financial data source
     """
 
     @app.tool()
     def get_stock_industry(code: Optional[str] = None, date: Optional[str] = None) -> str:
         """
-        获取特定股票或在指定日期所有股票的行业分类数据
+        Get industry classification data for specific stock or all stocks on specified date
 
-        参数:
-            code: 可选。股票代码（例如'sh.600000'）。如果为None，则获取所有股票数据。
-            date: 可选。日期，格式为'YYYY-MM-DD'。如果为None，使用最新可用日期。
+        Args:
+            code: Optional. Stock code (e.g., 'sh.600000'). If None, gets all stock data.
+            date: Optional. Date in 'YYYY-MM-DD' format. If None, uses latest available date.
 
-        返回:
-            包含行业分类数据的Markdown表格或错误信息
+        Returns:
+            Markdown table containing industry classification data or error message
         """
         log_msg = f"Tool 'get_stock_industry' called for code={code or 'all'}, date={date or 'latest'}"
         logger.info(log_msg)
         try:
-            # 如果需要，可以添加日期验证
+            # Date validation can be added here if needed
             df = active_data_source.get_stock_industry(code=code, date=date)
             logger.info(
                 f"Successfully retrieved industry data for {code or 'all'}, {date or 'latest'}.")
@@ -47,13 +47,13 @@ def register_index_tools(app: FastMCP, active_data_source: FinancialDataSource):
     @app.tool()
     def get_sz50_stocks(date: Optional[str] = None) -> str:
         """
-        获取指定日期的上证50指数成分股
+        Get SZSE 50 index constituent stocks for specified date
 
-        参数:
-            date: 可选。日期，格式为'YYYY-MM-DD'。如果为None，使用最新可用日期。
+        Args:
+            date: Optional. Date in 'YYYY-MM-DD' format. If None, uses latest available date.
 
-        返回:
-            包含上证50指数成分股的Markdown表格或错误信息
+        Returns:
+            Markdown table containing SZSE 50 index constituent stocks or error message
         """
         return call_index_constituent_tool(
             "get_sz50_stocks",
@@ -65,13 +65,13 @@ def register_index_tools(app: FastMCP, active_data_source: FinancialDataSource):
     @app.tool()
     def get_hs300_stocks(date: Optional[str] = None) -> str:
         """
-        获取指定日期的沪深300指数成分股
+        Get CSI 300 index constituent stocks for specified date
 
-        参数:
-            date: 可选。日期，格式为'YYYY-MM-DD'。如果为None，使用最新可用日期。
+        Args:
+            date: Optional. Date in 'YYYY-MM-DD' format. If None, uses latest available date.
 
-        返回:
-            包含沪深300指数成分股的Markdown表格或错误信息
+        Returns:
+            Markdown table containing CSI 300 index constituent stocks or error message
         """
         return call_index_constituent_tool(
             "get_hs300_stocks",
@@ -83,13 +83,13 @@ def register_index_tools(app: FastMCP, active_data_source: FinancialDataSource):
     @app.tool()
     def get_zz500_stocks(date: Optional[str] = None) -> str:
         """
-        获取指定日期的中证500指数成分股
+        Get CSI 500 index constituent stocks for specified date
 
-        参数:
-            date: 可选。日期，格式为'YYYY-MM-DD'。如果为None，使用最新可用日期。
+        Args:
+            date: Optional. Date in 'YYYY-MM-DD' format. If None, uses latest available date.
 
-        返回:
-            包含中证500指数成分股的Markdown表格或错误信息
+        Returns:
+            Markdown table containing CSI 500 index constituent stocks or error message
         """
         return call_index_constituent_tool(
             "get_zz500_stocks",

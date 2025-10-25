@@ -3,7 +3,7 @@ from dataclasses import dataclass
 
 @dataclass
 class TradeResult:
-    """交易结果"""
+    """Trade result"""
     action: str
     quantity: int
     price: float
@@ -15,8 +15,8 @@ class TradeResult:
 
 class TradeExecutor:
     """
-    交易执行器
-    处理交易订单的执行逻辑
+    Trade executor
+    Handles trade order execution logic
     """
     
     def __init__(self):
@@ -25,39 +25,39 @@ class TradeExecutor:
     def execute_trade(self, decision_data: dict, portfolio: dict, 
                      current_price: float, date: str, cost_model) -> List[Dict[str, Any]]:
         """
-        执行交易决策
+        Execute trade decision
         
         Args:
-            decision_data: 交易决策数据
-            portfolio: 当前投资组合
-            current_price: 当前价格
-            date: 交易日期
-            cost_model: 成本模型
+            decision_data: Trade decision data
+            portfolio: Current portfolio
+            current_price: Current price
+            date: Trade date
+            cost_model: Cost model
             
         Returns:
-            List[Dict]: 执行的交易列表
+            List[Dict]: List of executed trades
         """
         executed_trades = []
         
         action = decision_data.get("action", "hold")
         quantity = decision_data.get("quantity", 0)
         
-        # 智能解析：如果action是hold但quantity>0，说明想要建仓
+        # Smart parsing: if action is hold but quantity>0, means want to establish position
         if action == "hold" and quantity > 0:
-            if portfolio["stock"] == 0:  # 当前无持仓，将hold+quantity解释为买入
+            if portfolio["stock"] == 0:  # Currently no position, interpret hold+quantity as buy
                 action = "buy"
-            else:  # 当前有持仓，检查是否需要调整仓位
+            else:  # Currently have position, check if need to adjust position
                 current_position_value = portfolio["stock"] * current_price
                 target_position_value = quantity * current_price
                 
-                if target_position_value > current_position_value * 1.1:  # 目标仓位比当前大10%以上
+                if target_position_value > current_position_value * 1.1:  # Target position is 10% larger than current
                     action = "buy"
-                    quantity = quantity - portfolio["stock"]  # 计算需要额外买入的数量
-                elif target_position_value < current_position_value * 0.9:  # 目标仓位比当前小10%以上
+                    quantity = quantity - portfolio["stock"]  # Calculate additional quantity to buy
+                elif target_position_value < current_position_value * 0.9:  # Target position is 10% smaller than current
                     action = "sell"
-                    quantity = portfolio["stock"] - quantity  # 计算需要卖出的数量
+                    quantity = portfolio["stock"] - quantity  # Calculate quantity to sell
                 else:
-                    # 目标仓位与当前仓位相近，真正hold
+                    # Target position is similar to current position, truly hold
                     action = "hold"
                     quantity = 0
         
@@ -93,7 +93,7 @@ class TradeExecutor:
     
     def _execute_buy_order(self, quantity: int, price: float, portfolio: dict, 
                           date: str, cost_model) -> TradeResult:
-        """执行买入订单"""
+        """Execute buy order"""
         cost_without_fees = quantity * price
         total_cost = cost_model.calculate_total_cost(cost_without_fees, 'buy')
         
@@ -125,7 +125,7 @@ class TradeExecutor:
     
     def _execute_sell_order(self, quantity: int, price: float, portfolio: dict, 
                            date: str, cost_model) -> TradeResult:
-        """执行卖出订单"""
+        """Execute sell order"""
         actual_quantity = min(quantity, portfolio["stock"])
         
         if actual_quantity > 0:

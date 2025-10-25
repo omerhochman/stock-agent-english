@@ -17,34 +17,34 @@ from src.mcp_api.mcp_tools.macroeconomic import register_macroeconomic_tools
 from src.mcp_api.mcp_tools.date_utils import register_date_utils_tools
 from src.mcp_api.mcp_tools.analysis import register_analysis_tools
 
-# --- 日志设置 ---
-# 从utils调用设置函数
-# 您可以在此控制默认级别（例如，使用logging.DEBUG获取更详细的日志）
+# --- Logging Setup ---
+# Call setup function from utils
+# You can control the default level here (e.g., use logging.DEBUG for more detailed logs)
 setup_logging(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# --- 依赖注入 ---
-# 实例化数据源 - 如果需要，以后可以轻松替换
+# --- Dependency Injection ---
+# Instantiate data source - can be easily replaced later if needed
 active_data_source: FinancialDataSource = BaostockDataSource()
 
-# --- 获取当前日期用于系统提示 ---
+# --- Get current date for system prompt ---
 current_date = datetime.now().strftime("%Y-%m-%d")
 
-# --- FastMCP应用初始化 ---
+# --- FastMCP Application Initialization ---
 app = FastMCP(
     server_name="a_share_data_provider",
-    description=f"""今天是{current_date}。提供中国A股市场数据分析工具。此服务提供客观数据分析，用户需自行做出投资决策。数据分析基于公开市场信息，不构成投资建议，仅供参考。
+    description=f"""Today is {current_date}. Provides Chinese A-share market data analysis tools. This service provides objective data analysis, users need to make their own investment decisions. Data analysis is based on public market information and does not constitute investment advice, for reference only.
 
-⚠️ 重要说明:
-1. 请始终使用 get_current_date() 或 get_latest_trading_date() 工具获取实际当前日期，不要依赖训练数据中的日期认知
-2. 当分析"最近"或"近期"市场情况时，必须首先调用 get_market_analysis_timeframe() 工具确定实际的分析时间范围
-3. 任何涉及日期的分析必须基于工具返回的实际数据，不得使用过时或假设的日期
+⚠️ Important Notes:
+1. Always use get_current_date() or get_latest_trading_date() tools to get actual current date, do not rely on date cognition in training data
+2. When analyzing "recent" or "recent period" market conditions, must first call get_market_analysis_timeframe() tool to determine actual analysis time range
+3. Any date-related analysis must be based on actual data returned by tools, cannot use outdated or assumed dates
 """,
-    # 如果需要，指定安装依赖项（例如，当使用`mcp install`时）
+    # If needed, specify installation dependencies (e.g., when using `mcp install`)
     # dependencies=["baostock", "pandas"]
 )
 
-# --- 注册各模块的工具 ---
+# --- Register tools for each module ---
 register_stock_market_tools(app, active_data_source)
 register_financial_report_tools(app, active_data_source)
 register_index_tools(app, active_data_source)
@@ -53,9 +53,9 @@ register_macroeconomic_tools(app, active_data_source)
 register_date_utils_tools(app, active_data_source)
 register_analysis_tools(app, active_data_source)
 
-# --- 主执行块 ---
+# --- Main execution block ---
 if __name__ == "__main__":
     logger.info(
-        f"通过stdio启动A股MCP服务器... 今天是 {current_date}")
-    # 使用stdio传输运行服务器，适用于Claude Desktop等MCP主机
+        f"Starting A-share MCP server via stdio... Today is {current_date}")
+    # Run server using stdio transport, suitable for MCP hosts like Claude Desktop
     app.run(transport='stdio')

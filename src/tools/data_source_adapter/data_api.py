@@ -3,69 +3,69 @@ from typing import Dict, Any
 from .adapter import DataSourceAdapter
 
 class DataAPI:
-    """统一的数据API接口，封装内部数据源适配器实现"""
+    """Unified data API interface, encapsulates internal data source adapter implementation"""
     
     def __init__(self):
         self.adapter = DataSourceAdapter()
     
     def get_price_data(self, ticker: str, start_date: str = None, end_date: str = None) -> pd.DataFrame:
         """
-        获取股票价格数据
+        Get stock price data
         
         Args:
-            ticker: 股票代码
-            start_date: 开始日期，格式：YYYY-MM-DD
-            end_date: 结束日期，格式：YYYY-MM-DD
+            ticker: Stock code
+            start_date: Start date, format: YYYY-MM-DD
+            end_date: End date, format: YYYY-MM-DD
             
         Returns:
-            包含价格数据的DataFrame
+            DataFrame containing price data
         """
         return self.adapter.get_price_history(ticker, start_date, end_date)
     
     def get_financial_metrics(self, ticker: str) -> Dict[str, Any]:
         """
-        获取财务指标数据
+        Get financial metrics data
         
         Args:
-            ticker: 股票代码
+            ticker: Stock code
             
         Returns:
-            包含财务指标的字典
+            Dictionary containing financial metrics
         """
         return self.adapter.get_financial_metrics(ticker)
     
     def get_financial_statements(self, ticker: str) -> Dict[str, Any]:
         """
-        获取财务报表数据
+        Get financial statements data
         
         Args:
-            ticker: 股票代码
+            ticker: Stock code
             
         Returns:
-            包含财务报表数据的字典
+            Dictionary containing financial statements data
         """
         return self.adapter.get_financial_statements(ticker)
     
     def get_market_data(self, ticker: str) -> Dict[str, Any]:
         """
-        获取市场数据（现在包含行业指标）
+        Get market data (now includes industry metrics)
         
         Args:
-            ticker: 股票代码
+            ticker: Stock code
             
         Returns:
-            包含市场数据和行业指标的字典
+            Dictionary containing market data and industry metrics
         """
         return self.adapter.get_market_data(ticker)
     
     def get_industry_metrics(self, ticker: str) -> Dict[str, Any]:
         """
-        获取行业指标数据
+        Get industry metrics data
         
         Args:
-            ticker: 股票代码
+            ticker: Stock code
             
         Returns:
-            包含行业指标的字典
+            Dictionary containing industry metrics
         """
         return self.adapter.get_industry_metrics(ticker)

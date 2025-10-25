@@ -5,21 +5,21 @@ from abc import ABC, abstractmethod
 from openai import OpenAI
 from src.utils.logging_config import setup_logger, SUCCESS_ICON, ERROR_ICON, WAIT_ICON
 
-# 设置日志记录
+# Setup logging
 logger = setup_logger('llm_clients')
 
 
 class LLMClient(ABC):
-    """LLM 客户端抽象基类"""
+    """LLM client abstract base class"""
 
     @abstractmethod
     def get_completion(self, messages, **kwargs):
-        """获取模型回答"""
+        """Get model response"""
         pass
 
 
 class OpenAIClient(LLMClient):
-    """OpenAI Compatible API 客户端"""
+    """OpenAI Compatible API client"""
 
     def __init__(self, api_key=None, base_url=None, model=None):
         self.api_key = api_key or os.getenv("OPENAI_COMPATIBLE_API_KEY")
@@ -27,26 +27,26 @@ class OpenAIClient(LLMClient):
         self.model = model or os.getenv("OPENAI_COMPATIBLE_MODEL")
 
         if not self.api_key:
-            logger.error(f"{ERROR_ICON} 未找到 OPENAI_COMPATIBLE_API_KEY 环境变量")
+            logger.error(f"{ERROR_ICON} OPENAI_COMPATIBLE_API_KEY environment variable not found")
             raise ValueError(
                 "OPENAI_COMPATIBLE_API_KEY not found in environment variables")
 
         if not self.base_url:
-            logger.error(f"{ERROR_ICON} 未找到 OPENAI_COMPATIBLE_BASE_URL 环境变量")
+            logger.error(f"{ERROR_ICON} OPENAI_COMPATIBLE_BASE_URL environment variable not found")
             raise ValueError(
                 "OPENAI_COMPATIBLE_BASE_URL not found in environment variables")
 
         if not self.model:
-            logger.error(f"{ERROR_ICON} 未找到 OPENAI_COMPATIBLE_MODEL 环境变量")
+            logger.error(f"{ERROR_ICON} OPENAI_COMPATIBLE_MODEL environment variable not found")
             raise ValueError(
                 "OPENAI_COMPATIBLE_MODEL not found in environment variables")
 
-        # 初始化 OpenAI 客户端
+        # Initialize OpenAI client
         self.client = OpenAI(
             base_url=self.base_url,
             api_key=self.api_key
         )
-        logger.info(f"{SUCCESS_ICON} OpenAI Compatible 客户端初始化成功")
+        logger.info(f"{SUCCESS_ICON} OpenAI Compatible client initialized successfully")
 
     @backoff.on_exception(
         backoff.expo,
@@ -55,11 +55,11 @@ class OpenAIClient(LLMClient):
         max_time=300
     )
     def call_api_with_retry(self, messages, stream=False):
-        """带重试机制的 API 调用函数"""
+        """API call function with retry mechanism"""
         try:
-            logger.info(f"{WAIT_ICON} 正在调用 OpenAI API...")
-            logger.debug(f"请求内容: {messages}")
-            logger.debug(f"模型: {self.model}, 流式: {stream}")
+            logger.info(f"{WAIT_ICON} Calling OpenAI API...")
+            logger.debug(f"Request content: {messages}")
+            logger.debug(f"Model: {self.model}, Stream: {stream}")
 
             response = self.client.chat.completions.create(
                 model=self.model,
@@ -67,72 +67,72 @@ class OpenAIClient(LLMClient):
                 stream=stream
             )
 
-            logger.info(f"{SUCCESS_ICON} API 调用成功")
+            logger.info(f"{SUCCESS_ICON} API call successful")
             return response
         except Exception as e:
             error_msg = str(e)
-            logger.error(f"{ERROR_ICON} API 调用失败: {error_msg}")
+            logger.error(f"{ERROR_ICON} API call failed: {error_msg}")
             raise e
 
     def get_completion(self, messages, max_retries=3, initial_retry_delay=1, **kwargs):
-        """获取聊天完成结果，包含重试逻辑"""
+        """Get chat completion result with retry logic"""
         try:
-            logger.info(f"{WAIT_ICON} 使用 OpenAI 模型: {self.model}")
-            logger.debug(f"消息内容: {messages}")
+            logger.info(f"{WAIT_ICON} Using OpenAI model: {self.model}")
+            logger.debug(f"Message content: {messages}")
 
             for attempt in range(max_retries):
                 try:
-                    # 调用 API
+                    # Call API
                     response = self.call_api_with_retry(messages)
 
                     if response is None:
                         logger.warning(
-                            f"{ERROR_ICON} 尝试 {attempt + 1}/{max_retries}: API 返回空值")
+                            f"{ERROR_ICON} Attempt {attempt + 1}/{max_retries}: API returned null value")
                         if attempt < max_retries - 1:
                             retry_delay = initial_retry_delay * (2 ** attempt)
                             logger.info(
-                                f"{WAIT_ICON} 等待 {retry_delay} 秒后重试...")
+                                f"{WAIT_ICON} Waiting {retry_delay} seconds before retry...")
                             time.sleep(retry_delay)
                             continue
                         return None
 
-                    # 打印调试信息
+                    # Print debug information
                     content = response.choices[0].message.content
-                    logger.debug(f"API 原始响应: {content[:500]}...")
-                    logger.info(f"{SUCCESS_ICON} 成功获取 OpenAI 响应")
+                    logger.debug(f"API raw response: {content[:500]}...")
+                    logger.info(f"{SUCCESS_ICON} Successfully obtained OpenAI response")
 
-                    # 直接返回文本内容
+                    # Return text content directly
                     return content
 
                 except Exception as e:
                     logger.error(
-                        f"{ERROR_ICON} 尝试 {attempt + 1}/{max_retries} 失败: {str(e)}")
+                        f"{ERROR_ICON} Attempt {attempt + 1}/{max_retries} failed: {str(e)}")
                     if attempt < max_retries - 1:
                         retry_delay = initial_retry_delay * (2 ** attempt)
-                        logger.info(f"{WAIT_ICON} 等待 {retry_delay} 秒后重试...")
+                        logger.info(f"{WAIT_ICON} Waiting {retry_delay} seconds before retry...")
                         time.sleep(retry_delay)
                     else:
-                        logger.error(f"{ERROR_ICON} 最终错误: {str(e)}")
+                        logger.error(f"{ERROR_ICON} Final error: {str(e)}")
                         return None
 
         except Exception as e:
-            logger.error(f"{ERROR_ICON} get_completion 发生错误: {str(e)}")
+            logger.error(f"{ERROR_ICON} Error in get_completion: {str(e)}")
             return None
 
 
 class LLMClientFactory:
-    """LLM 客户端工厂类"""
+    """LLM client factory class"""
 
     @staticmethod
     def create_client(**kwargs):
         """
-        创建 OpenAI Compatible 客户端
+        Create OpenAI Compatible client
 
         Args:
-            **kwargs: 客户端的配置参数，包括 api_key、base_url 和 model
+            **kwargs: Client configuration parameters, including api_key, base_url and model
 
         Returns:
-            LLMClient: 实例化的 OpenAI Compatible 客户端
+            LLMClient: Instantiated OpenAI Compatible client
         """
         return OpenAIClient(
             api_key=kwargs.get("api_key"),

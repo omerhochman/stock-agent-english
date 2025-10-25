@@ -10,24 +10,24 @@ logger = logging.getLogger(__name__)
 
 def register_macroeconomic_tools(app: FastMCP, active_data_source: FinancialDataSource):
     """
-    向MCP应用注册宏观经济数据工具
+    Register macroeconomic data tools with MCP application
 
-    参数:
-        app: FastMCP应用实例
-        active_data_source: 活跃的金融数据源
+    Args:
+        app: FastMCP application instance
+        active_data_source: Active financial data source
     """
 
     @app.tool()
     def get_deposit_rate_data(start_date: Optional[str] = None, end_date: Optional[str] = None) -> str:
         """
-        获取指定日期范围内的基准存款利率数据（活期、定期）
+        Get benchmark deposit interest rate data (current, fixed-term) for specified date range
 
-        参数:
-            start_date: 可选。开始日期，格式为'YYYY-MM-DD'
-            end_date: 可选。结束日期，格式为'YYYY-MM-DD'
+        Args:
+            start_date: Optional. Start date in 'YYYY-MM-DD' format
+            end_date: Optional. End date in 'YYYY-MM-DD' format
 
-        返回:
-            包含存款利率数据的Markdown表格或错误信息
+        Returns:
+            Markdown table containing deposit interest rate data or error message
         """
         return call_macro_data_tool(
             "get_deposit_rate_data",
@@ -39,14 +39,14 @@ def register_macroeconomic_tools(app: FastMCP, active_data_source: FinancialData
     @app.tool()
     def get_loan_rate_data(start_date: Optional[str] = None, end_date: Optional[str] = None) -> str:
         """
-        获取指定日期范围内的基准贷款利率数据
+        Get benchmark loan interest rate data for specified date range
 
-        参数:
-            start_date: 可选。开始日期，格式为'YYYY-MM-DD'
-            end_date: 可选。结束日期，格式为'YYYY-MM-DD'
+        Args:
+            start_date: Optional. Start date in 'YYYY-MM-DD' format
+            end_date: Optional. End date in 'YYYY-MM-DD' format
 
-        返回:
-            包含贷款利率数据的Markdown表格或错误信息
+        Returns:
+            Markdown table containing loan interest rate data or error message
         """
         return call_macro_data_tool(
             "get_loan_rate_data",
@@ -58,17 +58,17 @@ def register_macroeconomic_tools(app: FastMCP, active_data_source: FinancialData
     @app.tool()
     def get_required_reserve_ratio_data(start_date: Optional[str] = None, end_date: Optional[str] = None, year_type: str = '0') -> str:
         """
-        获取指定日期范围内的存款准备金率数据
+        Get required reserve ratio data for specified date range
 
-        参数:
-            start_date: 可选。开始日期，格式为'YYYY-MM-DD'
-            end_date: 可选。结束日期，格式为'YYYY-MM-DD'
-            year_type: 可选。日期过滤类型。'0'表示公告日期（默认），'1'表示生效日期
+        Args:
+            start_date: Optional. Start date in 'YYYY-MM-DD' format
+            end_date: Optional. End date in 'YYYY-MM-DD' format
+            year_type: Optional. Date filter type. '0' for announcement date (default), '1' for effective date
 
-        返回:
-            包含存款准备金率数据的Markdown表格或错误信息
+        Returns:
+            Markdown table containing required reserve ratio data or error message
         """
-        # 对year_type参数进行基本验证
+        # Basic validation for year_type parameter
         if year_type not in ['0', '1']:
             logger.warning(f"Invalid year_type requested: {year_type}")
             return "Error: Invalid year_type '{year_type}'. Valid options are '0' (announcement date) or '1' (effective date)."
@@ -78,22 +78,22 @@ def register_macroeconomic_tools(app: FastMCP, active_data_source: FinancialData
             active_data_source.get_required_reserve_ratio_data,
             "Required Reserve Ratio",
             start_date, end_date,
-            yearType=year_type  # 正确命名传递额外参数给Baostock
+            yearType=year_type  # Correctly named parameter passed to Baostock
         )
 
     @app.tool()
     def get_money_supply_data_month(start_date: Optional[str] = None, end_date: Optional[str] = None) -> str:
         """
-        获取指定日期范围内的月度货币供应量数据（M0, M1, M2）
+        Get monthly money supply data (M0, M1, M2) for specified date range
 
-        参数:
-            start_date: 可选。开始日期，格式为'YYYY-MM'
-            end_date: 可选。结束日期，格式为'YYYY-MM'
+        Args:
+            start_date: Optional. Start date in 'YYYY-MM' format
+            end_date: Optional. End date in 'YYYY-MM' format
 
-        返回:
-            包含月度货币供应量数据的Markdown表格或错误信息
+        Returns:
+            Markdown table containing monthly money supply data or error message
         """
-        # 如果需要，可以添加对YYYY-MM格式的特定验证
+        # Add specific validation for YYYY-MM format if needed
         return call_macro_data_tool(
             "get_money_supply_data_month",
             active_data_source.get_money_supply_data_month,
@@ -104,16 +104,16 @@ def register_macroeconomic_tools(app: FastMCP, active_data_source: FinancialData
     @app.tool()
     def get_money_supply_data_year(start_date: Optional[str] = None, end_date: Optional[str] = None) -> str:
         """
-        获取指定年份范围内的年度货币供应量数据（M0, M1, M2 - 年末余额）
+        Get annual money supply data (M0, M1, M2 - year-end balance) for specified year range
 
-        参数:
-            start_date: 可选。开始年份，格式为'YYYY'
-            end_date: 可选。结束年份，格式为'YYYY'
+        Args:
+            start_date: Optional. Start year in 'YYYY' format
+            end_date: Optional. End year in 'YYYY' format
 
-        返回:
-            包含年度货币供应量数据的Markdown表格或错误信息
+        Returns:
+            Markdown table containing annual money supply data or error message
         """
-        # 如果需要，可以添加对YYYY格式的特定验证
+        # Add specific validation for YYYY format if needed
         return call_macro_data_tool(
             "get_money_supply_data_year",
             active_data_source.get_money_supply_data_year,
@@ -124,15 +124,15 @@ def register_macroeconomic_tools(app: FastMCP, active_data_source: FinancialData
     @app.tool()
     def get_shibor_data(start_date: Optional[str] = None, end_date: Optional[str] = None) -> str:
         """
-        获取指定日期范围内的SHIBOR（上海银行间同业拆放利率）数据
-        注意：当前数据源不支持此功能。此工具仅作为接口保留。
+        Get SHIBOR (Shanghai Interbank Offered Rate) data for specified date range
+        Note: Current data source does not support this functionality. This tool is kept as an interface only.
 
-        参数:
-            start_date: 可选。开始日期，格式为'YYYY-MM-DD'
-            end_date: 可选。结束日期，格式为'YYYY-MM-DD'
+        Args:
+            start_date: Optional. Start date in 'YYYY-MM-DD' format
+            end_date: Optional. End date in 'YYYY-MM-DD' format
 
-        返回:
-            信息提示SHIBOR数据暂不可用
+        Returns:
+            Information message that SHIBOR data is currently unavailable
         """
         logger.info(f"Tool 'get_shibor_data' called with dates from {start_date or 'default'} to {end_date or 'default'}")
-        return "数据源不支持SHIBOR数据查询功能。您可以查询存款利率(get_deposit_rate_data)或贷款利率(get_loan_rate_data)作为替代。"
+        return "Data source does not support SHIBOR data query functionality. You can query deposit rates (get_deposit_rate_data) or loan rates (get_loan_rate_data) as alternatives."

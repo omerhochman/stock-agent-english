@@ -37,8 +37,8 @@ from src.utils.llm_interaction_logger import (
 from src.utils.api_utils import app as fastapi_app
 from src.utils.json_unicode_handler import monkey_patch_all_agents, patch_json_dumps
 
-patch_json_dumps()  # 修改默认json.dumps行为
-monkey_patch_all_agents()  # 修补所有代理类
+patch_json_dumps()  # Modify default json.dumps behavior
+monkey_patch_all_agents()  # Patch all agent classes
 
 # --- Import Summary Report Generator ---
 try:
@@ -56,7 +56,7 @@ except ImportError:
     HAS_STRUCTURED_OUTPUT = False
 
 # Initialize logging system
-# 设置全局日志配置：控制台只显示WARNING及以上，文件记录所有级别
+# Set global logging configuration: console shows WARNING and above, file records all levels
 setup_global_logging(console_level=logging.WARNING, file_level=logging.DEBUG)
 
 # Use simple console logger that doesn't create additional files
@@ -73,7 +73,7 @@ def run_hedge_fund(run_id: str, ticker: str, start_date: str, end_date: str, por
                    tickers = None):
     print(f"--- Starting Workflow Run ID: {run_id} ---")
 
-    # 设置API状态
+    # Set API state
     try:
         from src.utils.api_utils import api_state
         api_state.current_run_id = run_id
@@ -84,13 +84,13 @@ def run_hedge_fund(run_id: str, ticker: str, start_date: str, end_date: str, por
     ticker_list = None
     if tickers:
         if isinstance(tickers, str):
-            # 如果是字符串，则按逗号分割
+            # If it's a string, split by comma
             ticker_list = [t.strip() for t in tickers.split(',')]
         elif isinstance(tickers, list):
-            # 如果已经是列表，直接使用
+            # If it's already a list, use directly
             ticker_list = tickers
         else:
-            # 其他类型，尝试转换为字符串
+            # Other types, try to convert to string
             try:
                 ticker_list = [str(tickers)]
             except:
@@ -98,7 +98,7 @@ def run_hedge_fund(run_id: str, ticker: str, start_date: str, end_date: str, por
                 
         if ticker_list:
             print(f"--- Processing multiple tickers: {ticker_list} ---")
-            # 确保主要ticker也在列表中
+            # Ensure main ticker is also in the list
             if ticker not in ticker_list:
                 ticker_list.insert(0, ticker)
     
@@ -118,46 +118,46 @@ def run_hedge_fund(run_id: str, ticker: str, start_date: str, end_date: str, por
         "metadata": {
             "show_reasoning": show_reasoning,
             "run_id": run_id,  # Pass run_id in metadata
-            "show_summary": show_summary,  # 是否显示汇总报告
+            "show_summary": show_summary,  # Whether to show summary report
         }
     }
     
-    # 如果有多个股票代码，添加到初始状态中
+    # If multiple tickers are provided, add them to the initial state
     if ticker_list:
         initial_state["data"]["tickers"] = ticker_list
     
-    # 直接执行工作流
+    # Execute the workflow directly
     final_state = app.invoke(initial_state)
     print(f"--- Finished Workflow Run ID: {run_id} ---")
 
-    # 在工作流结束后保存最终状态并生成汇总报告（如果启用）
+    # Save final state and generate summary report after workflow completion (if enabled)
     if HAS_SUMMARY_REPORT and show_summary:
-        # 保存最终状态到收集器
+        # Save final state to collector
         store_final_state(final_state)
-        # 获取增强的最终状态（包含所有收集到的数据）
+        # Get enhanced final state (including all collected data)
         enhanced_state = get_enhanced_final_state()
-        # 打印汇总报告
+        # Print summary report
         print_summary_report(enhanced_state)
 
-    # 如果启用了显示推理，显示结构化输出
+    # If reasoning display is enabled, show structured output
     if HAS_STRUCTURED_OUTPUT and show_reasoning:
         print_structured_output(final_state)
 
-    # 尝试更新API状态
+    # Try to update API state
     try:
         from src.utils.api_utils import api_state
         api_state.update_agent_data(run_id, "status", "completed")
     except Exception:
         pass
 
-    # 保持原有的返回格式：最后一条消息的内容
+    # Keep original return format: content of the last message
     return final_state["messages"][-1].content
 
 
-# --- 定义工作流图 ---
+# --- Define workflow graph ---
 workflow = StateGraph(AgentState)
 
-# 添加节点
+# Add nodes
 workflow.add_node("market_data_agent", market_data_agent)
 workflow.add_node("ai_model_analyst_agent", ai_model_analyst_agent)
 workflow.add_node("technical_analyst_agent", technical_analyst_agent)
@@ -172,10 +172,10 @@ workflow.add_node("risk_management_agent", risk_management_agent)
 workflow.add_node("macro_analyst_agent", macro_analyst_agent)
 workflow.add_node("portfolio_management_agent", portfolio_management_agent)
 
-# 定义工作流边缘
+# Define workflow edges
 workflow.set_entry_point("market_data_agent")
 
-# 市场数据到各分析师 - 第一层
+# Market data to analysts - First layer
 workflow.add_edge("market_data_agent", "ai_model_analyst_agent")
 workflow.add_edge("market_data_agent", "technical_analyst_agent")
 workflow.add_edge("market_data_agent", "fundamentals_agent")
@@ -183,7 +183,7 @@ workflow.add_edge("market_data_agent", "sentiment_agent")
 workflow.add_edge("market_data_agent", "valuation_agent")
 workflow.add_edge("market_data_agent", "portfolio_analyzer_agent")
 
-# 确保所有第一层分析完成后再进行研究员分析 - 第二层
+# Ensure all first layer analysis is complete before researcher analysis - Second layer
 workflow.add_conditional_edges(
     "ai_model_analyst_agent",
     lambda x: "researcher_bull_agent",
@@ -209,24 +209,24 @@ workflow.add_conditional_edges(
     lambda x: "researcher_bull_agent" if "researcher_bull_agent" not in [msg.name for msg in x["messages"]] else "researcher_bear_agent",
 )
 
-# 研究员到辩论室 - 第三层
+# Researchers to debate room - Third layer
 workflow.add_conditional_edges(
     "researcher_bull_agent",
     lambda x: "researcher_bear_agent" if "researcher_bear_agent" not in [msg.name for msg in x["messages"]] else "debate_room_agent",
 )
 workflow.add_edge("researcher_bear_agent", "debate_room_agent")
 
-# 辩论室到风险管理 - 第四层
+# Debate room to risk management - Fourth layer
 workflow.add_edge("debate_room_agent", "risk_management_agent")
 
-# 风险管理到宏观分析 - 第五层
+# Risk management to macro analysis - Fifth layer
 workflow.add_edge("risk_management_agent", "macro_analyst_agent")
 
-# 宏观分析到投资组合管理 - 第六层
+# Macro analysis to portfolio management - Sixth layer
 workflow.add_edge("macro_analyst_agent", "portfolio_management_agent")
 workflow.add_edge("portfolio_management_agent", END)
 
-# 编译工作流图
+# Compile workflow graph
 app = workflow.compile()
 
 
@@ -272,16 +272,16 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
 
-    # 根据参数设置日志级别
+    # Set log level based on parameters
     if args.verbose:
         log_level = logging.INFO
     else:
         log_level = getattr(logging, args.log_level.upper())
     
-    # 重新设置控制台日志级别
+    # Reset console log level
     set_console_level(log_level)
     
-    print(f"日志级别设置为: {logging.getLevelName(log_level)}")
+    print(f"Log level set to: {logging.getLevelName(log_level)}")
 
     # --- Date Handling ---
     current_date = datetime.now()
@@ -311,10 +311,10 @@ if __name__ == "__main__":
     # Generate run_id here when running directly
     main_run_id = str(uuid.uuid4())
     
-    # 如果启用了show_reasoning，自动设置日志级别为INFO以显示推理过程
+    # If show_reasoning is enabled, automatically set log level to INFO to show reasoning process
     if args.show_reasoning:
         set_console_level(logging.INFO)
-        print("已启用推理显示模式，日志级别已调整为INFO")
+        print("Reasoning display mode enabled, log level adjusted to INFO")
     
     result = run_hedge_fund(
         run_id=main_run_id,
@@ -325,7 +325,7 @@ if __name__ == "__main__":
         show_reasoning=args.show_reasoning,
         num_of_news=args.num_of_news,
         show_summary=args.summary,
-        tickers=args.tickers  # 传入多个股票代码
+        tickers=args.tickers  # Pass multiple stock codes
     )
     print("\nFinal Result:")
     print(result)
@@ -337,9 +337,9 @@ def get_historical_data(symbol: str) -> pd.DataFrame:
     end_date = yesterday
     target_start_date = yesterday - timedelta(days=365)
 
-    print(f"\n正在获取 {symbol} 的历史行情数据...")
-    print(f"目标开始日期：{target_start_date.strftime('%Y-%m-%d')}")
-    print(f"结束日期：{end_date.strftime('%Y-%m-%d')}")
+    print(f"\nGetting historical market data for {symbol}...")
+    print(f"Target start date: {target_start_date.strftime('%Y-%m-%d')}")
+    print(f"End date: {end_date.strftime('%Y-%m-%d')}")
 
     try:
         df = ak.stock_zh_a_hist(symbol=symbol,
@@ -353,21 +353,21 @@ def get_historical_data(symbol: str) -> pd.DataFrame:
         target_days = 365
 
         if actual_days < target_days:
-            print(f"提示：实际获取到的数据天数({actual_days}天)少于目标天数({target_days}天)")
-            print(f"将使用可获取到的所有数据进行分析")
+            print(f"Note: Actual data days ({actual_days} days) is less than target days ({target_days} days)")
+            print(f"Will use all available data for analysis")
 
-        print(f"成功获取历史行情数据，共 {actual_days} 条记录\n")
+        print(f"Successfully retrieved historical market data, {actual_days} records\n")
         return df
 
     except Exception as e:
-        print(f"获取历史数据时发生错误: {str(e)}")
-        print("将尝试获取最近可用的数据...")
+        print(f"Error occurred while getting historical data: {str(e)}")
+        print("Will try to get the most recent available data...")
 
         try:
             df = ak.stock_zh_a_hist(
                 symbol=symbol, period="daily", adjust="qfq")
-            print(f"成功获取历史行情数据，共 {len(df)} 条记录\n")
+            print(f"Successfully retrieved historical market data, {len(df)} records\n")
             return df
         except Exception as e:
-            print(f"获取历史数据失败: {str(e)}")
+            print(f"Failed to get historical data: {str(e)}")
             return pd.DataFrame()

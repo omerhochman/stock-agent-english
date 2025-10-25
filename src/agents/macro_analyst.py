@@ -7,83 +7,83 @@ import json
 from datetime import datetime, timedelta
 from src.tools.openrouter_config import get_chat_completion
 
-# 设置日志记录
+# Setup logging
 logger = setup_logger('macro_analyst_agent')
 
 
-@agent_endpoint("macro_analyst", "宏观分析师，分析宏观经济环境对目标股票的影响")
+@agent_endpoint("macro_analyst", "Macro analyst, analyzing the impact of macroeconomic environment on target stocks")
 def macro_analyst_agent(state: AgentState):
-    """负责宏观经济分析"""
+    """Responsible for macroeconomic analysis"""
     show_workflow_status("Macro Analyst")
     show_reasoning = state["metadata"]["show_reasoning"]
     data = state["data"]
     
-    # 获取资产列表
+    # Get asset list
     tickers = data.get("tickers", [])
     if isinstance(tickers, str):
         tickers = [ticker.strip() for ticker in tickers.split(',')]
     
-    # 如果没有提供tickers但提供了ticker，则使用单一ticker
+    # If no tickers provided but ticker is provided, use single ticker
     if not tickers and data.get("ticker"):
         tickers = [data["ticker"]]
     
     primary_ticker = tickers[0] if tickers else ""
     symbol = primary_ticker
-    logger.info(f"正在进行宏观分析: {symbol}")
+    logger.info(f"Performing macro analysis: {symbol}")
     
-    # 多资产宏观分析
+    # Multi-asset macro analysis
     multi_asset_analysis = None
     if len(tickers) > 1:
         try:
-            logger.info(f"执行多资产宏观分析: {tickers}")
-            # 收集所有资产的新闻
+            logger.info(f"Executing multi-asset macro analysis: {tickers}")
+            # Collect news for all assets
             all_assets_news = []
             for ticker in tickers:
                 asset_news = get_stock_news(ticker, max_news=20)
                 all_assets_news.extend(asset_news)
             
-            # 对所有新闻进行宏观分析
+            # Perform macro analysis on all news
             if all_assets_news:
                 multi_asset_analysis = get_macro_news_analysis(all_assets_news)
-                logger.info(f"多资产宏观分析完成: {multi_asset_analysis.get('macro_environment', 'neutral')}")
+                logger.info(f"Multi-asset macro analysis completed: {multi_asset_analysis.get('macro_environment', 'neutral')}")
         except Exception as e:
-            logger.error(f"多资产宏观分析失败: {e}")
+            logger.error(f"Multi-asset macro analysis failed: {e}")
     
-    # 获取大量新闻数据（最多100条）
-    news_list = get_stock_news(symbol, max_news=100)  # 尝试获取100条新闻
+    # Get large amount of news data (up to 100 articles)
+    news_list = get_stock_news(symbol, max_news=100)  # Try to get 100 news articles
     
-    # 过滤七天前的新闻
+    # Filter news from seven days ago
     cutoff_date = datetime.now() - timedelta(days=7)
     recent_news = [news for news in news_list
                   if datetime.strptime(news['publish_time'], '%Y-%m-%d %H:%M:%S') > cutoff_date]
     
-    logger.info(f"获取到 {len(recent_news)} 条七天内的新闻")
+    logger.info(f"Retrieved {len(recent_news)} news articles from the past seven days")
     
-    # 如果没有获取到新闻，使用多资产分析结果或返回默认结果
+    # If no news retrieved, use multi-asset analysis results or return default result
     if not recent_news:
-        logger.warning(f"未获取到 {symbol} 的最近新闻")
+        logger.warning(f"No recent news retrieved for {symbol}")
         if multi_asset_analysis:
-            logger.info("使用多资产宏观分析结果")
+            logger.info("Using multi-asset macro analysis results")
             macro_analysis = multi_asset_analysis
         else:
-            logger.warning("无法进行宏观分析")
+            logger.warning("Unable to perform macro analysis")
             macro_analysis = {
                 "macro_environment": "neutral",
                 "impact_on_stock": "neutral",
                 "key_factors": [],
-                "reasoning": "未获取到最近新闻，无法进行宏观分析"
+                "reasoning": "No recent news retrieved, unable to perform macro analysis"
             }
     else:
-        # 获取宏观分析结果
+        # Get macro analysis results
         macro_analysis = get_macro_news_analysis(recent_news)
     
-    # 如果需要显示推理过程
+    # If reasoning process needs to be displayed
     if show_reasoning:
         show_agent_reasoning(macro_analysis, "Macro Analysis Agent")
-        # 保存推理信息到metadata供API使用
+        # Save reasoning information to metadata for API use
         state["metadata"]["agent_reasoning"] = macro_analysis
     
-    # 添加多资产分析信息
+    # Add multi-asset analysis information
     if multi_asset_analysis and len(tickers) > 1:
         message_content = {
             "signal": macro_analysis.get("impact_on_stock", "neutral"),
@@ -92,13 +92,13 @@ def macro_analyst_agent(state: AgentState):
             "macro_environment": macro_analysis.get("macro_environment", "neutral"),
             "impact_on_stock": macro_analysis.get("impact_on_stock", "neutral"),
             "key_factors": macro_analysis.get("key_factors", []),
-            "reasoning": macro_analysis.get("reasoning", "未提供宏观分析理由"),
+            "reasoning": macro_analysis.get("reasoning", "No macro analysis reasoning provided"),
             "multi_asset_analysis": multi_asset_analysis,
             "tickers_analyzed": tickers,
             "summary": "\n".join([
-                f"宏观环境: {macro_analysis.get('macro_environment', 'neutral')}",
-                f"对股票影响: {macro_analysis.get('impact_on_stock', 'neutral')}",
-                "关键因素:",
+                f"Macro Environment: {macro_analysis.get('macro_environment', 'neutral')}",
+                f"Impact on Stock: {macro_analysis.get('impact_on_stock', 'neutral')}",
+                "Key Factors:",
                 *[f"- {factor}" for factor in macro_analysis.get("key_factors", [])]
             ])
         }
@@ -110,16 +110,16 @@ def macro_analyst_agent(state: AgentState):
             "macro_environment": macro_analysis.get("macro_environment", "neutral"),
             "impact_on_stock": macro_analysis.get("impact_on_stock", "neutral"),
             "key_factors": macro_analysis.get("key_factors", []),
-            "reasoning": macro_analysis.get("reasoning", "未提供宏观分析理由"),
+            "reasoning": macro_analysis.get("reasoning", "No macro analysis reasoning provided"),
             "summary": "\n".join([
-                f"宏观环境: {macro_analysis.get('macro_environment', 'neutral')}",
-                f"对股票影响: {macro_analysis.get('impact_on_stock', 'neutral')}",
-                "关键因素:",
+                f"Macro Environment: {macro_analysis.get('macro_environment', 'neutral')}",
+                f"Impact on Stock: {macro_analysis.get('impact_on_stock', 'neutral')}",
+                "Key Factors:",
                 *[f"- {factor}" for factor in macro_analysis.get("key_factors", [])]
             ])
         }
     
-    # 创建消息
+    # Create message
     message = HumanMessage(
         content=json.dumps(message_content),
         name="macro_analyst_agent",
@@ -137,149 +137,149 @@ def macro_analyst_agent(state: AgentState):
 
 
 def get_macro_news_analysis(news_list: list) -> dict:
-    """分析宏观经济新闻对股票的影响
+    """Analyze the impact of macroeconomic news on stocks
     
     Args:
-        news_list (list): 新闻列表
+        news_list (list): News list
         
     Returns:
-        dict: 宏观分析结果，包含环境评估、对股票的影响、关键因素和详细推理
+        dict: Macro analysis results, including environment assessment, impact on stocks, key factors and detailed reasoning
     """
     if not news_list:
         return {
             "macro_environment": "neutral",
             "impact_on_stock": "neutral",
             "key_factors": [],
-            "reasoning": "没有足够的新闻数据进行宏观分析"
+            "reasoning": "Insufficient news data for macro analysis"
         }
     
-    # 检查缓存
+    # Check cache
     import os
     cache_file = "src/data/macro_analysis_cache.json"
     os.makedirs(os.path.dirname(cache_file), exist_ok=True)
     
-    # 生成新闻内容的唯一标识
+    # Generate unique identifier for news content
     news_key = "|".join([
         f"{news['title']}|{news['publish_time']}"
-        for news in news_list[:20]  # 使用前20条新闻作为标识
+        for news in news_list[:20]  # Use first 20 news items as identifier
     ])
     
-    # 检查缓存
+    # Check cache
     if os.path.exists(cache_file):
         try:
             with open(cache_file, 'r', encoding='utf-8') as f:
                 cache = json.load(f)
                 if news_key in cache:
-                    logger.info("使用缓存的宏观分析结果")
+                    logger.info("Using cached macro analysis results")
                     return cache[news_key]
         except Exception as e:
-            logger.error(f"读取宏观分析缓存出错: {e}")
+            logger.error(f"Error reading macro analysis cache: {e}")
             cache = {}
     else:
-        logger.info("未找到宏观分析缓存文件，将创建新文件")
+        logger.info("Macro analysis cache file not found, will create new file")
         cache = {}
     
-    # 准备系统消息
+    # Prepare system message
     system_message = {
         "role": "system",
-        "content": """你是一位专业的宏观经济分析师，专注于分析宏观经济环境对A股个股的影响。
-        请分析提供的新闻，从宏观角度评估当前经济环境，并分析这些宏观因素对目标股票的潜在影响。
+        "content": """You are a professional macroeconomic analyst specializing in analyzing the impact of macroeconomic environment on A-share individual stocks.
+        Please analyze the provided news, assess the current economic environment from a macro perspective, and analyze the potential impact of these macro factors on target stocks.
         
-        请关注以下宏观因素：
-        1. 货币政策：利率、准备金率、公开市场操作等
-        2. 财政政策：政府支出、税收政策、补贴等
-        3. 产业政策：行业规划、监管政策、环保要求等
-        4. 国际环境：全球经济形势、贸易关系、地缘政治等
-        5. 市场情绪：投资者信心、市场流动性、风险偏好等
+        Please focus on the following macro factors:
+        1. Monetary policy: interest rates, reserve requirements, open market operations, etc.
+        2. Fiscal policy: government spending, tax policies, subsidies, etc.
+        3. Industrial policy: industry planning, regulatory policies, environmental requirements, etc.
+        4. International environment: global economic situation, trade relations, geopolitics, etc.
+        5. Market sentiment: investor confidence, market liquidity, risk appetite, etc.
         
-        你的分析应该包括：
-        1. 宏观环境评估：积极(positive)、中性(neutral)或消极(negative)
-        2. 对目标股票的影响：利好(positive)、中性(neutral)或利空(negative)
-        3. 关键影响因素：列出3-5个最重要的宏观因素
-        4. 详细推理：解释为什么这些因素会影响目标股票
+        Your analysis should include:
+        1. Macro environment assessment: positive, neutral, or negative
+        2. Impact on target stock: positive, neutral, or negative
+        3. Key influencing factors: list 3-5 most important macro factors
+        4. Detailed reasoning: explain why these factors would affect the target stock
         
-        请确保你的分析：
-        1. 基于事实和数据，而非猜测
-        2. 考虑行业特性和公司特点
-        3. 关注中长期影响，而非短期波动
-        4. 提供具体、可操作的见解"""
+        Please ensure your analysis:
+        1. Is based on facts and data, not speculation
+        2. Considers industry characteristics and company features
+        3. Focuses on medium to long-term impact, not short-term fluctuations
+        4. Provides specific, actionable insights"""
     }
     
-    # 准备新闻内容
+    # Prepare news content
     news_content = "\n\n".join([
-        f"标题：{news['title']}\n"
-        f"来源：{news['source']}\n"
-        f"时间：{news['publish_time']}\n"
-        f"内容：{news['content']}"
-        for news in news_list[:50]  # 使用前50条新闻进行分析
+        f"Title: {news['title']}\n"
+        f"Source: {news['source']}\n"
+        f"Time: {news['publish_time']}\n"
+        f"Content: {news['content']}"
+        for news in news_list[:50]  # Use first 50 news items for analysis
     ])
     
     user_message = {
         "role": "user",
-        "content": f"请分析以下新闻，评估当前宏观经济环境及其对相关A股上市公司的影响：\n\n{news_content}\n\n请以JSON格式返回结果，包含以下字段：macro_environment（宏观环境：positive/neutral/negative）、impact_on_stock（对股票影响：positive/neutral/negative）、key_factors（关键因素数组）、reasoning（详细推理）。"
+        "content": f"Please analyze the following news, assess the current macroeconomic environment and its impact on related A-share listed companies:\n\n{news_content}\n\nPlease return results in JSON format with the following fields: macro_environment (macro environment: positive/neutral/negative), impact_on_stock (impact on stock: positive/neutral/negative), key_factors (key factors array), reasoning (detailed reasoning)."
     }
     
     try:
-        # 获取LLM分析结果
-        logger.info("正在调用LLM进行宏观分析...")
+        # Get LLM analysis results
+        logger.info("Calling LLM for macro analysis...")
         result = get_chat_completion([system_message, user_message])
         if result is None:
-            logger.error("LLM分析失败，无法获取宏观分析结果")
+            logger.error("LLM analysis failed, unable to get macro analysis results")
             return {
                 "macro_environment": "neutral",
                 "impact_on_stock": "neutral",
                 "key_factors": [],
-                "reasoning": "LLM分析失败，无法获取宏观分析结果"
+                "reasoning": "LLM analysis failed, unable to get macro analysis results"
             }
         
-        # 解析JSON结果
+        # Parse JSON results
         try:
-            # 尝试直接解析
+            # Try direct parsing
             analysis_result = json.loads(result.strip())
-            logger.info("成功解析LLM返回的JSON结果")
+            logger.info("Successfully parsed LLM returned JSON results")
         except json.JSONDecodeError:
-            # 如果直接解析失败，尝试提取JSON部分
+            # If direct parsing fails, try to extract JSON part
             import re
             json_match = re.search(r'```json\s*(.*?)\s*```', result, re.DOTALL)
             if json_match:
                 try:
                     analysis_result = json.loads(json_match.group(1).strip())
-                    logger.info("成功从代码块中提取并解析JSON结果")
+                    logger.info("Successfully extracted and parsed JSON results from code block")
                 except:
-                    # 如果仍然失败，返回默认结果
-                    logger.error("无法解析代码块中的JSON结果")
+                    # If still fails, return default result
+                    logger.error("Unable to parse JSON results in code block")
                     return {
                         "macro_environment": "neutral",
                         "impact_on_stock": "neutral",
                         "key_factors": [],
-                        "reasoning": "无法解析LLM返回的JSON结果"
+                        "reasoning": "Unable to parse LLM returned JSON results"
                     }
             else:
-                # 如果没有找到JSON，返回默认结果
-                logger.error("LLM未返回有效的JSON格式结果")
+                # If no JSON found, return default result
+                logger.error("LLM did not return valid JSON format results")
                 return {
                     "macro_environment": "neutral",
                     "impact_on_stock": "neutral",
                     "key_factors": [],
-                    "reasoning": "LLM未返回有效的JSON格式结果"
+                    "reasoning": "LLM did not return valid JSON format results"
                 }
         
-        # 缓存结果
+        # Cache results
         cache[news_key] = analysis_result
         try:
             with open(cache_file, 'w', encoding='utf-8') as f:
                 json.dump(cache, f, ensure_ascii=False, indent=2)
-            logger.info("宏观分析结果已缓存")
+            logger.info("Macro analysis results cached")
         except Exception as e:
-            logger.error(f"写入宏观分析缓存出错: {e}")
+            logger.error(f"Error writing macro analysis cache: {e}")
         
         return analysis_result
     
     except Exception as e:
-        logger.error(f"宏观分析出错: {e}")
+        logger.error(f"Macro analysis error: {e}")
         return {
             "macro_environment": "neutral",
             "impact_on_stock": "neutral",
             "key_factors": [],
-            "reasoning": f"分析过程中出错: {str(e)}"
+            "reasoning": f"Error during analysis process: {str(e)}"
         }

@@ -1,11 +1,11 @@
 """
-因子数据API基础类和通用函数
+Factor data API base classes and common functions
 """
 from src.tools.data_source_adapter import DataAPI
 from src.utils.logging_config import setup_logger
 
-# 创建数据API实例
+# Create data API instance
 data_api = DataAPI()
 
-# 设置日志记录
+# Setup logging
 logger = setup_logger('factor_data_api')
