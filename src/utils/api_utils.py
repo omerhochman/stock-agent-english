@@ -4,30 +4,30 @@ API utility module - provides shared API functionality components for Agents
 This module defines API functionality components, providing unified API exposure methods for various Agents.
 """
 
+import functools
+import inspect
+import io
 import json
 import logging
-import functools
+import sys
 import threading
 import time
-import inspect
-import sys
-import io
-from typing import Dict, Any, TypeVar
 from datetime import datetime, timezone
+from typing import Any, Dict, TypeVar
 
 UTC = timezone.utc
 
 import uvicorn
-from fastapi import FastAPI, APIRouter
+from fastapi import APIRouter, FastAPI
 
 # Type definitions
-T = TypeVar('T')
+T = TypeVar("T")
 
 # Create FastAPI application instance
 app = FastAPI(
     title="A_Share_Investment_Agent API",
     description="API service for A_Share_Investment_Agent",
-    version="0.1.0"
+    version="0.1.0",
 )
 
 # Create routers
@@ -43,6 +43,7 @@ app.include_router(workflow_router)
 # Add a global dictionary to track LLM calls for each agent
 _agent_llm_calls = {}
 
+
 # Create global state manager
 class APIState:
     def __init__(self):
@@ -51,38 +52,40 @@ class APIState:
         self.agents = {}
         self.runs = {}
         self.agent_data = {}
-    
+
     def register_agent(self, agent_name: str, description: str = ""):
         """Register Agent to state manager"""
         self.agents[agent_name] = {
             "name": agent_name,
             "description": description,
-            "state": "idle"
+            "state": "idle",
         }
         self.agent_data[agent_name] = {}
-    
+
     def update_agent_state(self, agent_name: str, state: str):
         """Update Agent state"""
         if agent_name in self.agents:
             self.agents[agent_name]["state"] = state
             self.current_agent_name = agent_name
-    
+
     def update_agent_data(self, agent_name: str, key: str, value: Any):
         """Update Agent data"""
         if agent_name not in self.agent_data:
             self.agent_data[agent_name] = {}
         self.agent_data[agent_name][key] = value
-    
+
     def register_run(self, run_id: str, run_info: Dict[str, Any]):
         """Register run ID and information"""
         self.runs[run_id] = run_info
         self.current_run_id = run_id
+
 
 # Instantiate global state manager
 api_state = APIState()
 
 # Define logger uniformly here
 logger = logging.getLogger("api_utils")
+
 
 # Utility functions
 def safe_parse_json(json_str):
@@ -91,6 +94,7 @@ def safe_parse_json(json_str):
         return json.loads(json_str)
     except (json.JSONDecodeError, TypeError):
         return None
+
 
 def format_llm_request(request_data):
     """Format LLM request data for logging"""
@@ -110,6 +114,7 @@ def format_llm_request(request_data):
         logger.warning(f"Error formatting LLM request: {str(e)}")
         return {"data": "Unable to format request"}
 
+
 def format_llm_response(response_data):
     """Format LLM response data for logging"""
     try:
@@ -124,6 +129,7 @@ def format_llm_response(response_data):
     except Exception as e:
         logger.warning(f"Error formatting LLM response: {str(e)}")
         return {"content": "Unable to format response"}
+
 
 # -----------------------------------------------------------------------------
 # Decorators and utility functions
@@ -150,14 +156,13 @@ def log_llm_interaction(state):
             # Get current run ID
             run_id = api_state.current_run_id
 
-            api_state.update_agent_data(
-                agent_name, "llm_request", formatted_request)
-            api_state.update_agent_data(
-                agent_name, "llm_response", formatted_response)
+            api_state.update_agent_data(agent_name, "llm_request", formatted_request)
+            api_state.update_agent_data(agent_name, "llm_response", formatted_response)
 
             # Record interaction timestamp
             api_state.update_agent_data(
-                agent_name, "llm_timestamp", timestamp.isoformat())
+                agent_name, "llm_timestamp", timestamp.isoformat()
+            )
 
             return response_data
 
@@ -172,7 +177,7 @@ def log_llm_interaction(state):
             caller_info = {
                 "function": llm_func.__name__,
                 "file": caller_frame.f_code.co_filename,
-                "line": caller_frame.f_lineno
+                "line": caller_frame.f_lineno,
             }
 
             # Execute original function to get result
@@ -184,14 +189,17 @@ def log_llm_interaction(state):
 
             # Try to extract from state parameter
             if isinstance(state, dict):
-                agent_name = state.get("metadata", {}).get(
-                    "current_agent_name")
+                agent_name = state.get("metadata", {}).get("current_agent_name")
                 run_id = state.get("metadata", {}).get("run_id")
 
             # Try to get from context variables
             if not agent_name:
                 try:
-                    from src.utils.llm_interaction_logger import current_agent_name_context, current_run_id_context
+                    from src.utils.llm_interaction_logger import (
+                        current_agent_name_context,
+                        current_run_id_context,
+                    )
+
                     agent_name = current_agent_name_context.get()
                     run_id = current_run_id_context.get()
                 except (ImportError, AttributeError):
@@ -223,7 +231,7 @@ def log_llm_interaction(state):
                     "model": model,
                     "client_type": client_type,
                     "arguments": format_llm_request(args),
-                    "kwargs": format_llm_request(kwargs) if kwargs else {}
+                    "kwargs": format_llm_request(kwargs) if kwargs else {},
                 }
 
                 # Prepare formatted response data
@@ -231,15 +239,21 @@ def log_llm_interaction(state):
 
                 # Record to API state
                 api_state.update_agent_data(
-                    agent_name, "llm_request", formatted_request)
+                    agent_name, "llm_request", formatted_request
+                )
                 api_state.update_agent_data(
-                    agent_name, "llm_response", formatted_response)
+                    agent_name, "llm_response", formatted_response
+                )
                 api_state.update_agent_data(
-                    agent_name, "llm_timestamp", timestamp.isoformat())
+                    agent_name, "llm_timestamp", timestamp.isoformat()
+                )
 
             return result
+
         return wrapper
+
     return decorator
+
 
 def agent_endpoint(agent_name: str, description: str = ""):
     """
@@ -250,6 +264,7 @@ def agent_endpoint(agent_name: str, description: str = ""):
     def sentiment_agent(state: AgentState) -> AgentState:
         ...
     """
+
     def decorator(agent_func):
         # Register Agent
         api_state.register_agent(agent_name, description)
@@ -271,7 +286,7 @@ def agent_endpoint(agent_name: str, description: str = ""):
             run_id = state.get("metadata", {}).get("run_id")
             # Record input state
             timestamp_start = datetime.now(UTC)
-            
+
             # Serialize state function
             def serialize_agent_state(state):
                 """Serialize Agent state"""
@@ -282,10 +297,9 @@ def agent_endpoint(agent_name: str, description: str = ""):
                 except Exception as e:
                     logger.warning(f"Failed to serialize Agent state: {str(e)}")
                     return {"error": "Unable to serialize state"}
-                
+
             serialized_input = serialize_agent_state(state)
-            api_state.update_agent_data(
-                agent_name, "input_state", serialized_input)
+            api_state.update_agent_data(agent_name, "input_state", serialized_input)
 
             result = None
             error = None
@@ -332,7 +346,8 @@ def agent_endpoint(agent_name: str, description: str = ""):
                 # Serialize output state
                 serialized_output = serialize_agent_state(result)
                 api_state.update_agent_data(
-                    agent_name, "output_state", serialized_output)
+                    agent_name, "output_state", serialized_output
+                )
 
                 # Extract reasoning details from state (if any)
                 reasoning_details = None
@@ -340,9 +355,7 @@ def agent_endpoint(agent_name: str, description: str = ""):
                     if "agent_reasoning" in result.get("metadata", {}):
                         reasoning_details = result["metadata"]["agent_reasoning"]
                         api_state.update_agent_data(
-                            agent_name,
-                            "reasoning",
-                            reasoning_details
+                            agent_name, "reasoning", reasoning_details
                         )
 
                 # Update Agent state to completed
@@ -377,7 +390,9 @@ def agent_endpoint(agent_name: str, description: str = ""):
                 raise
 
         return wrapper
+
     return decorator
+
 
 # Function to start API server
 def start_api_server(host="0.0.0.0", port=8000, stop_event=None):
@@ -390,7 +405,7 @@ def start_api_server(host="0.0.0.0", port=8000, stop_event=None):
             port=port,
             log_config=None,
             # Enable ctrl+c handling
-            use_colors=True
+            use_colors=True,
         )
         server = uvicorn.Server(config)
 
@@ -404,10 +419,7 @@ def start_api_server(host="0.0.0.0", port=8000, stop_event=None):
             server.should_exit = True
 
         # Start stop_event monitoring thread
-        stop_monitor = threading.Thread(
-            target=check_stop_event,
-            daemon=True
-        )
+        stop_monitor = threading.Thread(target=check_stop_event, daemon=True)
         stop_monitor.start()
 
         # Run server (blocking call, but responds to should_exit flag)
@@ -421,19 +433,19 @@ def start_api_server(host="0.0.0.0", port=8000, stop_event=None):
         # Default startup method, no external stop control but still responds to Ctrl+C
         uvicorn.run(app, host=host, port=port, log_config=None)
 
+
 # Add basic API routes
 @app.get("/", tags=["Root"])
 def read_root():
     """API root path"""
-    return {
-        "message": "A_Share_Investment_Agent API",
-        "version": "0.1.0"
-    }
+    return {"message": "A_Share_Investment_Agent API", "version": "0.1.0"}
+
 
 @app.get("/agents/", tags=["Agents"])
 def list_agents():
     """List all registered Agents"""
     return {"agents": list(api_state.agents.values())}
+
 
 @app.get("/status/", tags=["Status"])
 def get_status():
@@ -442,5 +454,5 @@ def get_status():
         "current_run_id": api_state.current_run_id,
         "current_agent": api_state.current_agent_name,
         "agents_count": len(api_state.agents),
-        "runs_count": len(api_state.runs)
+        "runs_count": len(api_state.runs),
     }

@@ -2,13 +2,21 @@ import logging
 from typing import Optional
 
 from mcp.server.fastmcp import FastMCP
-from src.mcp_api.data_source_interface import FinancialDataSource, NoDataFoundError, LoginError, DataSourceError
+
+from src.mcp_api.data_source_interface import (
+    DataSourceError,
+    FinancialDataSource,
+    LoginError,
+    NoDataFoundError,
+)
 from src.mcp_api.formatting.markdown_formatter import format_df_to_markdown
 
 logger = logging.getLogger(__name__)
 
 
-def register_market_overview_tools(app: FastMCP, active_data_source: FinancialDataSource):
+def register_market_overview_tools(
+    app: FastMCP, active_data_source: FinancialDataSource
+):
     """
     Register market overview tools with MCP application
 
@@ -18,7 +26,9 @@ def register_market_overview_tools(app: FastMCP, active_data_source: FinancialDa
     """
 
     @app.tool()
-    def get_trade_dates(start_date: Optional[str] = None, end_date: Optional[str] = None) -> str:
+    def get_trade_dates(
+        start_date: Optional[str] = None, end_date: Optional[str] = None
+    ) -> str:
         """
         Get trading day information for specified date range
 
@@ -30,11 +40,13 @@ def register_market_overview_tools(app: FastMCP, active_data_source: FinancialDa
             Markdown table showing whether each day in the date range is a trading day (1) or non-trading day (0).
         """
         logger.info(
-            f"Tool 'get_trade_dates' called for range {start_date or 'default'} to {end_date or 'default'}")
+            f"Tool 'get_trade_dates' called for range {start_date or 'default'} to {end_date or 'default'}"
+        )
         try:
             # Date validation can be added here if needed
             df = active_data_source.get_trade_dates(
-                start_date=start_date, end_date=end_date)
+                start_date=start_date, end_date=end_date
+            )
             logger.info("Successfully retrieved trade dates.")
             # Trading dates table may be long, apply standard truncation
             return format_df_to_markdown(df)
@@ -57,8 +69,7 @@ def register_market_overview_tools(app: FastMCP, active_data_source: FinancialDa
             return f"Error: Invalid input parameter. {e}"
         except Exception as e:
             # Unexpected exception
-            logger.exception(
-                f"Unexpected Exception processing get_trade_dates: {e}")
+            logger.exception(f"Unexpected Exception processing get_trade_dates: {e}")
             return f"Error: An unexpected error occurred: {e}"
 
     @app.tool()
@@ -72,13 +83,11 @@ def register_market_overview_tools(app: FastMCP, active_data_source: FinancialDa
         Returns:
             Markdown table listing stock codes, names and their trading status (1=trading, 0=suspended).
         """
-        logger.info(
-            f"Tool 'get_all_stock' called for date={date or 'default'}")
+        logger.info(f"Tool 'get_all_stock' called for date={date or 'default'}")
         try:
             # Add date validation if needed
             df = active_data_source.get_all_stock(date=date)
-            logger.info(
-                f"Successfully retrieved stock list for {date or 'default'}.")
+            logger.info(f"Successfully retrieved stock list for {date or 'default'}.")
             # This list may be very long, apply standard truncation
             return format_df_to_markdown(df)
 
@@ -100,6 +109,5 @@ def register_market_overview_tools(app: FastMCP, active_data_source: FinancialDa
             return f"Error: Invalid input parameter. {e}"
         except Exception as e:
             # Unexpected exception
-            logger.exception(
-                f"Unexpected Exception processing get_all_stock: {e}")
+            logger.exception(f"Unexpected Exception processing get_all_stock: {e}")
             return f"Error: An unexpected error occurred: {e}"

@@ -1,21 +1,22 @@
 import logging
+import os
+import sys
 from datetime import datetime
+
 from mcp.server.fastmcp import FastMCP
 
-import sys
-import os
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../..')))
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../..")))
 
-from src.mcp_api.data_source_interface import FinancialDataSource
 from src.mcp_api.baostock_data_source import BaostockDataSource
-from src.mcp_api.mcp_utils import setup_logging
-from src.mcp_api.mcp_tools.stock_market import register_stock_market_tools
+from src.mcp_api.data_source_interface import FinancialDataSource
+from src.mcp_api.mcp_tools.analysis import register_analysis_tools
+from src.mcp_api.mcp_tools.date_utils import register_date_utils_tools
 from src.mcp_api.mcp_tools.financial_reports import register_financial_report_tools
 from src.mcp_api.mcp_tools.indices import register_index_tools
-from src.mcp_api.mcp_tools.market_overview import register_market_overview_tools
 from src.mcp_api.mcp_tools.macroeconomic import register_macroeconomic_tools
-from src.mcp_api.mcp_tools.date_utils import register_date_utils_tools
-from src.mcp_api.mcp_tools.analysis import register_analysis_tools
+from src.mcp_api.mcp_tools.market_overview import register_market_overview_tools
+from src.mcp_api.mcp_tools.stock_market import register_stock_market_tools
+from src.mcp_api.mcp_utils import setup_logging
 
 # --- Logging Setup ---
 # Call setup function from utils
@@ -55,7 +56,6 @@ register_analysis_tools(app, active_data_source)
 
 # --- Main execution block ---
 if __name__ == "__main__":
-    logger.info(
-        f"Starting A-share MCP server via stdio... Today is {current_date}")
+    logger.info(f"Starting A-share MCP server via stdio... Today is {current_date}")
     # Run server using stdio transport, suitable for MCP hosts like Claude Desktop
-    app.run(transport='stdio')
+    app.run(transport="stdio")

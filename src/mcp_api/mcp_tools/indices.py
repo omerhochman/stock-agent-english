@@ -2,6 +2,7 @@ import logging
 from typing import Optional
 
 from mcp.server.fastmcp import FastMCP
+
 from src.mcp_api.data_source_interface import FinancialDataSource
 from src.mcp_api.mcp_tools.base import call_index_constituent_tool
 
@@ -18,7 +19,9 @@ def register_index_tools(app: FastMCP, active_data_source: FinancialDataSource):
     """
 
     @app.tool()
-    def get_stock_industry(code: Optional[str] = None, date: Optional[str] = None) -> str:
+    def get_stock_industry(
+        code: Optional[str] = None, date: Optional[str] = None
+    ) -> str:
         """
         Get industry classification data for specific stock or all stocks on specified date
 
@@ -35,13 +38,14 @@ def register_index_tools(app: FastMCP, active_data_source: FinancialDataSource):
             # Date validation can be added here if needed
             df = active_data_source.get_stock_industry(code=code, date=date)
             logger.info(
-                f"Successfully retrieved industry data for {code or 'all'}, {date or 'latest'}.")
+                f"Successfully retrieved industry data for {code or 'all'}, {date or 'latest'}."
+            )
             from src.mcp_api.formatting.markdown_formatter import format_df_to_markdown
+
             return format_df_to_markdown(df)
 
         except Exception as e:
-            logger.exception(
-                f"Exception processing get_stock_industry: {e}")
+            logger.exception(f"Exception processing get_stock_industry: {e}")
             return f"Error: An unexpected error occurred: {e}"
 
     @app.tool()
@@ -56,10 +60,7 @@ def register_index_tools(app: FastMCP, active_data_source: FinancialDataSource):
             Markdown table containing SZSE 50 index constituent stocks or error message
         """
         return call_index_constituent_tool(
-            "get_sz50_stocks",
-            active_data_source.get_sz50_stocks,
-            "SZSE 50",
-            date
+            "get_sz50_stocks", active_data_source.get_sz50_stocks, "SZSE 50", date
         )
 
     @app.tool()
@@ -74,10 +75,7 @@ def register_index_tools(app: FastMCP, active_data_source: FinancialDataSource):
             Markdown table containing CSI 300 index constituent stocks or error message
         """
         return call_index_constituent_tool(
-            "get_hs300_stocks",
-            active_data_source.get_hs300_stocks,
-            "CSI 300",
-            date
+            "get_hs300_stocks", active_data_source.get_hs300_stocks, "CSI 300", date
         )
 
     @app.tool()
@@ -92,8 +90,5 @@ def register_index_tools(app: FastMCP, active_data_source: FinancialDataSource):
             Markdown table containing CSI 500 index constituent stocks or error message
         """
         return call_index_constituent_tool(
-            "get_zz500_stocks",
-            active_data_source.get_zz500_stocks,
-            "CSI 500",
-            date
+            "get_zz500_stocks", active_data_source.get_zz500_stocks, "CSI 500", date
         )

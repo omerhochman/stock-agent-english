@@ -1,8 +1,9 @@
+import calendar
 import logging
 from datetime import datetime
-import calendar
 
 from mcp.server.fastmcp import FastMCP
+
 from src.mcp_api.data_source_interface import FinancialDataSource
 
 logger = logging.getLogger(__name__)
@@ -47,25 +48,29 @@ def register_date_utils_tools(app: FastMCP, active_data_source: FinancialDataSou
 
             # Get trading date data from data source
             df = active_data_source.get_trade_dates(
-                start_date=start_date, end_date=end_date)
+                start_date=start_date, end_date=end_date
+            )
 
             # Filter out valid trading days
-            valid_trading_days = df[df['is_trading_day']
-                                    == '1']['calendar_date'].tolist()
+            valid_trading_days = df[df["is_trading_day"] == "1"][
+                "calendar_date"
+            ].tolist()
 
             # Find the maximum date less than or equal to today (i.e., the most recent trading day)
             latest_trading_date = None
             for date in valid_trading_days:
-                if date <= today and (latest_trading_date is None or date > latest_trading_date):
+                if date <= today and (
+                    latest_trading_date is None or date > latest_trading_date
+                ):
                     latest_trading_date = date
 
             if latest_trading_date:
-                logger.info(
-                    f"Latest trading date found: {latest_trading_date}")
+                logger.info(f"Latest trading date found: {latest_trading_date}")
                 return latest_trading_date
             else:
                 logger.warning(
-                    "No trading dates found before today, returning today's date")
+                    "No trading dates found before today, returning today's date"
+                )
                 return today
 
         except Exception as e:
@@ -89,8 +94,7 @@ def register_date_utils_tools(app: FastMCP, active_data_source: FinancialDataSou
         Returns:
             Detailed description string containing analysis time range, format "YYYY年M月-YYYY年M月" (Year-Month to Year-Month).
         """
-        logger.info(
-            f"Tool 'get_market_analysis_timeframe' called with period={period}")
+        logger.info(f"Tool 'get_market_analysis_timeframe' called with period={period}")
 
         now = datetime.now()
         end_date = now
@@ -101,8 +105,12 @@ def register_date_utils_tools(app: FastMCP, active_data_source: FinancialDataSou
             if now.day < 15:
                 # If currently at beginning of month, look at previous two months
                 if now.month == 1:
-                    start_date = datetime(now.year - 1, 11, 1)  # November of previous year
-                    middle_date = datetime(now.year - 1, 12, 1)  # December of previous year
+                    start_date = datetime(
+                        now.year - 1, 11, 1
+                    )  # November of previous year
+                    middle_date = datetime(
+                        now.year - 1, 12, 1
+                    )  # December of previous year
                 elif now.month == 2:
                     start_date = datetime(now.year, 1, 1)  # January of this year
                     middle_date = start_date
@@ -112,7 +120,9 @@ def register_date_utils_tools(app: FastMCP, active_data_source: FinancialDataSou
             else:
                 # If currently mid-month or end of month, look from last month to now
                 if now.month == 1:
-                    start_date = datetime(now.year - 1, 12, 1)  # December of previous year
+                    start_date = datetime(
+                        now.year - 1, 12, 1
+                    )  # December of previous year
                     middle_date = start_date
                 else:
                     start_date = datetime(now.year, now.month - 1, 1)  # Last month
@@ -133,15 +143,21 @@ def register_date_utils_tools(app: FastMCP, active_data_source: FinancialDataSou
             else:
                 start_date = datetime(now.year, now.month - 6, 1)
             # Calculate middle month (half-year midpoint)
-            middle_date = datetime(start_date.year, start_date.month + 3, 1) if start_date.month <= 9 else \
-                datetime(start_date.year + 1, start_date.month - 9, 1)
+            middle_date = (
+                datetime(start_date.year, start_date.month + 3, 1)
+                if start_date.month <= 9
+                else datetime(start_date.year + 1, start_date.month - 9, 1)
+            )
 
         elif period == "year":
             # Recent year
             start_date = datetime(now.year - 1, now.month, 1)
             # Calculate middle month (year midpoint)
-            middle_date = datetime(start_date.year, start_date.month + 6, 1) if start_date.month <= 6 else \
-                datetime(start_date.year + 1, start_date.month - 6, 1)
+            middle_date = (
+                datetime(start_date.year, start_date.month + 6, 1)
+                if start_date.month <= 6
+                else datetime(start_date.year + 1, start_date.month - 6, 1)
+            )
         else:
             # Default to recent 1 month
             if now.month == 1:
@@ -156,9 +172,10 @@ def register_date_utils_tools(app: FastMCP, active_data_source: FinancialDataSou
             return calendar.monthrange(year, month)[1]
 
         # Ensure end date does not exceed current date
-        end_day = min(get_month_end_day(
-            end_date.year, end_date.month), end_date.day)
-        end_display_date = f"{end_date.year}年{end_date.month}月"  # Year and month (年=year, 月=month)
+        end_day = min(get_month_end_day(end_date.year, end_date.month), end_date.day)
+        end_display_date = (
+            f"{end_date.year}年{end_date.month}月"  # Year and month (年=year, 月=month)
+        )
         end_iso_date = f"{end_date.year}-{end_date.month:02d}-{end_day:02d}"
 
         # Start date display
@@ -169,7 +186,10 @@ def register_date_utils_tools(app: FastMCP, active_data_source: FinancialDataSou
         if start_date.year != end_date.year:
             # If spanning years, show years
             date_range = f"{start_date.year}年{start_date.month}月-{end_date.year}年{end_date.month}月"  # Year-month to year-month (年=year, 月=month)
-        elif middle_date.month != start_date.month and middle_date.month != end_date.month:
+        elif (
+            middle_date.month != start_date.month
+            and middle_date.month != end_date.month
+        ):
             # If quarter or half year, show middle month
             date_range = f"{start_date.year}年{start_date.month}月-{middle_date.month}月-{end_date.month}月"  # Year-month to month to month (年=year, 月=month)
         elif start_date.month != end_date.month:

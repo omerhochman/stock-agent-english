@@ -1,16 +1,18 @@
+import json
+import operator
 from typing import Annotated, Any, Dict, Sequence, TypedDict
 
-import operator
 from langchain_core.messages import BaseMessage
-import json
+
 from src.utils.logging_config import setup_logger
 
 # Setup logging
-logger = setup_logger('agent_state')
+logger = setup_logger("agent_state")
 
 
 def merge_dicts(a: Dict[str, Any], b: Dict[str, Any]) -> Dict[str, Any]:
     return {**a, **b}
+
 
 # Define agent state
 
@@ -36,10 +38,11 @@ def show_workflow_status(agent_name: str, status: str = "processing"):
 
 def show_agent_reasoning(output, agent_name):
     """Display agent's analysis results."""
+
     def convert_to_serializable(obj):
-        if hasattr(obj, 'to_dict'):  # Handle Pandas Series/DataFrame
+        if hasattr(obj, "to_dict"):  # Handle Pandas Series/DataFrame
             return obj.to_dict()
-        elif hasattr(obj, '__dict__'):  # Handle custom objects
+        elif hasattr(obj, "__dict__"):  # Handle custom objects
             return obj.__dict__
         elif isinstance(obj, (int, float, bool, str)):
             return obj

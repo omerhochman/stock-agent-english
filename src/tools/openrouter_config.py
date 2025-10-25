@@ -1,14 +1,16 @@
 import os
 import time
-from dotenv import load_dotenv
 from dataclasses import dataclass
+
 import backoff
+from dotenv import load_dotenv
 from openai import OpenAI
-from src.utils.logging_config import setup_logger, SUCCESS_ICON, ERROR_ICON, WAIT_ICON
+
 from src.utils.llm_clients import LLMClientFactory
+from src.utils.logging_config import ERROR_ICON, SUCCESS_ICON, WAIT_ICON, setup_logger
 
 # Setup logging
-logger = setup_logger('api_calls')
+logger = setup_logger("api_calls")
 
 
 @dataclass
@@ -27,9 +29,10 @@ class ChatCompletion:
 
 
 # Get project root directory
-project_root = os.path.dirname(os.path.dirname(
-    os.path.dirname(os.path.abspath(__file__))))
-env_path = os.path.join(project_root, '.env')
+project_root = os.path.dirname(
+    os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+)
+env_path = os.path.join(project_root, ".env")
 
 # Load environment variables
 if os.path.exists(env_path):
@@ -44,29 +47,25 @@ base_url = os.getenv("OPENAI_COMPATIBLE_BASE_URL")
 model = os.getenv("OPENAI_COMPATIBLE_MODEL")
 
 if not api_key:
-    logger.error(f"{ERROR_ICON} OPENAI_COMPATIBLE_API_KEY environment variable not found")
+    logger.error(
+        f"{ERROR_ICON} OPENAI_COMPATIBLE_API_KEY environment variable not found"
+    )
     raise ValueError("OPENAI_COMPATIBLE_API_KEY not found in environment variables")
 if not base_url:
-    logger.error(f"{ERROR_ICON} OPENAI_COMPATIBLE_BASE_URL environment variable not found")
+    logger.error(
+        f"{ERROR_ICON} OPENAI_COMPATIBLE_BASE_URL environment variable not found"
+    )
     raise ValueError("OPENAI_COMPATIBLE_BASE_URL not found in environment variables")
 if not model:
     logger.error(f"{ERROR_ICON} OPENAI_COMPATIBLE_MODEL environment variable not found")
     raise ValueError("OPENAI_COMPATIBLE_MODEL not found in environment variables")
 
 # Initialize OpenAI client
-client = OpenAI(
-    base_url=base_url,
-    api_key=api_key
-)
+client = OpenAI(base_url=base_url, api_key=api_key)
 logger.info(f"{SUCCESS_ICON} OpenAI Compatible client initialized successfully")
 
 
-@backoff.on_exception(
-    backoff.expo,
-    (Exception),
-    max_tries=5,
-    max_time=300
-)
+@backoff.on_exception(backoff.expo, (Exception), max_tries=5, max_time=300)
 def call_api_with_retry(model, messages):
     """API call function with retry mechanism"""
     try:
@@ -74,10 +73,7 @@ def call_api_with_retry(model, messages):
         logger.debug(f"Request content: {messages}")
         logger.debug(f"Model: {model}")
 
-        response = client.chat.completions.create(
-            model=model,
-            messages=messages
-        )
+        response = client.chat.completions.create(model=model, messages=messages)
 
         logger.info(f"{SUCCESS_ICON} API call successful")
         content = response.choices[0].message.content
@@ -89,8 +85,14 @@ def call_api_with_retry(model, messages):
         raise e
 
 
-def get_chat_completion(messages, model=None, max_retries=3, initial_retry_delay=1,
-                        api_key=None, base_url=None):
+def get_chat_completion(
+    messages,
+    model=None,
+    max_retries=3,
+    initial_retry_delay=1,
+    api_key=None,
+    base_url=None,
+):
     """
     Get chat completion result with retry logic
 
@@ -113,16 +115,14 @@ def get_chat_completion(messages, model=None, max_retries=3, initial_retry_delay
 
         # Create client
         client = LLMClientFactory.create_client(
-            api_key=use_api_key,
-            base_url=use_base_url,
-            model=use_model
+            api_key=use_api_key, base_url=use_base_url, model=use_model
         )
 
         # Get response
         return client.get_completion(
             messages=messages,
             max_retries=max_retries,
-            initial_retry_delay=initial_retry_delay
+            initial_retry_delay=initial_retry_delay,
         )
     except Exception as e:
         logger.error(f"{ERROR_ICON} Error in get_chat_completion: {str(e)}")

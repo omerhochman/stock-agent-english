@@ -1,13 +1,16 @@
+import json
 import os
 import sys
-import json
+import time
 from datetime import datetime
+
 import akshare as ak
+import pandas as pd
 import requests
 from bs4 import BeautifulSoup
-from src.tools.openrouter_config import get_chat_completion, logger as api_logger
-import time
-import pandas as pd
+
+from src.tools.openrouter_config import get_chat_completion
+from src.tools.openrouter_config import logger as api_logger
 
 
 def get_stock_news(symbol: str, max_news: int = 10) -> list:
@@ -22,10 +25,10 @@ def get_stock_news(symbol: str, max_news: int = 10) -> list:
     """
 
     # Set pandas display options to ensure complete content display
-    pd.set_option('display.max_columns', None)
-    pd.set_option('display.max_rows', None)
-    pd.set_option('display.max_colwidth', None)
-    pd.set_option('display.width', None)
+    pd.set_option("display.max_columns", None)
+    pd.set_option("display.max_rows", None)
+    pd.set_option("display.max_colwidth", None)
+    pd.set_option("display.width", None)
 
     # Limit maximum number of news items
     max_news = min(max_news, 100)
@@ -54,7 +57,7 @@ def get_stock_news(symbol: str, max_news: int = 10) -> list:
     need_update = True
     if os.path.exists(news_file):
         try:
-            with open(news_file, 'r', encoding='utf-8') as f:
+            with open(news_file, "r", encoding="utf-8") as f:
                 data = json.load(f)
                 if data.get("date") == today:
                     cached_news = data.get("news", [])
@@ -63,11 +66,12 @@ def get_stock_news(symbol: str, max_news: int = 10) -> list:
                         return cached_news[:max_news]
                     else:
                         print(
-                            f"Cached news count ({len(cached_news)}) insufficient, need to fetch more news ({max_news} items)")
+                            f"Cached news count ({len(cached_news)}) insufficient, need to fetch more news ({max_news} items)"
+                        )
         except Exception as e:
             print(f"Failed to read cache file: {e}")
 
-    print(f'Starting to fetch news data for {symbol}...')
+    print(f"Starting to fetch news data for {symbol}...")
 
     try:
         # Get news list
@@ -81,7 +85,9 @@ def get_stock_news(symbol: str, max_news: int = 10) -> list:
         # Actual available news count
         available_news_count = len(news_df)
         if available_news_count < max_news:
-            print(f"Warning: Actual available news count ({available_news_count}) is less than requested ({max_news})")
+            print(
+                f"Warning: Actual available news count ({available_news_count}) is less than requested ({max_news})"
+            )
             max_news = available_news_count
 
         # Get specified number of news items (considering some news content might be empty, fetch 50% more)
@@ -89,8 +95,11 @@ def get_stock_news(symbol: str, max_news: int = 10) -> list:
         for _, row in news_df.head(int(max_news * 1.5)).iterrows():
             try:
                 # Get news content
-                content = row["news_content"] if "news_content" in row and not pd.isna(
-                    row["news_content"]) else ""
+                content = (
+                    row["news_content"]
+                    if "news_content" in row and not pd.isna(row["news_content"])
+                    else ""
+                )
                 if not content:
                     content = row["news_title"]
 
@@ -100,8 +109,11 @@ def get_stock_news(symbol: str, max_news: int = 10) -> list:
                     continue
 
                 # Get keywords
-                keyword = row["keywords"] if "keywords" in row and not pd.isna(
-                    row["keywords"]) else ""
+                keyword = (
+                    row["keywords"]
+                    if "keywords" in row and not pd.isna(row["keywords"])
+                    else ""
+                )
 
                 # Add news
                 news_item = {
@@ -110,7 +122,7 @@ def get_stock_news(symbol: str, max_news: int = 10) -> list:
                     "publish_time": row["publish_time"],
                     "source": row["news_source"].strip(),
                     "url": row["news_url"].strip(),
-                    "keyword": keyword.strip()
+                    "keyword": keyword.strip(),
                 }
                 news_list.append(news_item)
                 print(f"Successfully added news: {news_item['title']}")
@@ -127,13 +139,12 @@ def get_stock_news(symbol: str, max_news: int = 10) -> list:
 
         # Save to file
         try:
-            save_data = {
-                "date": today,
-                "news": news_list
-            }
-            with open(news_file, 'w', encoding='utf-8') as f:
+            save_data = {"date": today, "news": news_list}
+            with open(news_file, "w", encoding="utf-8") as f:
                 json.dump(save_data, f, ensure_ascii=False, indent=2)
-            print(f"Successfully saved {len(news_list)} news items to file: {news_file}")
+            print(
+                f"Successfully saved {len(news_list)} news items to file: {news_file}"
+            )
         except Exception as e:
             print(f"Error saving news data to file: {e}")
 
@@ -167,16 +178,18 @@ def get_news_sentiment(news_list: list, num_of_news: int = 5) -> float:
     os.makedirs(os.path.dirname(cache_file), exist_ok=True)
 
     # Generate unique identifier for news content
-    news_key = "|".join([
-        f"{news['title']}|{news['content'][:100]}|{news['publish_time']}"
-        for news in news_list[:num_of_news]
-    ])
+    news_key = "|".join(
+        [
+            f"{news['title']}|{news['content'][:100]}|{news['publish_time']}"
+            for news in news_list[:num_of_news]
+        ]
+    )
 
     # Check cache
     if os.path.exists(cache_file):
         print("Found sentiment analysis cache file")
         try:
-            with open(cache_file, 'r', encoding='utf-8') as f:
+            with open(cache_file, "r", encoding="utf-8") as f:
                 cache = json.load(f)
                 if news_key in cache:
                     print("Using cached sentiment analysis results")
@@ -214,21 +227,23 @@ def get_news_sentiment(news_list: list, num_of_news: int = 5) -> float:
         1. Authenticity and reliability of news
         2. Timeliness and scope of impact of news
         3. Actual impact on company fundamentals
-        4. Special reaction patterns of A-share market"""
+        4. Special reaction patterns of A-share market""",
     }
 
     # Prepare news content
-    news_content = "\n\n".join([
-        f"Title: {news['title']}\n"
-        f"Source: {news['source']}\n"
-        f"Time: {news['publish_time']}\n"
-        f"Content: {news['content']}"
-        for news in news_list[:num_of_news]  # Use specified number of news items
-    ])
+    news_content = "\n\n".join(
+        [
+            f"Title: {news['title']}\n"
+            f"Source: {news['source']}\n"
+            f"Time: {news['publish_time']}\n"
+            f"Content: {news['content']}"
+            for news in news_list[:num_of_news]  # Use specified number of news items
+        ]
+    )
 
     user_message = {
         "role": "user",
-        "content": f"Please analyze the sentiment tendency of the following A-share listed company related news:\n\n{news_content}\n\nPlease directly return a number, range -1 to 1, no explanation needed."
+        "content": f"Please analyze the sentiment tendency of the following A-share listed company related news:\n\n{news_content}\n\nPlease directly return a number, range -1 to 1, no explanation needed.",
     }
 
     try:
@@ -252,7 +267,7 @@ def get_news_sentiment(news_list: list, num_of_news: int = 5) -> float:
         # Cache result
         cache[news_key] = sentiment_score
         try:
-            with open(cache_file, 'w', encoding='utf-8') as f:
+            with open(cache_file, "w", encoding="utf-8") as f:
                 json.dump(cache, f, ensure_ascii=False, indent=2)
         except Exception as e:
             print(f"Error writing cache: {e}")

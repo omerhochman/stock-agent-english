@@ -11,16 +11,16 @@ Main Components:
 - BacktestTableGenerator: Table generator
 """
 
+from .comparison import StrategyComparator
 from .metrics import PerformanceMetrics
 from .significance import SignificanceTester
-from .comparison import StrategyComparator
-from .visualization import BacktestVisualizer
 from .table_generator import BacktestTableGenerator
+from .visualization import BacktestVisualizer
 
 __all__ = [
     "PerformanceMetrics",
-    "SignificanceTester", 
+    "SignificanceTester",
     "StrategyComparator",
     "BacktestVisualizer",
-    "BacktestTableGenerator"
-] 
+    "BacktestTableGenerator",
+]

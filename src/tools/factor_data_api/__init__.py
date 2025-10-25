@@ -34,79 +34,73 @@ capm_results = estimate_capm_for_stock("000001", start_date="2022-01-01", end_da
 """
 
 from .base import setup_logger
-from .risk_free_api import (
-    get_risk_free_rate,
-    _generate_mock_risk_free_rate
-)
-from .market_data_api import (
-    get_market_returns,
-    _generate_mock_market_returns,
-    get_stock_returns,
-    get_multi_stock_returns,
-    get_stock_covariance_matrix,
-    get_index_data,
-    get_multiple_index_data
-)
 from .fama_french_api import (
+    _generate_mock_fama_french_factors,
     calculate_fama_french_factors_tushare,
     get_fama_french_factors,
-    _generate_mock_fama_french_factors
 )
 from .industry_api import (
     get_industry_index_returns,
     get_industry_rotation_factors,
     get_sector_index_returns,
-    get_style_index_returns
+    get_style_index_returns,
 )
-from .macro_api import (
-    get_macro_economic_data,
-    _generate_mock_macro_data
+from .macro_api import _generate_mock_macro_data, get_macro_economic_data
+from .market_data_api import (
+    _generate_mock_market_returns,
+    get_index_data,
+    get_market_returns,
+    get_multi_stock_returns,
+    get_multiple_index_data,
+    get_stock_covariance_matrix,
+    get_stock_returns,
 )
 from .model_estimator_api import (
+    calculate_rolling_beta,
+    estimate_beta_for_stocks,
     estimate_capm_for_stock,
     estimate_fama_french_for_stock,
-    estimate_beta_for_stocks,
-    calculate_rolling_beta
 )
+from .risk_free_api import _generate_mock_risk_free_rate, get_risk_free_rate
 
 __all__ = [
-    'get_risk_free_rate',
-    'get_market_returns',
-    'get_stock_returns',
-    'get_multi_stock_returns',
-    'get_stock_covariance_matrix',
-    'get_index_data',
-    'get_multiple_index_data',
-    'calculate_fama_french_factors_tushare',
-    'get_fama_french_factors',
-    'get_industry_index_returns',
-    'get_industry_rotation_factors',
-    'get_sector_index_returns',
-    'get_style_index_returns',
-    'get_macro_economic_data',
-    'estimate_capm_for_stock',
-    'estimate_fama_french_for_stock',
-    'estimate_beta_for_stocks',
-    'calculate_rolling_beta'
+    "get_risk_free_rate",
+    "get_market_returns",
+    "get_stock_returns",
+    "get_multi_stock_returns",
+    "get_stock_covariance_matrix",
+    "get_index_data",
+    "get_multiple_index_data",
+    "calculate_fama_french_factors_tushare",
+    "get_fama_french_factors",
+    "get_industry_index_returns",
+    "get_industry_rotation_factors",
+    "get_sector_index_returns",
+    "get_style_index_returns",
+    "get_macro_economic_data",
+    "estimate_capm_for_stock",
+    "estimate_fama_french_for_stock",
+    "estimate_beta_for_stocks",
+    "calculate_rolling_beta",
 ]
 
-#----------------------------------------------------------------------------#
+# ----------------------------------------------------------------------------#
 # Risk-free Rate API Function Documentation
-#----------------------------------------------------------------------------#
+# ----------------------------------------------------------------------------#
 
 # def get_risk_free_rate(start_date=None, end_date=None, freq='D', use_cache=True):
 #     """
 #     Get risk-free rate data (interbank lending rate or treasury bond yield)
-    
+
 #     Parameters:
 #         start_date (str, optional): Start date, format: YYYY-MM-DD
 #         end_date (str, optional): End date, format: YYYY-MM-DD
 #         freq (str, optional): Data frequency, 'D' daily, 'W' weekly, 'M' monthly, default is 'D'
 #         use_cache (bool, optional): Whether to use cache, default is True
-        
+
 #     Returns:
 #         pd.Series: Series containing risk-free rates, indexed by date
-        
+
 #     Example:
 #         >>> rf = get_risk_free_rate(start_date="2022-01-01", end_date="2022-12-31", freq="D")
 #         >>> print(rf.head())
@@ -127,16 +121,16 @@ __all__ = [
 # def get_market_returns(index_code="000300", start_date=None, end_date=None, freq='D'):
 #     """
 #     Get market return data, using CSI 300 index by default
-    
+
 #     Parameters:
 #         index_code (str, optional): Index code, default is CSI 300("000300")
 #         start_date (str, optional): Start date, format: YYYY-MM-DD
 #         end_date (str, optional): End date, format: YYYY-MM-DD
 #         freq (str, optional): Data frequency, 'D' daily, 'W' weekly, 'M' monthly, default is 'D'
-        
+
 #     Returns:
 #         pd.Series: Series containing market returns, indexed by date
-        
+
 #     Example:
 #         >>> market_ret = get_market_returns(start_date="2022-01-01", end_date="2022-12-31", freq="D")
 #         >>> print(market_ret.head())
@@ -153,16 +147,16 @@ __all__ = [
 # def get_stock_returns(symbols, start_date=None, end_date=None, freq='D'):
 #     """
 #     Get return data for one or more stocks
-    
+
 #     Parameters:
 #         symbols (str or list): Single stock code or list of stock codes
 #         start_date (str, optional): Start date, format: YYYY-MM-DD
 #         end_date (str, optional): End date, format: YYYY-MM-DD
 #         freq (str, optional): Data frequency, 'D' daily, 'W' weekly, 'M' monthly, default is 'D'
-        
+
 #     Returns:
 #         dict: Dictionary containing stock returns, keys are stock codes, values are return Series
-        
+
 #     Example:
 #         >>> stock_ret = get_stock_returns(["000001", "600000"], start_date="2022-01-01", end_date="2022-01-10")
 #         >>> print(stock_ret["000001"].head())
@@ -179,18 +173,18 @@ __all__ = [
 # def get_multi_stock_returns(symbols, start_date=None, end_date=None, freq='D'):
 #     """
 #     Get return data for multiple stocks and return as DataFrame
-    
+
 #     Parameters:
 #         symbols (list): List of stock codes
 #         start_date (str, optional): Start date, format: YYYY-MM-DD
 #         end_date (str, optional): End date, format: YYYY-MM-DD
 #         freq (str, optional): Data frequency, 'D' daily, 'W' weekly, 'M' monthly, default is 'D'
-        
+
 #     Returns:
 #         pd.DataFrame: DataFrame containing multiple stock returns, columns are stock codes, indexed by date
-        
+
 #     Example:
-#         >>> returns_df = get_multi_stock_returns(["000001", "600000", "601398"], 
+#         >>> returns_df = get_multi_stock_returns(["000001", "600000", "601398"],
 #                                                start_date="2022-01-01", end_date="2022-01-10")
 #         >>> print(returns_df.head())
 #                      000001    600000    601398
@@ -206,21 +200,21 @@ __all__ = [
 # def get_stock_covariance_matrix(symbols, start_date=None, end_date=None, method="sample", freq='D'):
 #     """
 #     Calculate covariance matrix and average returns for multiple stock returns
-    
+
 #     Parameters:
 #         symbols (list): List of stock codes
 #         start_date (str, optional): Start date, format: YYYY-MM-DD
 #         end_date (str, optional): End date, format: YYYY-MM-DD
 #         method (str, optional): Covariance matrix estimation method, options "sample" or "ewma", default is "sample"
 #         freq (str, optional): Data frequency, 'D' daily, 'W' weekly, 'M' monthly, default is 'D'
-        
+
 #     Returns:
 #         tuple: (Covariance matrix DataFrame, Average returns Series)
-        
+
 #     Example:
 #         >>> cov_matrix, expected_returns = get_stock_covariance_matrix(
-#                 ["000001", "600000", "601398"], 
-#                 start_date="2022-01-01", 
+#                 ["000001", "600000", "601398"],
+#                 start_date="2022-01-01",
 #                 end_date="2022-12-31"
 #             )
 #         >>> print(cov_matrix)
@@ -240,19 +234,19 @@ __all__ = [
 # def get_index_data(index_symbol="000300", fields=None, start_date=None, end_date=None, freq='D'):
 #     """
 #     Get index data
-    
+
 #     Parameters:
 #         index_symbol (str, optional): Index code, default is CSI 300("000300")
 #         fields (list, optional): List of fields to retrieve, if None then get all available fields
 #         start_date (str, optional): Start date, format: YYYY-MM-DD
 #         end_date (str, optional): End date, format: YYYY-MM-DD
 #         freq (str, optional): Data frequency, 'D' daily, 'W' weekly, 'M' monthly, default is 'D'
-        
+
 #     Returns:
 #         pd.DataFrame: DataFrame containing index data
-        
+
 #     Example:
-#         >>> index_data = get_index_data("000300", fields=["date", "open", "close"], 
+#         >>> index_data = get_index_data("000300", fields=["date", "open", "close"],
 #                                        start_date="2022-01-01", end_date="2022-01-10")
 #         >>> print(index_data.head())
 #                 date      open     close
@@ -268,18 +262,18 @@ __all__ = [
 # def get_multiple_index_data(index_symbols, start_date=None, end_date=None, freq='D'):
 #     """
 #     Get data for multiple indices
-    
+
 #     Parameters:
 #         index_symbols (list): List of index codes
 #         start_date (str, optional): Start date, format: YYYY-MM-DD
 #         end_date (str, optional): End date, format: YYYY-MM-DD
 #         freq (str, optional): Data frequency, 'D' daily, 'W' weekly, 'M' monthly, default is 'D'
-        
+
 #     Returns:
 #         dict: Dictionary containing multiple index data, keys are index codes, values are index data DataFrames
-        
+
 #     Example:
-#         >>> index_dict = get_multiple_index_data(["000300", "000016", "000905"], 
+#         >>> index_dict = get_multiple_index_data(["000300", "000016", "000905"],
 #                                                start_date="2022-01-01", end_date="2022-01-10")
 #         >>> print(index_dict["000300"].head())
 #                 date      open     high      low     close      volume       amount
@@ -291,20 +285,20 @@ __all__ = [
 #     # Function implementation is in market_data_api.py
 #     pass
 
-#----------------------------------------------------------------------------#
+# ----------------------------------------------------------------------------#
 # Fama-French Three-Factor API Function Documentation
-#----------------------------------------------------------------------------#
+# ----------------------------------------------------------------------------#
 
 # def get_fama_french_factors(start_date=None, end_date=None, freq='D', use_cache=True):
 #     """
 #     Get Fama-French three-factor model factor data
-    
+
 #     Parameters:
 #         start_date (str, optional): Start date, format: YYYY-MM-DD
 #         end_date (str, optional): End date, format: YYYY-MM-DD
 #         freq (str, optional): Data frequency, 'D' daily, 'W' weekly, 'M' monthly, default is 'D'
 #         use_cache (bool, optional): Whether to use cache, default is True
-        
+
 #     Returns:
 #         dict: Dictionary containing the following factors:
 #             - 'market_returns': Market returns (pd.Series)
@@ -312,7 +306,7 @@ __all__ = [
 #             - 'smb': Size factor (pd.Series)
 #             - 'hml': Value factor (pd.Series)
 #             - 'risk_free_rate': Risk-free rate (pd.Series)
-        
+
 #     Example:
 #         >>> ff_factors = get_fama_french_factors(start_date="2022-01-01", end_date="2022-12-31", freq="D")
 #         >>> print(ff_factors["market_returns"].head())
@@ -336,12 +330,12 @@ __all__ = [
 # def calculate_fama_french_factors_tushare(start_date, end_date, freq='W'):
 #     """
 #     Calculate Fama-French three-factor data using TuShare
-    
+
 #     Parameters:
 #         start_date (str): Start date, format: YYYY-MM-DD or YYYYMMDD
 #         end_date (str): End date, format: YYYY-MM-DD or YYYYMMDD
 #         freq (str, optional): Data frequency, 'D' daily, 'W' weekly, 'M' monthly, default is 'W'
-        
+
 #     Returns:
 #         dict: Dictionary containing the following factors:
 #             - 'market_returns': Market returns (pd.Series)
@@ -349,32 +343,32 @@ __all__ = [
 #             - 'smb': Size factor (pd.Series)
 #             - 'hml': Value factor (pd.Series)
 #             - 'risk_free_rate': Risk-free rate (pd.Series)
-    
+
 #     Note:
 #         This function directly calls TuShare API to calculate factors, requires valid TuShare token and tushare library installation
 #     """
 #     # Function implementation is in fama_french_api.py
 #     pass
 
-#----------------------------------------------------------------------------#
+# ----------------------------------------------------------------------------#
 # Industry Data API Function Documentation
-#----------------------------------------------------------------------------#
+# ----------------------------------------------------------------------------#
 
 # def get_industry_index_returns(industry_codes, start_date=None, end_date=None, freq='D'):
 #     """
 #     Get industry index return data
-    
+
 #     Parameters:
 #         industry_codes (str or list): Industry index code or list of codes, e.g., "801780"(banking)
 #         start_date (str, optional): Start date, format: YYYY-MM-DD
 #         end_date (str, optional): End date, format: YYYY-MM-DD
 #         freq (str, optional): Data frequency, 'D' daily, 'W' weekly, 'M' monthly, default is 'D'
-        
+
 #     Returns:
 #         pd.DataFrame: DataFrame containing multiple industry index returns, columns are industry names, indexed by date
-        
+
 #     Example:
-#         >>> industry_returns = get_industry_index_returns(["801120", "801780"], 
+#         >>> industry_returns = get_industry_index_returns(["801120", "801780"],
 #                                                        start_date="2022-01-01", end_date="2022-01-10")
 #         >>> print(industry_returns.head())
 #                      Food & Beverage  Banking
@@ -390,15 +384,15 @@ __all__ = [
 # def get_industry_rotation_factors(start_date=None, end_date=None, freq='W'):
 #     """
 #     Get industry rotation factor data (including industry momentum, valuation, growth, etc.)
-    
+
 #     Parameters:
 #         start_date (str, optional): Start date, format: YYYY-MM-DD
 #         end_date (str, optional): End date, format: YYYY-MM-DD
 #         freq (str, optional): Data frequency, recommended 'W' for weekly or 'M' for monthly, default is 'W'
-        
+
 #     Returns:
 #         pd.DataFrame: DataFrame containing industry rotation factors
-        
+
 #     Example:
 #         >>> rotation_factors = get_industry_rotation_factors(start_date="2022-01-01", end_date="2022-12-31")
 #         >>> print(rotation_factors.columns)
@@ -414,15 +408,15 @@ __all__ = [
 # def get_sector_index_returns(start_date=None, end_date=None, freq='D'):
 #     """
 #     Get major sector index return data (Shanghai Composite, Shenzhen Component, ChiNext, SME Board, etc.)
-    
+
 #     Parameters:
 #         start_date (str, optional): Start date, format: YYYY-MM-DD
 #         end_date (str, optional): End date, format: YYYY-MM-DD
 #         freq (str, optional): Data frequency, 'D' daily, 'W' weekly, 'M' monthly, default is 'D'
-        
+
 #     Returns:
 #         pd.DataFrame: DataFrame containing major sector index returns, columns are sector names, indexed by date
-        
+
 #     Example:
 #         >>> sector_returns = get_sector_index_returns(start_date="2022-01-01", end_date="2022-01-10")
 #         >>> print(sector_returns.head())
@@ -437,15 +431,15 @@ __all__ = [
 # def get_style_index_returns(start_date=None, end_date=None, freq='D'):
 #     """
 #     Get style index return data (large-cap growth, small-cap value, etc.)
-    
+
 #     Parameters:
 #         start_date (str, optional): Start date, format: YYYY-MM-DD
 #         end_date (str, optional): End date, format: YYYY-MM-DD
 #         freq (str, optional): Data frequency, 'D' daily, 'W' weekly, 'M' monthly, default is 'D'
-        
+
 #     Returns:
 #         pd.DataFrame: DataFrame containing style index returns, columns are style index names, indexed by date
-        
+
 #     Example:
 #         >>> style_returns = get_style_index_returns(start_date="2022-01-01", end_date="2022-01-10")
 #         >>> print(style_returns.head())
@@ -457,14 +451,14 @@ __all__ = [
 #     # Function implementation is in industry_api.py
 #     pass
 
-#----------------------------------------------------------------------------#
+# ----------------------------------------------------------------------------#
 # Macroeconomic Data API Function Documentation
-#----------------------------------------------------------------------------#
+# ----------------------------------------------------------------------------#
 
 # def get_macro_economic_data(indicator_type="gdp", start_date=None, end_date=None):
 #     """
 #     Get macroeconomic indicator data
-    
+
 #     Parameters:
 #         indicator_type (str, optional): Indicator type, options:
 #                                   "gdp": Gross Domestic Product
@@ -473,10 +467,10 @@ __all__ = [
 #                                   "m2": Money Supply
 #         start_date (str, optional): Start date, format: YYYY-MM-DD
 #         end_date (str, optional): End date, format: YYYY-MM-DD
-        
+
 #     Returns:
 #         pd.DataFrame: DataFrame containing macroeconomic data
-        
+
 #     Example:
 #         >>> gdp_data = get_macro_economic_data("gdp", start_date="2018-01-01", end_date="2022-12-31")
 #         >>> print(gdp_data.head())
@@ -484,7 +478,7 @@ __all__ = [
 #         0  2018-03-31     213456.78     213456.78           6.8
 #         1  2018-06-30     225678.90     439135.68           6.7
 #         ...
-        
+
 #         >>> cpi_data = get_macro_economic_data("cpi", start_date="2022-01-01", end_date="2022-12-31")
 #         >>> print(cpi_data.head())
 #                 date  National_Year_Over_Year  National_Month_Over_Month  Urban_Year_Over_Year  Rural_Year_Over_Year
@@ -495,20 +489,20 @@ __all__ = [
 #     # Function implementation is in macro_api.py
 #     pass
 
-#----------------------------------------------------------------------------#
+# ----------------------------------------------------------------------------#
 # Model Estimation API Function Documentation
-#----------------------------------------------------------------------------#
+# ----------------------------------------------------------------------------#
 
 # def estimate_capm_for_stock(stock_symbol, start_date=None, end_date=None, freq='D'):
 #     """
 #     Estimate CAPM model parameters for a single stock
-    
+
 #     Parameters:
 #         stock_symbol (str): Stock code
 #         start_date (str, optional): Start date, format: YYYY-MM-DD
 #         end_date (str, optional): End date, format: YYYY-MM-DD
 #         freq (str, optional): Data frequency, 'D' daily, 'W' weekly, 'M' monthly, default is 'D'
-        
+
 #     Returns:
 #         dict: CAPM model parameter dictionary, including:
 #              - 'alpha': Alpha value, representing excess return
@@ -517,7 +511,7 @@ __all__ = [
 #              - 'p_value': Significance P-value
 #              - 't_stat': T-statistic
 #              - 'std_error': Standard error
-        
+
 #     Example:
 #         >>> capm_results = estimate_capm_for_stock("000001", start_date="2022-01-01", end_date="2022-12-31")
 #         >>> print(capm_results)
@@ -529,13 +523,13 @@ __all__ = [
 # def estimate_fama_french_for_stock(stock_symbol, start_date=None, end_date=None, freq='D'):
 #     """
 #     Estimate Fama-French three-factor model parameters for a single stock
-    
+
 #     Parameters:
 #         stock_symbol (str): Stock code
 #         start_date (str, optional): Start date, format: YYYY-MM-DD
 #         end_date (str, optional): End date, format: YYYY-MM-DD
 #         freq (str, optional): Data frequency, 'D' daily, 'W' weekly, 'M' monthly, default is 'D'
-        
+
 #     Returns:
 #         dict: Fama-French three-factor model parameter dictionary, including:
 #              - 'alpha': Alpha value, representing excess return
@@ -546,11 +540,11 @@ __all__ = [
 #              - 'p_value_beta': Market factor significance P-value
 #              - 'p_value_smb': Size factor significance P-value
 #              - 'p_value_hml': Value factor significance P-value
-        
+
 #     Example:
 #         >>> ff_results = estimate_fama_french_for_stock("000001", start_date="2022-01-01", end_date="2022-12-31")
 #         >>> print(ff_results)
-#         {'alpha': 0.000087, 'beta': 1.156, 'smb': 0.435, 'hml': -0.267, 'r_squared': 0.812, 
+#         {'alpha': 0.000087, 'beta': 1.156, 'smb': 0.435, 'hml': -0.267, 'r_squared': 0.812,
 #          'p_value_beta': 0.0001, 'p_value_smb': 0.0024, 'p_value_hml': 0.0375}
 #     """
 #     # Function implementation is in model_estimator_api.py
@@ -559,21 +553,21 @@ __all__ = [
 # def estimate_beta_for_stocks(symbols, start_date=None, end_date=None, freq='D'):
 #     """
 #     Estimate beta coefficients for multiple stocks
-    
+
 #     Parameters:
 #         symbols (list): List of stock codes
 #         start_date (str, optional): Start date, format: YYYY-MM-DD
 #         end_date (str, optional): End date, format: YYYY-MM-DD
 #         freq (str, optional): Data frequency, 'D' daily, 'W' weekly, 'M' monthly, default is 'D'
-        
+
 #     Returns:
 #         pd.DataFrame: DataFrame containing beta coefficients, columns include:
 #                      - 'symbol': Stock code
 #                      - 'beta': Beta coefficient
 #                      - 'r_squared': R-squared goodness of fit
-        
+
 #     Example:
-#         >>> beta_df = estimate_beta_for_stocks(["000001", "600000", "601398"], 
+#         >>> beta_df = estimate_beta_for_stocks(["000001", "600000", "601398"],
 #                                              start_date="2022-01-01", end_date="2022-12-31")
 #         >>> print(beta_df)
 #             symbol     beta  r_squared
@@ -587,19 +581,19 @@ __all__ = [
 # def calculate_rolling_beta(stock_symbol, window=60, start_date=None, end_date=None, freq='D'):
 #     """
 #     Calculate rolling beta coefficient for a stock
-    
+
 #     Parameters:
 #         stock_symbol (str): Stock code
 #         window (int, optional): Rolling window size (number of trading days), default is 60
 #         start_date (str, optional): Start date, format: YYYY-MM-DD
 #         end_date (str, optional): End date, format: YYYY-MM-DD
 #         freq (str, optional): Data frequency, 'D' daily, 'W' weekly, 'M' monthly, default is 'D'
-        
+
 #     Returns:
 #         pd.Series: Rolling beta coefficient Series, indexed by date
-        
+
 #     Example:
-#         >>> rolling_beta = calculate_rolling_beta("000001", window=60, 
+#         >>> rolling_beta = calculate_rolling_beta("000001", window=60,
 #                                                start_date="2022-01-01", end_date="2022-12-31")
 #         >>> print(rolling_beta.head())
 #         2022-04-01    1.125
@@ -613,9 +607,9 @@ __all__ = [
 #     pass
 
 
-#----------------------------------------------------------------------------#
+# ----------------------------------------------------------------------------#
 # Complete Usage Examples
-#----------------------------------------------------------------------------#
+# ----------------------------------------------------------------------------#
 
 """
 The following are complete usage examples showing how to combine various functions from factor_data_api:

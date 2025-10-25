@@ -30,81 +30,70 @@ Main Features
    - EWMA method for covariance matrix estimation
 """
 
-# Import main functions from submodules
-from src.calc.factor_models import (
-    estimate_capm,
-    estimate_fama_french,
-    time_series_test,
-    cross_sectional_test
-)
-
 from src.calc.calculate_beta import calculate_beta
-
-from src.calc.tail_risk_measures import (
-    calculate_historical_var,
-    calculate_conditional_var,
-    calculate_parametric_var,
-    backtesting_var
-)
-
-from src.calc.portfolio_optimization import (
-    optimize_portfolio,
-    efficient_frontier,
-    portfolio_return,
-    portfolio_volatility,
-    portfolio_sharpe_ratio
-)
-
-from src.calc.volatility_models import (
-    fit_garch,
-    forecast_garch_volatility,
-    calculate_realized_volatility
-)
-
-from src.calc.covariance_estimation import estimate_covariance_ewma
-
 from src.calc.correlation_analysis import (
     analyze_asset_correlations,
     calculate_optimal_weights_for_correlation,
-    cluster_assets
+    cluster_assets,
+)
+from src.calc.covariance_estimation import estimate_covariance_ewma
+
+# Import main functions from submodules
+from src.calc.factor_models import (
+    cross_sectional_test,
+    estimate_capm,
+    estimate_fama_french,
+    time_series_test,
+)
+from src.calc.portfolio_optimization import (
+    efficient_frontier,
+    optimize_portfolio,
+    portfolio_return,
+    portfolio_sharpe_ratio,
+    portfolio_volatility,
+)
+from src.calc.tail_risk_measures import (
+    backtesting_var,
+    calculate_conditional_var,
+    calculate_historical_var,
+    calculate_parametric_var,
+)
+from src.calc.volatility_models import (
+    calculate_realized_volatility,
+    fit_garch,
+    forecast_garch_volatility,
 )
 
 # Public API
 __all__ = [
     # Asset pricing models
-    'estimate_capm',
-    'estimate_fama_french',
-    'time_series_test',
-    'cross_sectional_test',
-    
+    "estimate_capm",
+    "estimate_fama_french",
+    "time_series_test",
+    "cross_sectional_test",
     # Beta calculation
-    'calculate_beta',
-    
+    "calculate_beta",
     # Risk measurement
-    'calculate_historical_var',
-    'calculate_conditional_var',
-    'calculate_parametric_var',
-    'backtesting_var',
-    
+    "calculate_historical_var",
+    "calculate_conditional_var",
+    "calculate_parametric_var",
+    "backtesting_var",
     # Portfolio optimization
-    'optimize_portfolio',
-    'efficient_frontier',
-    'portfolio_return',
-    'portfolio_volatility',
-    'portfolio_sharpe_ratio',
-    
+    "optimize_portfolio",
+    "efficient_frontier",
+    "portfolio_return",
+    "portfolio_volatility",
+    "portfolio_sharpe_ratio",
     # Volatility models
-    'fit_garch',
-    'forecast_garch_volatility',
-    'calculate_realized_volatility',
-    
+    "fit_garch",
+    "forecast_garch_volatility",
+    "calculate_realized_volatility",
     # Covariance estimation
-    'estimate_covariance_ewma',
-
+    "estimate_covariance_ewma",
     # Correlation analysis
-    'analyze_asset_correlations',
-    'calculate_optimal_weights_for_correlation',
-    'cluster_assets'
+    "analyze_asset_correlations",
+    "calculate_optimal_weights_for_correlation",
+    "cluster_assets",
 ]
 
 """

@@ -30,26 +30,26 @@ from .adapter import DataSourceAdapter
 from .cache import get_cached_data
 from .data_api import DataAPI
 
-__all__ = ['DataSourceAdapter', 'get_cached_data', 'DataAPI']
+__all__ = ["DataSourceAdapter", "get_cached_data", "DataAPI"]
 
-#----------------------------------------------------------------------------#
+# ----------------------------------------------------------------------------#
 # Data Source Adapter API Function Documentation
-#----------------------------------------------------------------------------#
+# ----------------------------------------------------------------------------#
 
 # class DataSourceAdapter:
 #     """
 #     Data source adapter supporting data acquisition from AKShare and TuShare
-    
+
 #     This class is responsible for converting and standardizing data from different data sources, handling error conditions,
 #     and providing a unified interface to obtain stock prices, financial metrics and market data.
-    
+
 #     Main methods:
 #         convert_stock_code: Convert stock code format
 #         get_price_history: Get historical price data
 #         get_financial_metrics: Get financial metrics data
 #         get_financial_statements: Get financial statement data
 #         get_market_data: Get market data
-    
+
 #     Example:
 #         >>> adapter = DataSourceAdapter()
 #         >>> df = adapter.get_price_history("600519", "2022-01-01", "2022-12-31")
@@ -58,18 +58,18 @@ __all__ = ['DataSourceAdapter', 'get_cached_data', 'DataAPI']
 #         0   2022-01-04  2026.0  2078.0  2019.0  2064.0  12345678.0  2517546700.0
 #         ...
 #     """
-    
+
 #     @staticmethod
 #     def convert_stock_code(symbol):
 #         """
 #         Convert stock code format, return AKShare and TuShare corresponding code formats
-        
+
 #         Args:
 #             symbol (str): Stock code, can be with exchange prefix (like sh600519) or without prefix
-            
+
 #         Returns:
 #             tuple: (akshare_code, tushare_code, exchange_prefix), containing code formats suitable for different data sources
-            
+
 #         Example:
 #             >>> DataSourceAdapter.convert_stock_code("600519")
 #             ('600519', '600519.SH', 'sh')
@@ -77,17 +77,17 @@ __all__ = ['DataSourceAdapter', 'get_cached_data', 'DataAPI']
 #             ('sh600519', '600519.SH', 'sh')
 #         """
 #         pass
-    
+
 #     def get_price_history(self, symbol, start_date=None, end_date=None, adjust="qfq"):
 #         """
 #         Get historical price data, prioritize AKShare, fallback to TuShare on failure
-        
+
 #         Args:
 #             symbol (str): Stock code
 #             start_date (str, optional): Start date, format: YYYY-MM-DD
 #             end_date (str, optional): End date, format: YYYY-MM-DD
 #             adjust (str, optional): Adjustment type, "qfq": forward adjustment, "hfq": backward adjustment, "": no adjustment, default forward adjustment
-            
+
 #         Returns:
 #             pd.DataFrame: DataFrame containing price data, columns include:
 #                          - date: Date
@@ -98,7 +98,7 @@ __all__ = ['DataSourceAdapter', 'get_cached_data', 'DataAPI']
 #                          - volume: Trading volume
 #                          - amount: Trading amount
 #                          May include other columns such as price change, turnover rate, etc.
-            
+
 #         Example:
 #             >>> adapter = DataSourceAdapter()
 #             >>> df = adapter.get_price_history("600519", "2022-01-01", "2022-01-10")
@@ -109,14 +109,14 @@ __all__ = ['DataSourceAdapter', 'get_cached_data', 'DataAPI']
 #             ...
 #         """
 #         pass
-    
+
 #     def get_financial_metrics(self, symbol):
 #         """
 #         Get financial metrics data, prioritize AKShare, fallback to TuShare on failure
-        
+
 #         Args:
 #             symbol (str): Stock code
-            
+
 #         Returns:
 #             list: List of dictionaries containing financial metrics (usually one element), keys include:
 #                  - return_on_equity: Return on equity
@@ -132,7 +132,7 @@ __all__ = ['DataSourceAdapter', 'get_cached_data', 'DataAPI']
 #                  - pe_ratio: Price-to-earnings ratio
 #                  - price_to_book: Price-to-book ratio
 #                  - price_to_sales: Price-to-sales ratio
-            
+
 #         Example:
 #             >>> adapter = DataSourceAdapter()
 #             >>> metrics = adapter.get_financial_metrics("600519")
@@ -140,14 +140,14 @@ __all__ = ['DataSourceAdapter', 'get_cached_data', 'DataAPI']
 #             {'return_on_equity': 0.325, 'net_margin': 0.518, 'operating_margin': 0.652, ...}
 #         """
 #         pass
-    
+
 #     def get_financial_statements(self, symbol):
 #         """
 #         Get financial statements data, prioritize AKShare, fallback to TuShare on failure
-        
+
 #         Args:
 #             symbol (str): Stock code
-            
+
 #         Returns:
 #             list: List of dictionaries containing financial statements data, usually includes latest two periods, keys include:
 #                  - net_income: Net income
@@ -157,7 +157,7 @@ __all__ = ['DataSourceAdapter', 'get_cached_data', 'DataAPI']
 #                  - depreciation_and_amortization: Depreciation and amortization
 #                  - capital_expenditure: Capital expenditure
 #                  - free_cash_flow: Free cash flow
-            
+
 #         Example:
 #             >>> adapter = DataSourceAdapter()
 #             >>> statements = adapter.get_financial_statements("600519")
@@ -167,14 +167,14 @@ __all__ = ['DataSourceAdapter', 'get_cached_data', 'DataAPI']
 #             {'net_income': 4500000000, 'operating_revenue': 18000000000, ...}
 #         """
 #         pass
-    
+
 #     def get_market_data(self, symbol):
 #         """
 #         Get market data, prioritize AKShare, fallback to TuShare on failure
-        
+
 #         Args:
 #             symbol (str): Stock code
-            
+
 #         Returns:
 #             dict: Dictionary containing market data, keys include:
 #                  - market_cap: Market capitalization
@@ -182,7 +182,7 @@ __all__ = ['DataSourceAdapter', 'get_cached_data', 'DataAPI']
 #                  - average_volume: Average volume (usually 30-day)
 #                  - fifty_two_week_high: 52-week high price
 #                  - fifty_two_week_low: 52-week low price
-            
+
 #         Example:
 #             >>> adapter = DataSourceAdapter()
 #             >>> market_data = adapter.get_market_data("600519")
@@ -192,31 +192,31 @@ __all__ = ['DataSourceAdapter', 'get_cached_data', 'DataAPI']
 #         pass
 
 
-#----------------------------------------------------------------------------#
+# ----------------------------------------------------------------------------#
 # Data Cache Function Documentation
-#----------------------------------------------------------------------------#
+# ----------------------------------------------------------------------------#
 
 # def get_cached_data(key, fetch_func, *args, ttl_days=1, **kwargs):
 #     """
 #     Get data from cache, if cache is expired or doesn't exist, call fetch_func to get data
-    
+
 #     This function implements a simple data caching mechanism that can reduce repeated requests to data sources,
 #     and provides cache expiration and data conversion functionality.
-    
+
 #     Args:
 #         key (str): Cache key, used to identify data
 #         fetch_func (callable): Function to fetch data, called when cache is unavailable
 #         ttl_days (float, optional): Cache validity period (days), default 1 day
 #         *args, **kwargs: Parameters passed to fetch_func
-    
+
 #     Returns:
 #         Any type: Data returned by fetch_func, could be DataFrame, dict, list, etc.
-            
+
 #     Example:
 #         >>> def fetch_stock_data(symbol, start_date, end_date):
 #         ...     # Function to fetch stock data
 #         ...     return pd.DataFrame(...)
-#         >>> 
+#         >>>
 #         >>> # Use cache to get data, cache validity period is 7 days
 #         >>> data = get_cached_data(
 #         ...     f"stock_data_600519_2022",
@@ -228,40 +228,40 @@ __all__ = ['DataSourceAdapter', 'get_cached_data', 'DataAPI']
 #     pass
 
 
-#----------------------------------------------------------------------------#
+# ----------------------------------------------------------------------------#
 # Unified Data API Class Documentation
-#----------------------------------------------------------------------------#
+# ----------------------------------------------------------------------------#
 
 # class DataAPI:
 #     """
 #     Unified data API interface, encapsulates internal data source adapter implementation
-    
+
 #     This class is the main interface for external calls, providing simple methods to get stock prices, financial metrics,
 #     financial statements and market data, internally uses DataSourceAdapter
 #     to handle data source switching and error handling.
-    
+
 #     Main methods:
 #         get_price_data: Get stock price data
 #         get_financial_metrics: Get financial metrics data
 #         get_financial_statements: Get financial statements data
 #         get_market_data: Get market data
-    
+
 #     Example:
 #         >>> data_api = DataAPI()
 #         >>> # Get stock price data
 #         >>> df = data_api.get_price_data("600519", "2022-01-01", "2022-12-31")
 #         >>> print(df.head())
 #     """
-    
+
 #     def get_price_data(self, ticker, start_date=None, end_date=None):
 #         """
 #         Get stock price data
-        
+
 #         Args:
 #             ticker (str): Stock code
 #             start_date (str, optional): Start date, format: YYYY-MM-DD
 #             end_date (str, optional): End date, format: YYYY-MM-DD
-            
+
 #         Returns:
 #             pd.DataFrame: DataFrame containing price data, columns include:
 #                          - date: Date
@@ -272,7 +272,7 @@ __all__ = ['DataSourceAdapter', 'get_cached_data', 'DataAPI']
 #                          - volume: Trading volume
 #                          - amount: Trading amount
 #                          May include other columns such as price change, turnover rate, etc.
-            
+
 #         Example:
 #             >>> data_api = DataAPI()
 #             >>> df = data_api.get_price_data("600519", "2022-01-01", "2022-01-10")
@@ -282,21 +282,21 @@ __all__ = ['DataSourceAdapter', 'get_cached_data', 'DataAPI']
 #             ...
 #         """
 #         pass
-    
+
 #     def get_financial_metrics(self, ticker):
 #         """
 #         Get financial metrics data
-        
+
 #         Args:
 #             ticker (str): Stock code
-            
+
 #         Returns:
 #             list: List of dictionaries containing financial metrics (usually one element), keys include:
 #                  - return_on_equity: Return on equity
 #                  - net_margin: Net profit margin
 #                  - operating_margin: Operating profit margin
 #                  - and other financial metrics
-            
+
 #         Example:
 #             >>> data_api = DataAPI()
 #             >>> metrics = data_api.get_financial_metrics("600519")
@@ -304,17 +304,17 @@ __all__ = ['DataSourceAdapter', 'get_cached_data', 'DataAPI']
 #             {'return_on_equity': 0.325, 'net_margin': 0.518, ...}
 #         """
 #         pass
-    
+
 #     def get_financial_statements(self, ticker):
 #         """
 #         Get financial statements data
-        
+
 #         Args:
 #             ticker (str): Stock code
-            
+
 #         Returns:
 #             list: List of dictionaries containing financial statements data, usually includes latest two periods
-            
+
 #         Example:
 #             >>> data_api = DataAPI()
 #             >>> statements = data_api.get_financial_statements("600519")
@@ -322,17 +322,17 @@ __all__ = ['DataSourceAdapter', 'get_cached_data', 'DataAPI']
 #             {'net_income': 5000000000, 'operating_revenue': 20000000000, ...}
 #         """
 #         pass
-    
+
 #     def get_market_data(self, ticker):
 #         """
 #         Get market data
-        
+
 #         Args:
 #             ticker (str): Stock code
-            
+
 #         Returns:
 #             dict: Dictionary containing market data, including market cap, volume, 52-week high/low prices, etc.
-            
+
 #         Example:
 #             >>> data_api = DataAPI()
 #             >>> market_data = data_api.get_market_data("600519")
@@ -342,9 +342,9 @@ __all__ = ['DataSourceAdapter', 'get_cached_data', 'DataAPI']
 #         pass
 
 
-#----------------------------------------------------------------------------#
+# ----------------------------------------------------------------------------#
 # Complete Usage Examples
-#----------------------------------------------------------------------------#
+# ----------------------------------------------------------------------------#
 
 """
 The following are complete usage examples showing how to use the data_source_adapter module to fetch and process various types of data:

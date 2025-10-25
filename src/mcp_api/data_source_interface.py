@@ -1,19 +1,24 @@
 from abc import ABC, abstractmethod
+from typing import List, Optional
+
 import pandas as pd
-from typing import Optional, List
+
 
 class DataSourceError(Exception):
     """Base exception class for data source errors."""
+
     pass
 
 
 class LoginError(DataSourceError):
     """Exception raised when login to data source fails."""
+
     pass
 
 
 class NoDataFoundError(DataSourceError):
     """Exception raised when no data is found for a given query."""
+
     pass
 
 
@@ -83,7 +88,9 @@ class FinancialDataSource(ABC):
         pass
 
     @abstractmethod
-    def get_trade_dates(self, start_date: Optional[str] = None, end_date: Optional[str] = None) -> pd.DataFrame:
+    def get_trade_dates(
+        self, start_date: Optional[str] = None, end_date: Optional[str] = None
+    ) -> pd.DataFrame:
         """Get trading date information within a certain range."""
         pass
 
@@ -93,31 +100,46 @@ class FinancialDataSource(ABC):
         pass
 
     @abstractmethod
-    def get_deposit_rate_data(self, start_date: Optional[str] = None, end_date: Optional[str] = None) -> pd.DataFrame:
+    def get_deposit_rate_data(
+        self, start_date: Optional[str] = None, end_date: Optional[str] = None
+    ) -> pd.DataFrame:
         """Get benchmark deposit interest rates."""
         pass
 
     @abstractmethod
-    def get_loan_rate_data(self, start_date: Optional[str] = None, end_date: Optional[str] = None) -> pd.DataFrame:
+    def get_loan_rate_data(
+        self, start_date: Optional[str] = None, end_date: Optional[str] = None
+    ) -> pd.DataFrame:
         """Get benchmark loan interest rates."""
         pass
 
     @abstractmethod
-    def get_required_reserve_ratio_data(self, start_date: Optional[str] = None, end_date: Optional[str] = None, year_type: str = '0') -> pd.DataFrame:
+    def get_required_reserve_ratio_data(
+        self,
+        start_date: Optional[str] = None,
+        end_date: Optional[str] = None,
+        year_type: str = "0",
+    ) -> pd.DataFrame:
         """Get required reserve ratio data."""
         pass
 
     @abstractmethod
-    def get_money_supply_data_month(self, start_date: Optional[str] = None, end_date: Optional[str] = None) -> pd.DataFrame:
+    def get_money_supply_data_month(
+        self, start_date: Optional[str] = None, end_date: Optional[str] = None
+    ) -> pd.DataFrame:
         """Get monthly money supply data (M0, M1, M2)."""
         pass
 
     @abstractmethod
-    def get_money_supply_data_year(self, start_date: Optional[str] = None, end_date: Optional[str] = None) -> pd.DataFrame:
+    def get_money_supply_data_year(
+        self, start_date: Optional[str] = None, end_date: Optional[str] = None
+    ) -> pd.DataFrame:
         """Get annual money supply data (M0, M1, M2 - year-end balance)."""
         pass
 
     @abstractmethod
-    def get_shibor_data(self, start_date: Optional[str] = None, end_date: Optional[str] = None) -> pd.DataFrame:
+    def get_shibor_data(
+        self, start_date: Optional[str] = None, end_date: Optional[str] = None
+    ) -> pd.DataFrame:
         """Get SHIBOR (Shanghai Interbank Offered Rate) data."""
         pass

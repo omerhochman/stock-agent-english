@@ -8,10 +8,7 @@ Main Components:
 - CostModel: Trading cost model
 """
 
-from .trade_executor import TradeExecutor
 from .cost_model import CostModel
+from .trade_executor import TradeExecutor
 
-__all__ = [
-    "TradeExecutor",
-    "CostModel"
-] 
+__all__ = ["TradeExecutor", "CostModel"]

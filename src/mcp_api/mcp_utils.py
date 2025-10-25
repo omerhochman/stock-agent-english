@@ -1,23 +1,28 @@
-import baostock as bs
+import logging
 import os
 import sys
-import logging
 from contextlib import contextmanager
+
+import baostock as bs
+
 from .data_source_interface import LoginError
+
 
 # --- Logging setup ---
 def setup_logging(level=logging.INFO):
     """Configure basic logging for the application."""
     logging.basicConfig(
         level=level,
-        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-        datefmt='%Y-%m-%d %H:%M:%S'
+        format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+        datefmt="%Y-%m-%d %H:%M:%S",
     )
     # If dependency logs are too verbose, you can choose to silence them
     # logging.getLogger("mcp").setLevel(logging.WARNING)
 
+
 # Get a logger instance for this module (optional, but good practice)
 logger = logging.getLogger(__name__)
+
 
 # --- Baostock context manager ---
 @contextmanager
@@ -39,7 +44,7 @@ def baostock_login_context():
     os.dup2(saved_stdout_fd, original_stdout_fd)
     os.close(saved_stdout_fd)
 
-    if lg.error_code != '0':
+    if lg.error_code != "0":
         # Log error before throwing exception
         logger.error(f"Baostock login failed: {lg.error_msg}")
         raise LoginError(f"Baostock login failed: {lg.error_msg}")

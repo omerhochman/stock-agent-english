@@ -1,8 +1,12 @@
 import logging
 from typing import Callable, Optional
 
+from src.mcp_api.data_source_interface import (
+    DataSourceError,
+    LoginError,
+    NoDataFoundError,
+)
 from src.mcp_api.formatting.markdown_formatter import format_df_to_markdown
-from src.mcp_api.data_source_interface import NoDataFoundError, LoginError, DataSourceError
 
 logger = logging.getLogger(__name__)
 
@@ -14,7 +18,7 @@ def call_financial_data_tool(
     data_type_name: str,
     code: str,
     year: str,
-    quarter: int
+    quarter: int,
 ) -> str:
     """
     Helper function to reduce duplicate code in financial data tools
@@ -43,7 +47,8 @@ def call_financial_data_tool(
         # Call appropriate method on instantiated active_data_source
         df = data_source_method(code=code, year=year, quarter=quarter)
         logger.info(
-            f"Successfully retrieved {data_type_name} data for {code}, {year}Q{quarter}.")
+            f"Successfully retrieved {data_type_name} data for {code}, {year}Q{quarter}."
+        )
         # Use smaller limits for financial tables
         return format_df_to_markdown(df, max_rows=20, max_cols=10)
 
@@ -65,8 +70,7 @@ def call_financial_data_tool(
         return f"Error: Invalid input parameter. {e}"
     except Exception as e:
         # Unexpected exception
-        logger.exception(
-            f"Unexpected Exception processing {tool_name} for {code}: {e}")
+        logger.exception(f"Unexpected Exception processing {tool_name} for {code}: {e}")
         return f"Error: An unexpected error occurred: {e}"
 
 
@@ -76,7 +80,7 @@ def call_macro_data_tool(
     data_type_name: str,
     start_date: Optional[str] = None,
     end_date: Optional[str] = None,
-    **kwargs  # For additional parameters, e.g., year_type
+    **kwargs,  # For additional parameters, e.g., year_type
 ) -> str:
     """
     Helper function for macroeconomic data tools
@@ -97,8 +101,7 @@ def call_macro_data_tool(
     logger.info(f"Tool '{tool_name}' called {date_range_log}{kwargs_log}")
     try:
         # Call appropriate method on active_data_source
-        df = data_source_method(start_date=start_date,
-                                end_date=end_date, **kwargs)
+        df = data_source_method(start_date=start_date, end_date=end_date, **kwargs)
         logger.info(f"Successfully retrieved {data_type_name} data.")
         return format_df_to_markdown(df)
     except NoDataFoundError as e:
@@ -127,7 +130,7 @@ def call_index_constituent_tool(
     tool_name: str,
     data_source_method: Callable,
     index_name: str,
-    date: Optional[str] = None
+    date: Optional[str] = None,
 ) -> str:
     """
     Helper function for index constituent tools
@@ -147,7 +150,8 @@ def call_index_constituent_tool(
         # Add date validation if needed
         df = data_source_method(date=date)
         logger.info(
-            f"Successfully retrieved {index_name} constituents for {date or 'latest'}.")
+            f"Successfully retrieved {index_name} constituents for {date or 'latest'}."
+        )
         return format_df_to_markdown(df)
     except NoDataFoundError as e:
         # No data found error

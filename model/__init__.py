@@ -245,27 +245,25 @@ print(f"  Factor model: {factor_signals['signal']} ({factor_signals['confidence'
 ```
 """
 
-from model.dl import MLAgent, DeepLearningModule, preprocess_stock_data
-from model.rl import RLTradingAgent, RLTrader, StockTradingEnv
 from model.deap_factors import FactorAgent, FactorMiningModule
-from . import evaluate
-from . import split_evaluate
+from model.dl import DeepLearningModule, MLAgent, preprocess_stock_data
+from model.rl import RLTrader, RLTradingAgent, StockTradingEnv
+
+from . import evaluate, split_evaluate
 
 # Public API
 __all__ = [
     # Deep learning module
-    'MLAgent',
-    'DeepLearningModule',
-    'preprocess_stock_data',
-    
+    "MLAgent",
+    "DeepLearningModule",
+    "preprocess_stock_data",
     # Reinforcement learning module
-    'RLTradingAgent',
-    'RLTrader',
-    'StockTradingEnv',
-    
+    "RLTradingAgent",
+    "RLTrader",
+    "StockTradingEnv",
     # Genetic programming module
-    'FactorAgent',
-    'FactorMiningModule',
-    'evaluate',
-    'split_evaluate'
+    "FactorAgent",
+    "FactorMiningModule",
+    "evaluate",
+    "split_evaluate",
 ]

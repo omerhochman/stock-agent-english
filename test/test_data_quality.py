@@ -1,6 +1,7 @@
 # Data processing example
-from src.tools.api import get_price_history, get_financial_metrics
 import matplotlib.pyplot as plt
+
+from src.tools.api import get_financial_metrics, get_price_history
 
 # Get high-quality price data
 ticker = "600519"
@@ -14,7 +15,7 @@ print(f"Number of missing values in data: {price_df.isna().sum().sum()}")
 
 # Plot price chart
 plt.figure(figsize=(12, 6))
-plt.plot(price_df.index, price_df['close'])
+plt.plot(price_df.index, price_df["close"])
 plt.title(f"{ticker} Closing Price")
 plt.xlabel("Date")
 plt.ylabel("Price")

@@ -1,10 +1,10 @@
 import functools
 import io
-import sys
 import logging
+import sys
 from contextvars import ContextVar
-from typing import Any, Callable, Optional
 from datetime import datetime, timezone
+from typing import Any, Callable, Optional
 
 UTC = timezone.utc
 
@@ -22,48 +22,53 @@ current_run_id_context: ContextVar[Optional[str]] = ContextVar(
     "current_run_id_context", default=None
 )
 
+
 # Simple in-memory storage class for log information
 class SimpleLogStorage:
     def __init__(self):
         self.llm_logs = []
         self.agent_logs = []
-    
+
     def add_log(self, log_entry):
         """Add LLM interaction log"""
         self.llm_logs.append(log_entry)
-    
+
     def add_agent_log(self, log_entry):
         """Add Agent execution log"""
         self.agent_logs.append(log_entry)
-    
+
     def get_logs(self, agent_name=None, run_id=None):
         """Get LLM interaction logs matching criteria"""
         if not agent_name and not run_id:
             return self.llm_logs
-        
+
         filtered_logs = []
         for log in self.llm_logs:
-            if (agent_name is None or log.get("agent_name") == agent_name) and \
-               (run_id is None or log.get("run_id") == run_id):
+            if (agent_name is None or log.get("agent_name") == agent_name) and (
+                run_id is None or log.get("run_id") == run_id
+            ):
                 filtered_logs.append(log)
-        
+
         return filtered_logs
-    
+
     def get_agent_logs(self, agent_name=None, run_id=None):
         """Get Agent execution logs matching criteria"""
         if not agent_name and not run_id:
             return self.agent_logs
-        
+
         filtered_logs = []
         for log in self.agent_logs:
-            if (agent_name is None or log.get("agent_name") == agent_name) and \
-               (run_id is None or log.get("run_id") == run_id):
+            if (agent_name is None or log.get("agent_name") == agent_name) and (
+                run_id is None or log.get("run_id") == run_id
+            ):
                 filtered_logs.append(log)
-        
+
         return filtered_logs
+
 
 # Global log storage instance
 _log_storage = SimpleLogStorage()
+
 
 # --- Output Capture Utility ---
 class OutputCapture:
@@ -136,8 +141,9 @@ def wrap_llm_call(original_llm_func: Callable) -> Callable:
 
         # Assume the first argument is usually the list of messages or prompt
         # This might need adjustment if the wrapped function signature varies
-        request_data = args[0] if args else kwargs.get(
-            'messages', kwargs)  # Adapt based on common usage
+        request_data = (
+            args[0] if args else kwargs.get("messages", kwargs)
+        )  # Adapt based on common usage
 
         # Execute the original LLM call
         response_data = original_llm_func(*args, **kwargs)
@@ -148,7 +154,7 @@ def wrap_llm_call(original_llm_func: Callable) -> Callable:
             "run_id": run_id,  # run_id can be None if not set
             "request_data": request_data,  # Consider serializing complex objects if needed
             "response_data": response_data,  # Consider serializing complex objects if needed
-            "timestamp": datetime.now(UTC).isoformat()  # Explicit timestamp
+            "timestamp": datetime.now(UTC).isoformat(),  # Explicit timestamp
         }
         _log_storage.add_log(log_entry)
 
@@ -179,7 +185,7 @@ def log_agent_execution(agent_name: str):
 
             # Capture start time and input state
             timestamp_start = datetime.now(UTC)
-            
+
             # Serialize input state
             serialized_input = state.copy() if isinstance(state, dict) else state
 
@@ -199,14 +205,20 @@ def log_agent_execution(agent_name: str):
                 terminal_outputs = output_capture.outputs
 
                 # Serialize output state
-                serialized_output = result_state.copy() if isinstance(result_state, dict) else result_state
+                serialized_output = (
+                    result_state.copy()
+                    if isinstance(result_state, dict)
+                    else result_state
+                )
 
                 # Extract reasoning details (if any)
                 reasoning_details = None
                 if result_state and isinstance(result_state, dict):
                     if result_state.get("metadata", {}).get("show_reasoning", False):
                         if "agent_reasoning" in result_state.get("metadata", {}):
-                            reasoning_details = result_state["metadata"]["agent_reasoning"]
+                            reasoning_details = result_state["metadata"][
+                                "agent_reasoning"
+                            ]
 
                 # Create log entry
                 log_entry = {
@@ -217,7 +229,7 @@ def log_agent_execution(agent_name: str):
                     "input_state": serialized_input,
                     "output_state": serialized_output,
                     "reasoning_details": reasoning_details,
-                    "terminal_outputs": terminal_outputs
+                    "terminal_outputs": terminal_outputs,
                 }
 
                 # Store log
@@ -235,10 +247,10 @@ def log_agent_execution(agent_name: str):
                     "input_state": serialized_input,
                     "output_state": {"error": error},
                     "reasoning_details": None,
-                    "terminal_outputs": output_capture.outputs
+                    "terminal_outputs": output_capture.outputs,
                 }
                 _log_storage.add_agent_log(log_entry)
-                
+
                 # Re-raise exception for upper level handling
                 raise
             finally:
@@ -247,7 +259,9 @@ def log_agent_execution(agent_name: str):
                 current_run_id_context.reset(run_id_token)
 
             return result_state
+
         return wrapper
+
     return decorator
 
 

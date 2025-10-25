@@ -1,6 +1,7 @@
 # Single investment decision example
-from src.main import run_hedge_fund
 import uuid
+
+from src.main import run_hedge_fund
 
 # Generate unique run ID
 run_id = str(uuid.uuid4())
@@ -16,7 +17,7 @@ result = run_hedge_fund(
     end_date="2023-12-31",
     portfolio=portfolio,
     show_reasoning=True,
-    num_of_news=5
+    num_of_news=5,
 )
 
 # Print results

@@ -2,7 +2,13 @@ import logging
 from typing import List, Optional
 
 from mcp.server.fastmcp import FastMCP
-from src.mcp_api.data_source_interface import FinancialDataSource, NoDataFoundError, LoginError, DataSourceError
+
+from src.mcp_api.data_source_interface import (
+    DataSourceError,
+    FinancialDataSource,
+    LoginError,
+    NoDataFoundError,
+)
 from src.mcp_api.formatting.markdown_formatter import format_df_to_markdown
 
 logger = logging.getLogger(__name__)
@@ -55,11 +61,12 @@ def register_stock_market_tools(app: FastMCP, active_data_source: FinancialDataS
             If result set is too large, table may be truncated.
         """
         logger.info(
-            f"Tool 'get_historical_k_data' called for {code} ({start_date}-{end_date}, freq={frequency}, adj={adjust_flag}, fields={fields})")
+            f"Tool 'get_historical_k_data' called for {code} ({start_date}-{end_date}, freq={frequency}, adj={adjust_flag}, fields={fields})"
+        )
         try:
             # Validate frequency and adjustment flag (if necessary)
-            valid_freqs = ['d', 'w', 'm', '5', '15', '30', '60']
-            valid_adjusts = ['1', '2', '3']
+            valid_freqs = ["d", "w", "m", "5", "15", "30", "60"]
+            valid_adjusts = ["1", "2", "3"]
             if frequency not in valid_freqs:
                 logger.warning(f"Invalid frequency requested: {frequency}")
                 return f"Error: Invalid frequency '{frequency}'. Valid options are: {valid_freqs}"
@@ -78,7 +85,8 @@ def register_stock_market_tools(app: FastMCP, active_data_source: FinancialDataS
             )
             # Format result
             logger.info(
-                f"Successfully retrieved K-data for {code}, formatting to Markdown.")
+                f"Successfully retrieved K-data for {code}, formatting to Markdown."
+            )
             return format_df_to_markdown(df)
 
         except NoDataFoundError as e:
@@ -100,7 +108,8 @@ def register_stock_market_tools(app: FastMCP, active_data_source: FinancialDataS
         except Exception as e:
             # Catch all unexpected errors
             logger.exception(
-                f"Unexpected Exception processing get_historical_k_data for {code}: {e}")
+                f"Unexpected Exception processing get_historical_k_data for {code}: {e}"
+            )
             return f"Error: An unexpected error occurred: {e}"
 
     @app.tool()
@@ -117,17 +126,16 @@ def register_stock_market_tools(app: FastMCP, active_data_source: FinancialDataS
         Returns:
             Markdown format string containing basic stock information table, or error message
         """
-        logger.info(
-            f"Tool 'get_stock_basic_info' called for {code} (fields={fields})")
+        logger.info(f"Tool 'get_stock_basic_info' called for {code} (fields={fields})")
         try:
             # Call injected data source
             # Pass fields parameter; BaostockDataSource implementation will handle selection
-            df = active_data_source.get_stock_basic_info(
-                code=code, fields=fields)
+            df = active_data_source.get_stock_basic_info(code=code, fields=fields)
 
             # Format result (basic info is usually small, use default truncation)
             logger.info(
-                f"Successfully retrieved basic info for {code}, formatting to Markdown.")
+                f"Successfully retrieved basic info for {code}, formatting to Markdown."
+            )
             # Basic info uses smaller limits
             return format_df_to_markdown(df, max_rows=10, max_cols=10)
 
@@ -146,11 +154,14 @@ def register_stock_market_tools(app: FastMCP, active_data_source: FinancialDataS
         except ValueError as e:
             # Value error
             logger.warning(f"ValueError processing request for {code}: {e}")
-            return f"Error: Invalid input parameter or requested field not available. {e}"
+            return (
+                f"Error: Invalid input parameter or requested field not available. {e}"
+            )
         except Exception as e:
             # Unexpected exception
             logger.exception(
-                f"Unexpected Exception processing get_stock_basic_info for {code}: {e}")
+                f"Unexpected Exception processing get_stock_basic_info for {code}: {e}"
+            )
             return f"Error: An unexpected error occurred: {e}"
 
     @app.tool()
@@ -170,10 +181,11 @@ def register_stock_market_tools(app: FastMCP, active_data_source: FinancialDataS
             Markdown format string containing dividend data table, or error message
         """
         logger.info(
-            f"Tool 'get_dividend_data' called for {code}, year={year}, year_type={year_type}")
+            f"Tool 'get_dividend_data' called for {code}, year={year}, year_type={year_type}"
+        )
         try:
             # Basic validation
-            if year_type not in ['report', 'operate']:
+            if year_type not in ["report", "operate"]:
                 logger.warning(f"Invalid year_type requested: {year_type}")
                 return f"Error: Invalid year_type '{year_type}'. Valid options are: 'report', 'operate'"
             if not year.isdigit() or len(year) != 4:
@@ -181,9 +193,11 @@ def register_stock_market_tools(app: FastMCP, active_data_source: FinancialDataS
                 return f"Error: Invalid year '{year}'. Please provide a 4-digit year."
 
             df = active_data_source.get_dividend_data(
-                code=code, year=year, year_type=year_type)
+                code=code, year=year, year_type=year_type
+            )
             logger.info(
-                f"Successfully retrieved dividend data for {code}, year {year}.")
+                f"Successfully retrieved dividend data for {code}, year {year}."
+            )
             return format_df_to_markdown(df)
 
         except NoDataFoundError as e:
@@ -205,7 +219,8 @@ def register_stock_market_tools(app: FastMCP, active_data_source: FinancialDataS
         except Exception as e:
             # Unexpected exception
             logger.exception(
-                f"Unexpected Exception processing get_dividend_data for {code}: {e}")
+                f"Unexpected Exception processing get_dividend_data for {code}: {e}"
+            )
             return f"Error: An unexpected error occurred: {e}"
 
     @app.tool()
@@ -223,13 +238,14 @@ def register_stock_market_tools(app: FastMCP, active_data_source: FinancialDataS
             Markdown format string containing adjustment factor data table, or error message
         """
         logger.info(
-            f"Tool 'get_adjust_factor_data' called for {code} ({start_date} to {end_date})")
+            f"Tool 'get_adjust_factor_data' called for {code} ({start_date} to {end_date})"
+        )
         try:
             # Basic date validation can be added here if needed
             df = active_data_source.get_adjust_factor_data(
-                code=code, start_date=start_date, end_date=end_date)
-            logger.info(
-                f"Successfully retrieved adjustment factor data for {code}.")
+                code=code, start_date=start_date, end_date=end_date
+            )
+            logger.info(f"Successfully retrieved adjustment factor data for {code}.")
             return format_df_to_markdown(df)
 
         except NoDataFoundError as e:
@@ -251,5 +267,6 @@ def register_stock_market_tools(app: FastMCP, active_data_source: FinancialDataS
         except Exception as e:
             # Unexpected exception
             logger.exception(
-                f"Unexpected Exception processing get_adjust_factor_data for {code}: {e}")
+                f"Unexpected Exception processing get_adjust_factor_data for {code}: {e}"
+            )
             return f"Error: An unexpected error occurred: {e}"

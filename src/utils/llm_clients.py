@@ -1,12 +1,14 @@
 import os
 import time
-import backoff
 from abc import ABC, abstractmethod
+
+import backoff
 from openai import OpenAI
-from src.utils.logging_config import setup_logger, SUCCESS_ICON, ERROR_ICON, WAIT_ICON
+
+from src.utils.logging_config import ERROR_ICON, SUCCESS_ICON, WAIT_ICON, setup_logger
 
 # Setup logging
-logger = setup_logger('llm_clients')
+logger = setup_logger("llm_clients")
 
 
 class LLMClient(ABC):
@@ -27,33 +29,34 @@ class OpenAIClient(LLMClient):
         self.model = model or os.getenv("OPENAI_COMPATIBLE_MODEL")
 
         if not self.api_key:
-            logger.error(f"{ERROR_ICON} OPENAI_COMPATIBLE_API_KEY environment variable not found")
+            logger.error(
+                f"{ERROR_ICON} OPENAI_COMPATIBLE_API_KEY environment variable not found"
+            )
             raise ValueError(
-                "OPENAI_COMPATIBLE_API_KEY not found in environment variables")
+                "OPENAI_COMPATIBLE_API_KEY not found in environment variables"
+            )
 
         if not self.base_url:
-            logger.error(f"{ERROR_ICON} OPENAI_COMPATIBLE_BASE_URL environment variable not found")
+            logger.error(
+                f"{ERROR_ICON} OPENAI_COMPATIBLE_BASE_URL environment variable not found"
+            )
             raise ValueError(
-                "OPENAI_COMPATIBLE_BASE_URL not found in environment variables")
+                "OPENAI_COMPATIBLE_BASE_URL not found in environment variables"
+            )
 
         if not self.model:
-            logger.error(f"{ERROR_ICON} OPENAI_COMPATIBLE_MODEL environment variable not found")
+            logger.error(
+                f"{ERROR_ICON} OPENAI_COMPATIBLE_MODEL environment variable not found"
+            )
             raise ValueError(
-                "OPENAI_COMPATIBLE_MODEL not found in environment variables")
+                "OPENAI_COMPATIBLE_MODEL not found in environment variables"
+            )
 
         # Initialize OpenAI client
-        self.client = OpenAI(
-            base_url=self.base_url,
-            api_key=self.api_key
-        )
+        self.client = OpenAI(base_url=self.base_url, api_key=self.api_key)
         logger.info(f"{SUCCESS_ICON} OpenAI Compatible client initialized successfully")
 
-    @backoff.on_exception(
-        backoff.expo,
-        (Exception),
-        max_tries=5,
-        max_time=300
-    )
+    @backoff.on_exception(backoff.expo, (Exception), max_tries=5, max_time=300)
     def call_api_with_retry(self, messages, stream=False):
         """API call function with retry mechanism"""
         try:
@@ -62,9 +65,7 @@ class OpenAIClient(LLMClient):
             logger.debug(f"Model: {self.model}, Stream: {stream}")
 
             response = self.client.chat.completions.create(
-                model=self.model,
-                messages=messages,
-                stream=stream
+                model=self.model, messages=messages, stream=stream
             )
 
             logger.info(f"{SUCCESS_ICON} API call successful")
@@ -87,11 +88,13 @@ class OpenAIClient(LLMClient):
 
                     if response is None:
                         logger.warning(
-                            f"{ERROR_ICON} Attempt {attempt + 1}/{max_retries}: API returned null value")
+                            f"{ERROR_ICON} Attempt {attempt + 1}/{max_retries}: API returned null value"
+                        )
                         if attempt < max_retries - 1:
-                            retry_delay = initial_retry_delay * (2 ** attempt)
+                            retry_delay = initial_retry_delay * (2**attempt)
                             logger.info(
-                                f"{WAIT_ICON} Waiting {retry_delay} seconds before retry...")
+                                f"{WAIT_ICON} Waiting {retry_delay} seconds before retry..."
+                            )
                             time.sleep(retry_delay)
                             continue
                         return None
@@ -106,10 +109,13 @@ class OpenAIClient(LLMClient):
 
                 except Exception as e:
                     logger.error(
-                        f"{ERROR_ICON} Attempt {attempt + 1}/{max_retries} failed: {str(e)}")
+                        f"{ERROR_ICON} Attempt {attempt + 1}/{max_retries} failed: {str(e)}"
+                    )
                     if attempt < max_retries - 1:
-                        retry_delay = initial_retry_delay * (2 ** attempt)
-                        logger.info(f"{WAIT_ICON} Waiting {retry_delay} seconds before retry...")
+                        retry_delay = initial_retry_delay * (2**attempt)
+                        logger.info(
+                            f"{WAIT_ICON} Waiting {retry_delay} seconds before retry..."
+                        )
                         time.sleep(retry_delay)
                     else:
                         logger.error(f"{ERROR_ICON} Final error: {str(e)}")
@@ -137,5 +143,5 @@ class LLMClientFactory:
         return OpenAIClient(
             api_key=kwargs.get("api_key"),
             base_url=kwargs.get("base_url"),
-            model=kwargs.get("model")
+            model=kwargs.get("model"),
         )

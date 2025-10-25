@@ -3,8 +3,8 @@ Serialization utilities - for converting complex Python objects to JSON serializ
 """
 
 import json
+from datetime import UTC, datetime
 from typing import Any, Dict
-from datetime import datetime, UTC
 
 
 def serialize_agent_state(state: Dict) -> Dict:
@@ -27,20 +27,17 @@ def serialize_agent_state(state: Dict) -> Dict:
         return {
             "error": f"Unable to serialize state: {str(e)}",
             "serialization_error": True,
-            "timestamp": datetime.now(UTC).isoformat()
+            "timestamp": datetime.now(UTC).isoformat(),
         }
 
 
 def _convert_to_serializable(obj: Any) -> Any:
     """Recursively convert object to JSON serializable format"""
-    if hasattr(obj, 'to_dict'):  # Handle Pandas Series/DataFrame
+    if hasattr(obj, "to_dict"):  # Handle Pandas Series/DataFrame
         return obj.to_dict()
-    elif hasattr(obj, 'content') and hasattr(obj, 'type'):  # Might be LangChain message
-        return {
-            "content": _convert_to_serializable(obj.content),
-            "type": obj.type
-        }
-    elif hasattr(obj, '__dict__'):  # Handle custom objects
+    elif hasattr(obj, "content") and hasattr(obj, "type"):  # Might be LangChain message
+        return {"content": _convert_to_serializable(obj.content), "type": obj.type}
+    elif hasattr(obj, "__dict__"):  # Handle custom objects
         return _convert_to_serializable(obj.__dict__)
     elif isinstance(obj, (int, float, bool, str, type(None))):
         return obj
